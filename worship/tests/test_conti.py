@@ -61,6 +61,12 @@ class NormalizeTests(unittest.TestCase):
         kept, short = conti.trim(r["hymns"], conti.DIST_HYMN)
         self.assertEqual((len(kept), short), (9, {"느린곡": 1}))
 
+    def test_trim_with_partial_dist(self):
+        items = [{"title": "a", "tempo": "빠른곡"}, {"title": "b", "tempo": "느린곡"}, {"title": "c", "tempo": "빠른곡"}]
+        kept, short = conti.trim(items, {"빠른곡": 1})          # 중간·느린 정원 없음 → KeyError 없이 빠른곡 1개만
+        self.assertEqual([k["title"] for k in kept], ["a"])
+        self.assertEqual(short, {})
+
     def test_verify_hymns_by_youtube_title(self):
         hymns = [{"no": 430, "title": "주와 같이 길 가는 것", "tempo": "중간곡", "key": "E"},
                  {"no": 999, "title": "없는 찬송", "tempo": "빠른곡", "key": "G"},
@@ -107,6 +113,28 @@ class YoutubeTests(unittest.TestCase):
             conti.attach_links(rec, workers=1)
         self.assertEqual(seen, ["a 찬양팀", "새찬송가 305장 b"])            # url 있는 항목은 다시 검색하지 않음
         self.assertTrue(rec["hymns"][0]["url"].startswith("https://y/"))
+
+
+class PdfInputTests(unittest.TestCase):
+    def test_pdf_only_saves_pdf_not_hwp(self):
+        import tempfile
+        calls = []
+        class FG:
+            def find_child(self, *a, **k): return None
+            def create_folder(self, parent, name): return {"id": "F", "webViewLink": "https://f"}
+        def fake_save(g, fid, name, path=None, data=None, mime="", convert_to=None):
+            calls.append(name); return {"name": name, "link": "https://x", "status": "uploaded"}
+        with tempfile.TemporaryDirectory() as td:
+            pdf = Path(td) / "20260920 주일 주보.pdf"; pdf.write_bytes(b"%PDF-1.4 fake")
+            with mock.patch.object(conti, "hwp_to_markdown", return_value=FIX), \
+                 mock.patch.object(conti, "refresh_repertoire", return_value={}), \
+                 mock.patch.object(conti, "recommend", return_value={"theme": "", "ccm": [], "hymns": [], "counts": {}, "short": {}}), \
+                 mock.patch.object(conti, "save_to_folder", fake_save), \
+                 mock.patch.object(conti.prep, "G", lambda tok: FG()), mock.patch.object(conti.prep, "access_token", lambda: "t"), \
+                 mock.patch.object(conti, "hwp_to_pdf", side_effect=AssertionError("PDF 입력엔 변환하면 안 됨")), \
+                 mock.patch.object(conti, "OUT", Path(td) / "out"), mock.patch.object(conti, "log"), mock.patch("builtins.print"):
+                conti.run(pdf, None, date(2026, 9, 20), "이경진", dry_run=False, no_youtube=True, notify=False)
+        self.assertEqual(calls, ["20260920 주일 주보.pdf", "20260920 콘티 추천"])   # HWP 없음 → PDF 와 추천문서만
 
 
 class FormatTests(unittest.TestCase):

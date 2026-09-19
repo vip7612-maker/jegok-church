@@ -11,7 +11,7 @@
   5) 곡마다 yt-dlp 로 유튜브 링크 확보 → 지정 형식으로 출력, 폴더에 `YYYYMMDD 콘티 추천` 구글문서로도 저장
   6) --notify 면 텔레그램(경진비서방)에 발송
 
-사용:  python3 conti.py 주보.hwp [--pdf 주보.pdf] [--date 2026-09-20] [--leader 이경진] [--dry-run] [--notify]
+사용:  python3 conti.py 주보.hwp|주보.pdf [--pdf 주보.pdf] [--date 2026-09-20] [--leader 이경진] [--dry-run] [--notify]
        --dry-run : 드라이브 업로드·텔레그램 없이 변환+추천만 (out/ 에 결과)
        --no-youtube : 링크 검색 생략(빠른 확인용)
 """
@@ -66,6 +66,7 @@ def date_from_filename(name: str) -> date | None:
 
 # ── 변환·추출 ────────────────────────────────────────────────
 def hwp_to_markdown(hwp: Path, workdir: Path) -> str:
+    """HWP·HWPX·PDF 무엇이든 kordoc 이 Markdown 으로 (이름은 역사적 이유로 hwp_)."""
     out = workdir / "jubo.md"
     r = subprocess.run(["npx", "-y", "kordoc@^4", str(hwp), "-o", str(out)], capture_output=True, text=True, timeout=600)
     if not out.exists():
@@ -250,11 +251,12 @@ def normalize(data: dict) -> dict:
 
 
 def trim(items: list[dict], dist: dict) -> tuple[list[dict], dict]:
+    """정원(dist)대로 템포별로 자른다. dist 에 없는 템포는 정원 0 (부분 정원으로 호출돼도 안전)."""
     kept, seen = [], {t: 0 for t in TEMPOS}
     for it in items:
-        if seen[it["tempo"]] < dist[it["tempo"]]:
+        if seen[it["tempo"]] < dist.get(it["tempo"], 0):
             kept.append(it); seen[it["tempo"]] += 1
-    return kept, {k: dist[k] - seen[k] for k in TEMPOS if seen[k] < dist[k]}
+    return kept, {k: dist.get(k, 0) - seen[k] for k in TEMPOS if seen[k] < dist.get(k, 0)}
 
 
 def _tokens(title: str) -> list[str]:
@@ -392,6 +394,9 @@ def run(hwp: Path, pdf: Path | None, d: date, leader: str, dry_run: bool, no_you
         sermon["summary"] = "\n".join(_plain(md))[:3000]
 
     pdf_note = ""
+    is_pdf_input = hwp.suffix.lower() == ".pdf"
+    if is_pdf_input and pdf is None:      # PDF 만 받은 경우: 변환 없이 그 PDF 를 저장
+        pdf = hwp
     if pdf is None:
         try:
             pdf = hwp_to_pdf(hwp, work / f"{ymd} 주일 주보.pdf")
@@ -434,7 +439,8 @@ def run(hwp: Path, pdf: Path | None, d: date, leader: str, dry_run: bool, no_you
         fname = prep.folder_name(d, leader)
         folder = g.find_child(prep.WORK_FOLDER, fname, prep.FOLDER_MIME) or g.create_folder(prep.WORK_FOLDER, fname)
         fid = folder["id"]
-        saved.append(save_to_folder(g, fid, f"{ymd} 주일 주보.hwp", path=hwp, mime=HWP_MIME))
+        if not is_pdf_input:
+            saved.append(save_to_folder(g, fid, f"{ymd} 주일 주보{hwp.suffix.lower()}", path=hwp, mime=HWP_MIME))
         if pdf:
             saved.append(save_to_folder(g, fid, f"{ymd} 주일 주보{pdf_note}.pdf", path=pdf, mime=PDF_MIME))
         saved.append(save_to_folder(g, fid, f"{ymd} 콘티 추천", data=text.encode("utf-8"), mime="text/plain",
@@ -456,8 +462,8 @@ def run(hwp: Path, pdf: Path | None, d: date, leader: str, dry_run: bool, no_you
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="주보 HWP → 콘티 추천")
-    ap.add_argument("hwp")
-    ap.add_argument("--pdf", help="한글에서 내보낸 PDF (있으면 자동변환 대신 사용)")
+    ap.add_argument("hwp", help="주보 파일 — .hwp/.hwpx 또는 .pdf (PDF 만 있으면 그대로 저장하고 본문만 읽는다)")
+    ap.add_argument("--pdf", help="한글에서 내보낸 PDF (HWP 와 함께 받았을 때; 자동변환 대신 사용)")
     ap.add_argument("--date"); ap.add_argument("--leader", default=prep.DEFAULT_LEADER)
     ap.add_argument("--dry-run", action="store_true"); ap.add_argument("--no-youtube", action="store_true")
     ap.add_argument("--notify", action="store_true")
