@@ -146,7 +146,7 @@ class FormatTests(unittest.TestCase):
                "hymns": [{"no": 305, "title": "나 같은 죄인 살리신", "key": "G", "tempo": "느린곡", "url": "http://h"}]}
         t = conti.format_text(date(2026, 9, 20), {"title": "귀향 공동체", "scripture": "역대상 9:1-44"}, rec)
         self.assertIn("🎵 9/20(일) 주일예배 콘티 추천", t)
-        self.assertIn("<빠른곡>\n1. 아름다운 마음들이 모여서 C코드 http://a", t)
+        self.assertIn("<빠른곡>\n1. 아름다운 마음들이 모여서 C코드 http://a\n   악보: https://www.google.com/search?tbm=isch&q=", t)
         self.assertIn("<중간곡>\n1. 주 은혜임을 G코드 (링크 못 찾음)", t)
         self.assertIn("[찬송가 1곡]", t)
         self.assertIn("1. 305장 나 같은 죄인 살리신 G코드 http://h", t)
@@ -158,7 +158,10 @@ class FormatTests(unittest.TestCase):
                        {"title": "링크없음", "key": "D", "tempo": "중간곡", "url": ""}],
                "hymns": [{"no": 305, "title": "나 같은 죄인 살리신", "key": "G", "tempo": "느린곡", "url": "https://youtu.be/h"}]}
         h = conti.format_html(date(2026, 9, 20), {"title": "귀향", "scripture": "역대상 9:1-44"}, rec, "https://drive.google.com/drive/folders/1VM61P_X")
-        self.assertIn('1. <a href="https://youtu.be/a?x=1&amp;y=2">주 은혜임을 &lt;G&gt;</a> G코드', h)   # 제목이 링크, 특수문자 이스케이프
+        self.assertIn('1. <a href="https://youtu.be/a?x=1&amp;y=2">주 은혜임을 &lt;G&gt;</a> G코드, <a href="https://www.google.com/search?tbm=isch&amp;q=%EC%A3%BC+', h)   # 제목 링크 + 악보(구글 이미지) 링크
+        self.assertIn(">악보</a>", h)
+        self.assertIn("q=%EC%83%88%EC%B0%AC%EC%86%A1%EA%B0%80+305%EC%9E%A5+", h)                 # 찬송가는 '새찬송가 305장 …악보'
+        self.assertEqual(conti.sheet_url({"title": "왕 되신 주께 감사하세"}), "https://www.google.com/search?tbm=isch&q=%EC%99%95+%EB%90%98%EC%8B%A0+%EC%A3%BC%EA%BB%98+%EA%B0%90%EC%82%AC%ED%95%98%EC%84%B8+%EC%95%85%EB%B3%B4")
         self.assertIn("1. 링크없음 (링크 못 찾음) D코드", h)
         self.assertIn('<a href="https://youtu.be/h">305장 나 같은 죄인 살리신</a> G코드', h)
         self.assertIn("&lt;빠른곡&gt;", h)                                  # 섹션 표시는 텍스트로

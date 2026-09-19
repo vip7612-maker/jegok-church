@@ -338,7 +338,7 @@ def format_text(d: date, sermon: dict, rec: dict) -> str:
                 no = f"{it['no']}장 " if it.get("no") else ""
                 key = f" {it['key']}코드" if it.get("key") else ""
                 url = f" {it['url']}" if it.get("url") else " (링크 못 찾음)"
-                out.append(f"{i}. {no}{it['title']}{key}{url}")
+                out.append(f"{i}. {no}{it['title']}{key}{url}\n   악보: {sheet_url(it)}")
         return out
     lines = head + block(rec["ccm"], f"CCM {len(rec['ccm'])}곡") + block(rec["hymns"], f"찬송가 {len(rec['hymns'])}곡")
     if rec.get("short"):
@@ -348,6 +348,12 @@ def format_text(d: date, sermon: dict, rec: dict) -> str:
 
 def _h(s: str) -> str:
     return html.escape(str(s), quote=True)
+
+
+def sheet_url(it: dict) -> str:
+    """구글 이미지 검색 '곡명 악보' (찬송가는 '새찬송가 N장 곡명 악보')."""
+    q = (f"새찬송가 {it['no']}장 " if it.get("no") else "") + f"{it['title']} 악보"
+    return "https://www.google.com/search?tbm=isch&q=" + urllib.parse.quote_plus(q)
 
 
 def format_html(d: date, sermon: dict, rec: dict, folder_link: str = "") -> str:
@@ -367,7 +373,7 @@ def format_html(d: date, sermon: dict, rec: dict, folder_link: str = "") -> str:
                 name = f"{no}{_h(it['title'])}"
                 link = f'<a href="{_h(it["url"])}">{name}</a>' if it.get("url") else f"{name} (링크 못 찾음)"
                 key = f" {_h(it['key'])}코드" if it.get("key") else ""
-                out.append(f"{i}. {link}{key}")
+                out.append(f'{i}. {link}{key}, <a href="{_h(sheet_url(it))}">악보</a>')
     block(rec["ccm"], f"CCM {len(rec['ccm'])}곡")
     block(rec["hymns"], f"찬송가 {len(rec['hymns'])}곡")
     if rec.get("short"):
@@ -450,11 +456,19 @@ def save_to_folder(g: prep.G, folder_id: str, name: str, path: Path | None = Non
 
 
 # ── 실행 ─────────────────────────────────────────────────────
-def run(hwp: Path, pdf: Path | None, d: date, leader: str, dry_run: bool, no_youtube: bool, notify: bool, redo: bool = False) -> int:
+def run(hwp: Path, pdf: Path | None, d: date, leader: str, dry_run: bool, no_youtube: bool, notify: bool,
+        redo: bool = False, from_cache: bool = False) -> int:
     OUT.mkdir(exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="conti-"))
     g = None if dry_run else prep.G(prep.access_token())
     ymd = f"{d:%Y%m%d}"
+    cache = OUT / f"{ymd}-conti.json"
+
+    if from_cache and cache.exists():
+        c = json.loads(cache.read_text(encoding="utf-8"))
+        sermon, rec = c["sermon"], c["rec"]
+        log(f"♻️ 직전 추천 재사용: {cache.name} (CCM {len(rec['ccm'])} · 찬송가 {len(rec['hymns'])})")
+        return finish(g, d, leader, hwp, pdf, sermon, rec, ymd, dry_run, notify, redo, cached=True)
 
     log(f"📖 주보 읽기: {hwp.name}")
     md = hwp_to_markdown(hwp, work)
@@ -501,18 +515,28 @@ def run(hwp: Path, pdf: Path | None, d: date, leader: str, dry_run: bool, no_you
         rec["hymns"], _ = trim(rec["hymns"], DIST_HYMN)
         missing = sum(1 for it in rec["ccm"] + rec["hymns"] if not it.get("url"))
         log(f"   링크 {len(rec['ccm']) + len(rec['hymns']) - missing}/{len(rec['ccm']) + len(rec['hymns'])} 확보")
+    shutil.rmtree(work, ignore_errors=True)
+    return finish(g, d, leader, hwp, pdf, sermon, rec, ymd, dry_run, notify, redo)
+
+
+def finish(g, d: date, leader: str, hwp: Path, pdf: Path | None, sermon: dict, rec: dict, ymd: str,
+           dry_run: bool, notify: bool, redo: bool, cached: bool = False) -> int:
+    """형식 만들기 → 드라이브 저장(주보·PDF·콘티 문서) → 텔레그램. (수집·추천 뒤, 또는 --from-cache 에서)"""
     text = format_text(d, sermon, rec)
     (OUT / f"{ymd}-conti.txt").write_text(text, encoding="utf-8")
-    (OUT / f"{ymd}-conti.json").write_text(json.dumps({"sermon": sermon, "rec": rec}, ensure_ascii=False, indent=1), encoding="utf-8")
+    if not cached:
+        (OUT / f"{ymd}-conti.json").write_text(json.dumps({"sermon": sermon, "rec": rec}, ensure_ascii=False, indent=1), encoding="utf-8")
+    is_pdf_input = hwp.suffix.lower() == ".pdf"
+    pdf_note = "" if (pdf is None or is_pdf_input or pdf.name.endswith(f"{ymd} 주일 주보.pdf")) else " (자동변환·레이아웃 근사)"
 
     saved = []
     if g:
         fname = prep.folder_name(d, leader)
         folder = g.find_child(prep.WORK_FOLDER, fname, prep.FOLDER_MIME) or g.create_folder(prep.WORK_FOLDER, fname)
         fid = folder["id"]
-        if not is_pdf_input:
+        if hwp.exists() and not is_pdf_input:
             saved.append(save_to_folder(g, fid, f"{ymd} 주일 주보{hwp.suffix.lower()}", path=hwp, mime=HWP_MIME))
-        if pdf:
+        if pdf and pdf.exists():
             saved.append(save_to_folder(g, fid, f"{ymd} 주일 주보{pdf_note}.pdf", path=pdf, mime=PDF_MIME))
         folder_link = folder.get("webViewLink") or f"https://drive.google.com/drive/folders/{fid}"
         doc_html = html_to_gdoc(format_html(d, sermon, rec, folder_link))
@@ -538,11 +562,9 @@ def run(hwp: Path, pdf: Path | None, d: date, leader: str, dry_run: bool, no_you
     if notify and not dry_run:
         ok = telegram_html(html_msg)
         log(f"텔레그램 {'발송 완료' if ok else '발송 실패'} (제목 링크, HTML)")
-        # 워커가 그대로 답장할 한 줄 — 긴 목록은 이미 텔레그램으로 갔다
         print(f"\n✅ {d.month}/{d.day} 콘티 추천 {len(rec['ccm']) + len(rec['hymns'])}곡을 텔레그램으로 보냈습니다. 폴더: {folder_link}")
     else:
         print("\n" + text)
-    shutil.rmtree(work, ignore_errors=True)
     return 0
 
 
@@ -554,13 +576,14 @@ def main(argv=None) -> int:
     ap.add_argument("--dry-run", action="store_true"); ap.add_argument("--no-youtube", action="store_true")
     ap.add_argument("--notify", action="store_true", help="텔레그램(경진비서방)으로 발송 — 곡 제목에 링크(HTML)")
     ap.add_argument("--redo", action="store_true", help="이미 있는 '콘티 추천' 문서를 새 추천으로 덮어쓴다")
+    ap.add_argument("--from-cache", action="store_true", help="직전 추천(out/YYYYMMDD-conti.json)을 그대로 써서 형식·저장·발송만 다시 한다")
     a = ap.parse_args(argv)
     hwp = Path(a.hwp).expanduser()
     if not hwp.exists():
         log(f"❌ 파일 없음: {hwp}"); return 1
     d = date.fromisoformat(a.date) if a.date else (date_from_filename(hwp.name) or prep.next_sunday())
     try:
-        return run(hwp, Path(a.pdf).expanduser() if a.pdf else None, d, a.leader, a.dry_run, a.no_youtube, a.notify, redo=a.redo)
+        return run(hwp, Path(a.pdf).expanduser() if a.pdf else None, d, a.leader, a.dry_run, a.no_youtube, a.notify, redo=a.redo, from_cache=a.from_cache)
     except Exception as e:  # noqa: BLE001
         log(f"❌ 실패: {e}")
         return 1
