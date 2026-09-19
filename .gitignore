@@ -1,3 +1,5 @@
 picture/
 .claude/
 .DS_Store
+.venv/
+.venv312/
