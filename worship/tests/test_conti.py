@@ -152,6 +152,21 @@ class FormatTests(unittest.TestCase):
         self.assertIn("1. 305장 나 같은 죄인 살리신 G코드 http://h", t)
         self.assertNotIn("정원 미달", t)
 
+    def test_html_links_on_titles(self):
+        rec = {"theme": "돌아옴 & 회복", "short": {},
+               "ccm": [{"title": "주 은혜임을 <G>", "key": "G", "tempo": "빠른곡", "url": "https://youtu.be/a?x=1&y=2"},
+                       {"title": "링크없음", "key": "D", "tempo": "중간곡", "url": ""}],
+               "hymns": [{"no": 305, "title": "나 같은 죄인 살리신", "key": "G", "tempo": "느린곡", "url": "https://youtu.be/h"}]}
+        h = conti.format_html(date(2026, 9, 20), {"title": "귀향", "scripture": "역대상 9:1-44"}, rec, "https://drive.google.com/drive/folders/1VM61P_X")
+        self.assertIn('1. <a href="https://youtu.be/a?x=1&amp;y=2">주 은혜임을 &lt;G&gt;</a> G코드', h)   # 제목이 링크, 특수문자 이스케이프
+        self.assertIn("1. 링크없음 (링크 못 찾음) D코드", h)
+        self.assertIn('<a href="https://youtu.be/h">305장 나 같은 죄인 살리신</a> G코드', h)
+        self.assertIn("&lt;빠른곡&gt;", h)                                  # 섹션 표시는 텍스트로
+        self.assertIn('<a href="https://drive.google.com/drive/folders/1VM61P_X">2026 0920 주일예배 폴더</a>', h)
+        self.assertNotRegex(h, r"\d\. https://")                           # 맨 URL 나열 없음
+        self.assertIn("주제: 돌아옴 &amp; 회복", h)
+        self.assertIn("<br>", conti.html_to_gdoc(h).decode())
+
     def test_chunks(self):
         text = "\n".join(f"{i}. 곡" for i in range(3000))
         chunks = conti.telegram_chunks(text, 3900)

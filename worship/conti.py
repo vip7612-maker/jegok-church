@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures as cf
+import html
 import json
 import os
 import re
@@ -345,6 +346,76 @@ def format_text(d: date, sermon: dict, rec: dict) -> str:
     return "\n".join(lines).strip()
 
 
+def _h(s: str) -> str:
+    return html.escape(str(s), quote=True)
+
+
+def format_html(d: date, sermon: dict, rec: dict, folder_link: str = "") -> str:
+    """제목에 링크를 심은 HTML (텔레그램 parse_mode=HTML 과 구글문서 변환 공용). 한 줄 = 한 곡."""
+    wd = "월화수목금토일"[d.weekday()]
+    out = [f"🎵 <b>{d.month}/{d.day}({wd}) 주일예배 콘티 추천</b>",
+           f"설교 「{_h(sermon.get('title') or '-')}」 ({_h(sermon.get('scripture') or '본문 미확인')})"]
+    if rec.get("theme"):
+        out.append(f"주제: {_h(rec['theme'])}")
+    def block(items, label):
+        out.append(f"\n<b>[{label}]</b>")
+        for t in TEMPOS:
+            rows = [it for it in items if it["tempo"] == t]
+            out.append(f"\n&lt;{t}&gt;")
+            for i, it in enumerate(rows, 1):
+                no = f"{it['no']}장 " if it.get("no") else ""
+                name = f"{no}{_h(it['title'])}"
+                link = f'<a href="{_h(it["url"])}">{name}</a>' if it.get("url") else f"{name} (링크 못 찾음)"
+                key = f" {_h(it['key'])}코드" if it.get("key") else ""
+                out.append(f"{i}. {link}{key}")
+    block(rec["ccm"], f"CCM {len(rec['ccm'])}곡")
+    block(rec["hymns"], f"찬송가 {len(rec['hymns'])}곡")
+    if rec.get("short"):
+        out.append("\n※ 정원 미달: " + ", ".join(f"{k} {v}곡" for k, v in rec["short"].items()))
+    if folder_link:
+        out.append(f'\n📁 <a href="{_h(folder_link)}">2026 {d:%m%d} 주일예배 폴더</a>')
+    return "\n".join(out).strip()
+
+
+def html_to_gdoc(html_body: str) -> bytes:
+    """텔레그램용 HTML 을 구글문서 변환용 HTML 문서로 (줄바꿈 → <br>)."""
+    body = html_body.replace("\n", "<br>\n")
+    return f'<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;line-height:1.6">{body}</body></html>'.encode("utf-8")
+
+
+def telegram_html(text_html: str) -> bool:
+    """parse_mode=HTML 로 발송 (제목 링크). 4096자 제한 → 줄 단위로 나눔. 토큰은 daily-briefing/.env."""
+    env = Path.home() / "dev" / "daily-briefing" / ".env"
+    tok = None
+    try:
+        for line in open(env, encoding="utf-8"):
+            if line.startswith("TELEGRAM_BOT_TOKEN="):
+                tok = line.split("=", 1)[1].strip().strip('"'); break
+    except FileNotFoundError:
+        pass
+    if not tok:
+        log("텔레그램 생략: 토큰 없음"); return False
+    chat = os.environ.get("TELEGRAM_NOTIFY_CHAT", "8047286046")
+    ok_all = True
+    for chunk in telegram_chunks(text_html, 3800):
+        data = urllib.parse.urlencode({"chat_id": chat, "text": chunk, "parse_mode": "HTML", "disable_web_page_preview": "true"}).encode()
+        try:
+            with urllib.request.urlopen(f"https://api.telegram.org/bot{tok}/sendMessage", data=data, timeout=30) as r:
+                ok = bool(json.loads(r.read().decode()).get("ok"))
+        except urllib.error.HTTPError as e:
+            log(f"텔레그램 HTML 실패: {e.code} {e.read().decode(errors='replace')[:200]}"); ok = False
+        except Exception as e:  # noqa: BLE001
+            log(f"텔레그램 실패: {e}"); ok = False
+        ok_all = ok_all and ok
+    return ok_all
+
+
+def replace_gdoc(g: prep.G, file_id: str, html_bytes: bytes) -> dict:
+    """기존 구글문서 내용을 HTML 로 교체 (media 업로드 → 구글이 변환)."""
+    return g.req("PATCH", f"{prep.UPLOAD}/files/{file_id}?uploadType=media&supportsAllDrives=true&fields=id,name,webViewLink",
+                 html_bytes, ctype="text/html", timeout=300)
+
+
 def telegram_chunks(text: str, limit: int = 3900) -> list[str]:
     chunks, cur = [], ""
     for para in text.split("\n"):
@@ -379,7 +450,7 @@ def save_to_folder(g: prep.G, folder_id: str, name: str, path: Path | None = Non
 
 
 # ── 실행 ─────────────────────────────────────────────────────
-def run(hwp: Path, pdf: Path | None, d: date, leader: str, dry_run: bool, no_youtube: bool, notify: bool) -> int:
+def run(hwp: Path, pdf: Path | None, d: date, leader: str, dry_run: bool, no_youtube: bool, notify: bool, redo: bool = False) -> int:
     OUT.mkdir(exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix="conti-"))
     g = None if dry_run else prep.G(prep.access_token())
@@ -443,19 +514,34 @@ def run(hwp: Path, pdf: Path | None, d: date, leader: str, dry_run: bool, no_you
             saved.append(save_to_folder(g, fid, f"{ymd} 주일 주보{hwp.suffix.lower()}", path=hwp, mime=HWP_MIME))
         if pdf:
             saved.append(save_to_folder(g, fid, f"{ymd} 주일 주보{pdf_note}.pdf", path=pdf, mime=PDF_MIME))
-        saved.append(save_to_folder(g, fid, f"{ymd} 콘티 추천", data=text.encode("utf-8"), mime="text/plain",
-                                    convert_to="application/vnd.google-apps.document"))
-        for s in saved:
-            log(f"   {'✅' if s['status'] == 'uploaded' else '⏭'} {s['name']} → {s['link']}")
         folder_link = folder.get("webViewLink") or f"https://drive.google.com/drive/folders/{fid}"
+        doc_html = html_to_gdoc(format_html(d, sermon, rec, folder_link))
+        existing = g.find_child(fid, f"{ymd} 콘티 추천")
+        if existing and redo:
+            r = replace_gdoc(g, existing["id"], doc_html)
+            saved.append({"name": f"{ymd} 콘티 추천", "link": r.get("webViewLink") or existing.get("webViewLink"), "status": "replaced"})
+        elif existing:
+            saved.append({"name": f"{ymd} 콘티 추천", "link": existing.get("webViewLink"), "status": "exists"})
+        else:
+            saved.append(save_to_folder(g, fid, f"{ymd} 콘티 추천", data=doc_html, mime="text/html",
+                                        convert_to="application/vnd.google-apps.document"))
+        for s_ in saved:
+            mark = {"uploaded": "✅", "replaced": "♻️", "exists": "⏭"}[s_["status"]]
+            log(f"   {mark} {s_['name']} → {s_['link']}")
         text += f"\n\n📁 {fname}\n{folder_link}"
     else:
+        folder_link = ""
         log(f"DRY-RUN — 업로드·텔레그램 생략. 결과: {OUT / (ymd + '-conti.txt')}")
 
-    print("\n" + text)
+    html_msg = format_html(d, sermon, rec, folder_link)
+    (OUT / f"{ymd}-conti.html").write_text(html_msg, encoding="utf-8")
     if notify and not dry_run:
-        ok = all(prep.notify(c) for c in telegram_chunks(text))
-        log(f"텔레그램 {'발송 완료' if ok else '발송 실패'}")
+        ok = telegram_html(html_msg)
+        log(f"텔레그램 {'발송 완료' if ok else '발송 실패'} (제목 링크, HTML)")
+        # 워커가 그대로 답장할 한 줄 — 긴 목록은 이미 텔레그램으로 갔다
+        print(f"\n✅ {d.month}/{d.day} 콘티 추천 {len(rec['ccm']) + len(rec['hymns'])}곡을 텔레그램으로 보냈습니다. 폴더: {folder_link}")
+    else:
+        print("\n" + text)
     shutil.rmtree(work, ignore_errors=True)
     return 0
 
@@ -466,14 +552,15 @@ def main(argv=None) -> int:
     ap.add_argument("--pdf", help="한글에서 내보낸 PDF (HWP 와 함께 받았을 때; 자동변환 대신 사용)")
     ap.add_argument("--date"); ap.add_argument("--leader", default=prep.DEFAULT_LEADER)
     ap.add_argument("--dry-run", action="store_true"); ap.add_argument("--no-youtube", action="store_true")
-    ap.add_argument("--notify", action="store_true")
+    ap.add_argument("--notify", action="store_true", help="텔레그램(경진비서방)으로 발송 — 곡 제목에 링크(HTML)")
+    ap.add_argument("--redo", action="store_true", help="이미 있는 '콘티 추천' 문서를 새 추천으로 덮어쓴다")
     a = ap.parse_args(argv)
     hwp = Path(a.hwp).expanduser()
     if not hwp.exists():
         log(f"❌ 파일 없음: {hwp}"); return 1
     d = date.fromisoformat(a.date) if a.date else (date_from_filename(hwp.name) or prep.next_sunday())
     try:
-        return run(hwp, Path(a.pdf).expanduser() if a.pdf else None, d, a.leader, a.dry_run, a.no_youtube, a.notify)
+        return run(hwp, Path(a.pdf).expanduser() if a.pdf else None, d, a.leader, a.dry_run, a.no_youtube, a.notify, redo=a.redo)
     except Exception as e:  # noqa: BLE001
         log(f"❌ 실패: {e}")
         return 1
