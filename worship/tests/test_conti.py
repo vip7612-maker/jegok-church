@@ -170,6 +170,24 @@ class FormatTests(unittest.TestCase):
         self.assertIn("주제: 돌아옴 &amp; 회복", h)
         self.assertIn("<br>", conti.html_to_gdoc(h).decode())
 
+    def test_scripture_on_top_of_doc_only(self):
+        rec = {"theme": "", "short": {}, "ccm": [], "hymns": []}
+        sermon = {"title": "귀향", "scripture": "마가복음 3:31-35"}
+        with mock.patch.object(conti, "scripture_text", return_value="마가복음 3:31-35\n31   첫 절 <본문>\n32   둘째 절"):
+            doc = conti.format_html(date(2026, 9, 20), sermon, rec, "https://drive/x", with_scripture=True)
+            msg = conti.format_html(date(2026, 9, 20), sermon, rec, "https://drive/x")
+        self.assertIn("📖 <b>마가복음 3:31-35</b>\n31   첫 절 &lt;본문&gt;\n32   둘째 절", doc)
+        self.assertLess(doc.index("📖"), doc.index("[CCM"))                 # 본문이 곡 목록보다 위
+        self.assertNotIn("📖", msg)                                          # 텔레그램 메시지에는 없음
+
+    def test_scripture_text_real_lookup(self):
+        if conti.bible_lookup is None:
+            self.skipTest("bible_lookup 없음")
+        t = conti.scripture_text("역대상 9:1-3")
+        self.assertTrue(t.startswith("역대상 9:1-3\n1   "))
+        self.assertEqual(conti.scripture_text(""), "")
+        self.assertEqual(conti.scripture_text("본문 미확인"), "")
+
     def test_chunks(self):
         text = "\n".join(f"{i}. 곡" for i in range(3000))
         chunks = conti.telegram_chunks(text, 3900)

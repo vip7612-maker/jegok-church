@@ -36,6 +36,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import prep  # noqa: E402  — 날짜·폴더·구글 API 재사용
 
+sys.path.insert(0, str(Path.home() / "dev" / "next_api_bot" / "worker"))
+try:
+    import bible_lookup  # noqa: E402  — 개역개정 본문(worker/data/bible_krv.json). 없으면 본문 없이 진행
+except Exception:  # noqa: BLE001
+    bible_lookup = None
+
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "out"
 VENV = HERE.parent / ".venv"
@@ -356,11 +362,27 @@ def sheet_url(it: dict) -> str:
     return "https://www.google.com/search?tbm=isch&q=" + urllib.parse.quote_plus(q)
 
 
-def format_html(d: date, sermon: dict, rec: dict, folder_link: str = "") -> str:
-    """제목에 링크를 심은 HTML (텔레그램 parse_mode=HTML 과 구글문서 변환 공용). 한 줄 = 한 곡."""
+def scripture_text(ref: str) -> str:
+    """주보에서 읽은 본문 표기('역대상 9:1-44') → 개역개정 본문(머리글 + '절   본문' 줄). 못 찾으면 빈 문자열."""
+    if not ref or bible_lookup is None:
+        return ""
+    try:
+        return bible_lookup.render(ref) or ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def format_html(d: date, sermon: dict, rec: dict, folder_link: str = "", with_scripture: bool = False) -> str:
+    """제목에 링크를 심은 HTML (텔레그램 parse_mode=HTML 과 구글문서 변환 공용). 한 줄 = 한 곡.
+    with_scripture=True(구글문서용)면 맨 위에 주보에서 파악한 성경 본문을 그대로 적는다(2026-09-19 지시)."""
     wd = "월화수목금토일"[d.weekday()]
     out = [f"🎵 <b>{d.month}/{d.day}({wd}) 주일예배 콘티 추천</b>",
            f"설교 「{_h(sermon.get('title') or '-')}」 ({_h(sermon.get('scripture') or '본문 미확인')})"]
+    if with_scripture:
+        body = scripture_text(sermon.get("scripture") or "")
+        if body:
+            head, _, verses_ = body.partition("\n")
+            out += ["", f"📖 <b>{_h(head)}</b>"] + [_h(l) for l in verses_.split("\n")] + [""]
     if rec.get("theme"):
         out.append(f"주제: {_h(rec['theme'])}")
     def block(items, label):
@@ -539,7 +561,7 @@ def finish(g, d: date, leader: str, hwp: Path, pdf: Path | None, sermon: dict, r
         if pdf and pdf.exists():
             saved.append(save_to_folder(g, fid, f"{ymd} 주일 주보{pdf_note}.pdf", path=pdf, mime=PDF_MIME))
         folder_link = folder.get("webViewLink") or f"https://drive.google.com/drive/folders/{fid}"
-        doc_html = html_to_gdoc(format_html(d, sermon, rec, folder_link))
+        doc_html = html_to_gdoc(format_html(d, sermon, rec, folder_link, with_scripture=True))   # 문서 맨 위에 성경 본문
         existing = g.find_child(fid, f"{ymd} 콘티 추천")
         if existing and redo:
             r = replace_gdoc(g, existing["id"], doc_html)
