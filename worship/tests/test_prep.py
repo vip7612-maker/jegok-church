@@ -91,30 +91,40 @@ class FakeG:
     def upload_pptx(self, parent, name, data): self.calls.append(("upload", name, len(data))); return {"id": "P1", "webViewLink": "https://drive/P1"}
 
 
+def fake_weekly(status):
+    """악보집 HTML 단계(accomp/weekly.py) 가짜 — 빌드·게시·업로드 없이 결과만 돌려준다."""
+    import types
+    m = types.ModuleType("weekly")
+    m.setup = lambda d, g=None, folder_id=None: {"opened": status == "created", "url": "https://report-site-kohl.vercel.app/jegok_worship_20260920",
+                                                  "drive": {"name": "2026 0920 예배자 악보.html", "webViewLink": "https://drive/H1", "status": status}}
+    return mock.patch.dict("sys.modules", {"weekly": m})
+
+
 class PrepareFlowTests(unittest.TestCase):
+    """2026-10-03 부터: 구글 슬라이드 악보 복사는 없고, 주일예배 PPT 복사 + HTML 악보집(weekly.setup)."""
     def test_fresh_run_creates_everything(self):
         g = FakeG()
-        with mock.patch.object(prep, "log"):
+        with mock.patch.object(prep, "log"), fake_weekly("created"):
             res = prep.prepare(date(2026, 9, 20), "이경진", "", g=g)
-        kinds = [c[0] for c in g.calls]
-        self.assertEqual(kinds, ["folder", "copy", "slides", "download", "upload"])
-        self.assertEqual(g.calls[1][1], "2026 0920 반주자 및 싱어용 악보")
-        self.assertEqual(g.calls[4][1], "2026 0920 주일예배 PPT")
+        self.assertEqual([c[0] for c in g.calls], ["folder", "download", "upload"])
+        self.assertEqual(g.calls[2][1], "2026 0920 주일예배 PPT")
         self.assertEqual([r["status"] for r in res["results"]], ["copied", "copied"])
-        self.assertEqual(res["results"][1]["date_edits"], 2)
-        self.assertIn("2026 0920 주일예배 이경진", prep.summary(res))
+        self.assertEqual(res["results"][0]["date_edits"], 2)
+        self.assertEqual(res["results"][1]["kind"], "html")
+        out = prep.summary(res)
+        self.assertIn("2026 0920 주일예배 이경진", out); self.assertIn("예배자 악보집(HTML)", out)
 
     def test_idempotent_when_exists(self):
-        g = FakeG(existing_folder="2026 0920 주일예배 이경진", existing_files={"2026 0920 반주자 및 싱어용 악보", "2026 0920 주일예배 PPT"})
-        with mock.patch.object(prep, "log"):
+        g = FakeG(existing_folder="2026 0920 주일예배 이경진", existing_files={"2026 0920 주일예배 PPT"})
+        with mock.patch.object(prep, "log"), fake_weekly("updated"):
             res = prep.prepare(date(2026, 9, 20), "이경진", "", g=g)
-        self.assertEqual(g.calls, [])                                   # 아무것도 새로 만들지 않음
+        self.assertEqual(g.calls, [])                                   # 드라이브에 새로 만든 것 없음
         self.assertEqual([r["status"] for r in res["results"]], ["exists", "exists"])
 
     def test_dry_run_touches_nothing(self):
         res = prep.prepare(date(2026, 9, 20), "이경진", "", dry_run=True, g=FakeG())
         self.assertTrue(res["dry_run"])
-        self.assertEqual(res["files"], ["2026 0920 반주자 및 싱어용 악보", "2026 0920 주일예배 PPT"])
+        self.assertEqual(res["files"], ["2026 0920 주일예배 PPT"])
 
 
 if __name__ == "__main__":
