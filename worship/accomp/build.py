@@ -75,6 +75,7 @@ body{margin:0;background:#d9dce1;font-family:'Pretendard Variable',Pretendard,'A
 .textpage .body{flex:1;min-height:0;overflow:hidden;line-height:1.45}
 .red{color:#dc2626;font-style:normal}
 .verses{line-height:1.75}
+.creed{padding:9mm 14mm}.creed h2{font-size:32pt;margin-bottom:6mm}.creed .body{white-space:nowrap;line-height:1.62;font-weight:600;letter-spacing:-.01em}
 .vn{color:#1e3a8a;margin-right:1.5mm}
 .sermon-head{display:flex;gap:6mm;align-items:baseline}
 .sermon-head{border-bottom:2px solid #1e3a8a;padding-bottom:2mm;margin-bottom:4mm}.sermon-head h2{margin:0;font-size:24pt}.sermon-head .ref{font-size:22pt;font-weight:800}.sermon-head .tt{font-size:22pt;font-weight:800;color:#1e3a8a;margin-left:auto}
@@ -184,7 +185,7 @@ VIEW = r"""
 FIT = """
 // 글이 칸을 넘치면 글자를 줄인다 — 웹글꼴이 늦게 오면 한 번 더
 function wsFit(){document.querySelectorAll('.pages .body').forEach(b=>{let s=parseFloat(b.dataset.max||16);b.style.fontSize=s+'pt';
-  while(b.scrollHeight>b.clientHeight+1&&s>6){s-=.25;b.style.fontSize=s+'pt'}})}
+  while((b.scrollHeight>b.clientHeight+1||b.scrollWidth>b.clientWidth+1)&&s>6){s-=.25;b.style.fontSize=s+'pt'}})}
 wsFit(); if(document.fonts) document.fonts.ready.then(wsFit);
 """
 
@@ -263,8 +264,8 @@ def page_html(n: int, p: dict, date: str) -> str:
     elif t == "roster":
         inner = roster_html(date)
     elif t in ("recite", "creed"):
-        mx = 24 if t == "creed" else 14
-        inner = f'<div class="textpage"><h2>{p["heading"]}</h2><div class="body" data-max="{mx}">{p["body"]}</div></div>'
+        mx = 60 if t == "creed" else 14
+        inner = f'<div class="textpage{' creed' if t == 'creed' else ''}"><h2>{p["heading"]}</h2><div class="body" data-max="{mx}">{p["body"]}</div></div>'
     elif t == "sermon_text":
         inner = (f'<div class="textpage"><div class="sermon-head"><h2>설교본문:</h2><span class="ref">{p["ref"]}</span>'
                  f'<span class="tt">{p["title"]}</span></div><div class="body verses" data-max="26">{p["body"]}</div></div>')
