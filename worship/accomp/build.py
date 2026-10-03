@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""반주자·싱어용 악보 — data/<날짜>.json → out/<날짜>.html (2026-10-03 교장님 지시).
+"""예배자 악보(옛 이름 반주자·싱어용 악보) — data/<날짜>.json → out/<날짜>.html (2026-10-03 교장님 지시).
 
 쪽마다 구획(slot)이 있어 말로 고치거나 악보를 주시면 그 자리에 넣는다.
   python3 accomp/build.py 2026-09-27            # 만들기
@@ -93,7 +93,7 @@ body{margin:0;background:#d9dce1;font-family:'Pretendard Variable',Pretendard,'A
 .slot img{width:100%;flex:1;min-height:0;object-fit:contain;object-position:top center}
 .slot.empty{border:2px dashed #93c5fd;border-radius:3mm;align-items:center;justify-content:center;color:#3b82f6;background:#f8fbff}
 .slot.empty b{font-size:16pt}.slot.empty span{font-size:10pt;margin-top:2mm;color:#64748b}
-.shead{position:absolute;left:0;top:0;z-index:3;display:flex;align-items:center;gap:2.5mm;background:rgba(255,255,255,.92);border-radius:0 0 2.5mm 0;padding:0 3mm .8mm 0}.shead .stt{font-size:11pt;font-weight:700;color:#1e3a8a}
+.shead{flex:0 0 auto;display:flex;align-items:center;gap:2.5mm;padding:0 0 1mm 0}.shead .stt{font-size:11pt;font-weight:700;color:#1e3a8a}
 .slot .badge{position:static;align-self:flex-start;flex:0 0 auto;min-width:11mm;text-align:center;font-size:13pt;font-weight:900;color:#fff;background:#1e3a8a;border-radius:2mm;padding:.8mm 3.5mm}
 .slot.empty .badge{position:absolute;left:0;top:0}
 .slot .st{position:absolute;left:0;bottom:0;font-size:8pt;color:#fff;background:rgba(37,99,235,.85);padding:.5mm 2mm;border-radius:0 2mm 0 0}
@@ -101,7 +101,8 @@ body{margin:0;background:#d9dce1;font-family:'Pretendard Variable',Pretendard,'A
   body{background:#fff}.bar,.tag,.slot .st{display:none}
 .slot.empty .badge{position:absolute;left:0;top:0}
 .slot .st{display:none}
-  .pages{display:block;padding:0}.page{box-shadow:none;break-after:page}
+  html,body{margin:0!important;padding:0!important;width:297mm}
+  .pages{display:block;padding:0}.page{box-shadow:none;break-after:page;zoom:1!important;margin:0!important;transform:none!important}   /* 화면 맞춤 축소(zoom)가 인쇄에 남아 왼쪽 위로 쏠리던 것 (2026-10-03) */
   .slot.empty{border:0;background:none}.slot.empty b,.slot.empty span:not(.badge){display:none}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
@@ -113,12 +114,18 @@ body.sv #sv .page,body.pr #sv .page{zoom:1}
 body.sv .pages{display:none}
 #sv{display:none}
 body.sv #sv,body.pr #sv{display:flex;position:fixed;inset:44px 0 0 0}
-#rail{width:210px;flex:0 0 210px;overflow-y:auto;background:#f8fafc;border-right:1px solid #d1d5db;padding:10px 12px 40px}
+#rail{width:var(--rw,210px);flex:0 0 var(--rw,210px);overflow-y:auto;background:#f8fafc;border-right:1px solid #d1d5db;padding:10px 12px 40px}
 .th{position:relative;display:flex;gap:6px;margin-bottom:10px;cursor:pointer}
 .th .n{font-size:12px;color:#64748b;width:16px;text-align:right;padding-top:2px}
 .th .box{width:168px;height:118.8px;overflow:hidden;border-radius:4px;border:2px solid transparent;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15)}
 .th.cur .box{border-color:#2563eb}
 .th .box .page{transform-origin:0 0;box-shadow:none}
+/* 썸네일·큰 화면 사이 손잡이 — 끌어서 폭 조절, 좁히면 썸네일이 작아진다 (2026-10-03 교장님 지시) */
+#split{flex:0 0 8px;cursor:col-resize;background:#e5e7eb;border-left:1px solid #d1d5db;border-right:1px solid #d1d5db;position:relative;touch-action:none}
+#split::after{content:'';position:absolute;left:2px;top:50%;width:2px;height:36px;margin-top:-18px;border-left:1px solid #9ca3af;border-right:1px solid #9ca3af}
+#split:hover,#split.drag{background:#bfdbfe}
+body.pr #split{display:none}
+body.dragging,body.dragging *{cursor:col-resize!important;user-select:none!important}
 #stage{flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
 #stage .page{transform-origin:center center;flex:0 0 auto}
 #hint{position:absolute;right:14px;bottom:10px;font-size:12px;color:#64748b}
@@ -130,6 +137,45 @@ body.pr .tag,body.sv #stage .tag{display:none}
 #pn{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);font-size:12px;color:#9ca3af;display:none}
 body.pr #pn{display:block}
 @media print{#sv{display:none!important}body.sv .pages,body.pr .pages{display:block!important}}
+.bar b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.bar .btns{display:flex;gap:8px;flex:0 0 auto}
+.bar button{white-space:nowrap}
+/* 휴대폰: 제목 한 줄 + 아래 줄에 단추 4개 한 줄, 스크롤해도 위에 고정 (2026-10-03 교장님 지시) */
+@media screen and (max-width:700px){
+  .bar{position:sticky;top:0;flex-wrap:wrap;gap:6px;padding:7px 10px}
+  .bar b{flex:1 0 100%;font-size:13px;margin:0}
+  .bar .btns{flex:1 0 100%;display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+  .bar button{font-size:12px;padding:7px 1px;width:100%}
+}
+/* 🔒 준비 — 준비자만 비밀번호로 여는 후보 악보함 (2026-10-03 교장님 지시) */
+#prep{display:none;position:fixed;left:0;right:0;bottom:0;top:44px;z-index:8;overflow:auto;background:#eef1f5}
+body.prep{overflow:hidden}body.prep #prep{display:block}
+#prep .lock{max-width:340px;margin:12vh auto 0;background:#fff;border-radius:14px;padding:26px 22px;box-shadow:0 6px 24px rgba(0,0,0,.12);text-align:center}
+#prep .lock h3{margin:0 0 6px;font-size:18px}#prep .lock p{margin:0 0 16px;color:#64748b;font-size:13px}
+#prep .lock input{width:100%;font:inherit;font-size:18px;padding:10px 12px;border:1.5px solid #cbd5e1;border-radius:10px;text-align:center;letter-spacing:.2em}
+#prep .lock button{margin-top:10px;width:100%;font:inherit;font-weight:800;border:0;border-radius:10px;padding:11px;background:#1e3a8a;color:#fff;cursor:pointer}
+#prep .lock .err{color:#b91c1c;font-size:13px;min-height:18px;margin-top:8px}
+#prep .in{padding:16px 18px 60px;max-width:1500px;margin:0 auto}
+#prep .ph{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;margin-bottom:12px}
+#prep .ph h3{margin:0;font-size:18px}#prep .ph .now{font-size:13px;color:#475569}
+#prep .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+#prep .card{background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.12);overflow:hidden;cursor:zoom-in}
+#prep .card .ct{display:flex;gap:8px;align-items:center;padding:8px 10px;border-bottom:1px solid #e5e7eb;font-weight:700;font-size:14px}
+#prep .card .ct i{font-style:normal;font-size:12px;color:#fff;background:#7c3aed;border-radius:6px;padding:2px 7px}
+#prep .card .ct u{text-decoration:none;font-size:11px;color:#0e7490;background:#e6f7fa;border-radius:6px;padding:2px 6px;margin-left:auto}
+#prep .card img{display:block;width:100%;height:auto}
+#prep .empty{color:#64748b;text-align:center;padding:60px 0}
+#zoom{display:none;position:fixed;inset:0;z-index:60;background:rgba(15,23,42,.92);overflow:auto;cursor:zoom-out}
+#zoom img{display:block;max-width:min(1100px,100%);margin:20px auto;background:#fff}
+@media print{#prep,#zoom{display:none!important}}
+.rt .nm.off{opacity:.32;filter:grayscale(1)}
+.shead .skey{flex:0 0 auto;font:900 12pt/1 inherit;color:#1e3a8a;background:#dbeafe;border:1px solid #93c5fd;border-radius:1.6mm;padding:.8mm 2.2mm}
+.shead .skeys{display:inline-flex;align-items:center;gap:1mm}.shead .karr{font-weight:900;color:#1e3a8a}
+.shead button.skey{cursor:pointer;opacity:.55}.shead button.skey.on{opacity:1;background:#1e3a8a;color:#fff;border-color:#1e3a8a}
+.slot img.kalt{display:none}
+@media print{.shead button.skey{opacity:1}}
+.shead a.stt{text-decoration:underline;text-decoration-color:#93c5fd;text-underline-offset:2px}.shead a.stt .yt{font-size:8pt;color:#dc2626}
+@media print{.shead a.stt{text-decoration:none}.shead a.stt .yt{display:none}}
 @media screen and (max-width:1150px){.page{zoom:calc(100vw / 1150px)}}
 """
 
@@ -140,14 +186,33 @@ VIEW = r"""
   const rail=document.getElementById('rail'), stage=document.getElementById('stage'), pn=document.getElementById('pn');
   const PW=pages[0].offsetWidth, PH=pages[0].offsetHeight;
   let cur=0, built=false, big=null;
+  const sv=document.getElementById('sv'), split=document.getElementById('split');
+  let RW=+localStorage.getItem('ws_rw')||210;
+  function thumbs(){  // 썸네일 칸 폭에 맞춰 작은 쪽 크기를 다시 맞춘다
+    sv.style.setProperty('--rw',RW+'px');
+    const w=Math.max(40,RW-24-22), s=(w-4)/PW;
+    rail.querySelectorAll('.th .box').forEach(b=>{b.style.width=w+'px';b.style.height=(PH*s+4)+'px';
+      const c=b.firstElementChild; if(c) c.style.transform='scale('+s+')';});
+  }
   function build(){
     if(built) return; built=true;
     pages.forEach((p,i)=>{
       const t=document.createElement('div'); t.className='th'; t.innerHTML='<span class="n">'+(i+1)+'</span><div class="box"></div>';
-      const c=p.cloneNode(true); c.removeAttribute('id'); c.style.transform='scale('+(168/PW)+')';
+      const c=p.cloneNode(true); c.removeAttribute('id');
       t.querySelector('.box').appendChild(c); t.onclick=()=>go(i); rail.appendChild(t);
     });
+    thumbs();
   }
+  split.addEventListener('pointerdown',e=>{
+    e.preventDefault(); try{split.setPointerCapture(e.pointerId)}catch(_){} split.classList.add('drag'); document.body.classList.add('dragging');
+    const x0=e.clientX, r0=RW;
+    function mv(ev){RW=Math.round(Math.max(90,Math.min(innerWidth*0.6,r0+ev.clientX-x0))); thumbs(); fit();}
+    function up(){split.removeEventListener('pointermove',mv);split.removeEventListener('pointerup',up);split.removeEventListener('pointercancel',up);
+      split.classList.remove('drag');document.body.classList.remove('dragging');localStorage.setItem('ws_rw',RW);
+      const th=rail.children[cur]; if(th) th.scrollIntoView({block:'nearest'});}
+    split.addEventListener('pointermove',mv); split.addEventListener('pointerup',up); split.addEventListener('pointercancel',up);
+  });
+  split.addEventListener('dblclick',()=>{RW=210;localStorage.setItem('ws_rw',RW);thumbs();fit();});
   function fit(){
     if(!big) return;
     const r=stage.getBoundingClientRect(), pad=document.body.classList.contains('pr')?0:40;
@@ -171,26 +236,93 @@ VIEW = r"""
     go(cur); setTimeout(fit,60);
   }
   window.wsMode=mode;
+  // 공유본은 맨 위에 다운로드 단추 줄(.dlbar)이 따로 붙는다 — 우리 막대는 그 바로 아래에 붙어 함께 고정
+  function stick(){const dl=document.querySelector('.dlbar'),bar=document.querySelector('.bar');if(bar)bar.style.top=(dl?dl.offsetHeight:0)+'px'}
+  stick(); addEventListener('resize',stick);
   document.addEventListener('keydown',e=>{
     const on=document.body.classList.contains('sv')||document.body.classList.contains('pr');
     if(!on) return;
     if(['ArrowRight','ArrowDown','PageDown',' ','Enter'].includes(e.key)){e.preventDefault();go(cur+1)}
     else if(['ArrowLeft','ArrowUp','PageUp','Backspace'].includes(e.key)){e.preventDefault();go(cur-1)}
     else if(e.key==='Home') go(0); else if(e.key==='End') go(pages.length-1);
-    else if(e.key==='Escape') mode(document.body.classList.contains('pr')?'sv':'doc');
+    else if(e.key==='Escape') mode('doc');
   });
   stage.addEventListener('click',e=>{ if(!document.body.classList.contains('pr')) return;
     go(cur+(e.clientX>innerWidth/2?1:-1)); });
   let x0=null; stage.addEventListener('touchstart',e=>x0=e.touches[0].clientX,{passive:true});
   stage.addEventListener('touchend',e=>{ if(x0===null) return; const dx=e.changedTouches[0].clientX-x0; if(Math.abs(dx)>40) go(cur+(dx<0?1:-1)); x0=null; });
-  document.addEventListener('fullscreenchange',()=>{ if(!document.fullscreenElement && document.body.classList.contains('pr')) mode('sv'); });
+  document.addEventListener('fullscreenchange',()=>{ if(!document.fullscreenElement && document.body.classList.contains('pr')) mode('doc'); });
   addEventListener('resize',fit);
   const start=()=>{ if(location.hash==='#slides') mode('sv'); else if(location.hash==='#present') mode('pr'); };
   (document.fonts?document.fonts.ready:Promise.resolve()).then(start);
 })();
 """
 
+PREP = r"""
+// 🔒 준비 — 비밀번호로 후보 악보를 푼다(PBKDF2+AES-GCM, seal.mjs 와 같은 방식). 한 번 맞히면 이 창을 닫을 때까지 기억
+(function(){
+  const box=JSON.parse(document.getElementById('prep-box').textContent), P=document.getElementById('prep');
+  const lock=P.querySelector('.lock'), inner=P.querySelector('.in'), err=document.getElementById('prep-err'), zoom=document.getElementById('zoom');
+  const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+  async function open(pw){
+    const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+    const key=await crypto.subtle.deriveKey({name:'PBKDF2',hash:'SHA-256',salt:b64(box.salt),iterations:box.it},base,{name:'AES-GCM',length:256},false,['decrypt']);
+    const t=new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(box.iv)},key,b64(box.ct)));
+    inner.innerHTML=t; inner.hidden=false; lock.hidden=true;
+    inner.querySelectorAll('.card').forEach(c=>c.onclick=()=>{zoom.innerHTML='';zoom.appendChild(c.querySelector('img').cloneNode());zoom.style.display='block';zoom.scrollTop=0});
+  }
+  zoom.onclick=()=>{zoom.style.display='none'};
+  window.wsUnlock=async e=>{ e.preventDefault(); const pw=document.getElementById('prep-pw').value.trim(); err.textContent='';
+    try{ await open(pw); sessionStorage.setItem('ws_prep',pw); }catch(_){ err.textContent='비밀번호가 맞지 않습니다'; } };
+  window.wsPrep=()=>{
+    if(document.body.classList.contains('prep')){ wsMode('doc'); return; }
+    wsMode('doc'); document.body.classList.add('prep');
+    document.querySelectorAll('.bar [data-mode]').forEach(b=>b.classList.toggle('on',b.dataset.mode==='prep'));
+    const bar=document.querySelector('.bar'); P.style.top=Math.max(0,bar.getBoundingClientRect().bottom)+'px';
+    const pw=sessionStorage.getItem('ws_prep');
+    if(inner.hidden && pw) open(pw).catch(()=>sessionStorage.removeItem('ws_prep'));
+    if(inner.hidden) setTimeout(()=>document.getElementById('prep-pw').focus(),50);
+  };
+  const m0=window.wsMode; window.wsMode=x=>{ document.body.classList.remove('prep'); zoom.style.display='none'; m0(x); };
+  if(location.hash==='#prep') wsPrep();
+})();
+"""
+
+PDF_JS = r"""
+// PDF 저장 — 공유본 옆에 서버가 미리 만들어 둔 doc.pdf(A4 가로 12쪽)를 받아 저장 위치를 묻는다 (2026-10-03 교장님 지시)
+// 크롬·엣지: 저장 위치 창(showSaveFilePicker) · 사파리 등: 내려받기 · 카톡 안 브라우저: PDF 를 바로 연다 · doc.pdf 가 없으면(로컬 파일) 인쇄 창
+// PPT — 같은 폴더의 ppt.html(쪽마다 한 장 · 보기 + .pptx 내려받기) 로 간다 (2026-10-03 교장님 지시)
+window.wsPpt = function(){
+  if (location.protocol === 'file:') { alert('PPT 페이지는 링크(공유본)에서 열립니다'); return; }
+  location.href = location.pathname.endsWith('/') ? 'ppt.html' : location.pathname + '/ppt.html';
+};
+window.wsJubo = function(){   // 주보 — 그 주 드라이브 주보 PDF 를 보고 내려받는 jubo.html (2026-10-03 교장님 지시)
+  if (location.protocol === 'file:') { alert('주보 페이지는 링크(공유본)에서 열립니다'); return; }
+  location.href = location.pathname.endsWith('/') ? 'jubo.html' : location.pathname + '/jubo.html';   // 한글 주보를 읽어 만든 HTML 주보 (2026-10-03 교장님 지시)
+};
+window.wsPdf = async function(){
+  const name = "@@NAME@@";
+  if (/KAKAOTALK|NAVER|Line\//i.test(navigator.userAgent)) { location.href = 'doc.pdf'; return; }
+  let blob = null;
+  try { const r = await fetch('doc.pdf', {cache:'no-store'});
+        if (r.ok && /pdf/.test(r.headers.get('content-type') || '')) blob = await r.blob(); } catch (e) {}
+  if (!blob) { window.print(); return; }
+  if (window.showSaveFilePicker) {
+    try { const h = await showSaveFilePicker({suggestedName: name, types: [{description: 'PDF 문서', accept: {'application/pdf': ['.pdf']}}]});
+          const w = await h.createWritable(); await w.write(blob); await w.close(); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
+};
+"""
+
 FIT = """
+window.wsKey = function(b){   // 두 코드 악보 — 누른 코드의 악보만 보이게 (2026-10-03 교장님 지시)
+  var slot = b.closest('.slot'), k = b.dataset.k;
+  slot.querySelectorAll('button.skey').forEach(function(x){ x.classList.toggle('on', x === b); });
+  slot.querySelectorAll('img[data-k]').forEach(function(im){ im.classList.toggle('kalt', im.dataset.k !== k); });
+};
 // 글이 칸을 넘치면 글자를 줄인다 — 웹글꼴이 늦게 오면 한 번 더
 function wsFit(){document.querySelectorAll('.pages .body').forEach(b=>{let s=parseFloat(b.dataset.max||16);b.style.fontSize=s+'pt';
   while((b.scrollHeight>b.clientHeight+1||b.scrollWidth>b.clientWidth+1)&&s>6){s-=.25;b.style.fontSize=s+'pt'}})}
@@ -202,6 +334,43 @@ def img_src(rel: str) -> str:
     p = HERE / rel
     return f"data:image/{p.suffix[1:].replace('jpg', 'jpeg')};base64," + base64.b64encode(p.read_bytes()).decode()
 
+
+
+PASS_FILE = HERE / "prep_pass.txt"   # git 제외. 없으면 네 자리 임시 비번을 만든다
+NODE = Path.home() / ".local/bin/node"
+
+
+def prep_pass() -> str:
+    if not PASS_FILE.exists():
+        import secrets
+        PASS_FILE.write_text(f"{secrets.randbelow(9000) + 1000}\n")
+    return PASS_FILE.read_text().strip()
+
+
+def seal(text: str) -> dict:
+    r = subprocess.run([str(NODE), str(HERE / "seal.mjs")], input=json.dumps({"pass": prep_pass(), "text": text}),
+                       capture_output=True, text=True, timeout=60, check=True)
+    return json.loads(r.stdout)
+
+
+def prep_html(d: dict, date: str) -> str:
+    """준비 탭: 후보 악보(pool)를 비밀번호로 암호화해 넣는다 — 비번 없이는 페이지 원본을 열어도 못 본다."""
+    pool = d.get("pool", [])
+    S = d.get("songs", {})
+    now = [f"{'도입곡' if g == 'intro' else '적용송' if g == 'apply' else f'{i + 1}번'} {x.get('title') or '제목 미정'}"
+           for g in ("intro", "main", "apply") for i, x in enumerate(S.get(g, []))]
+    cards = "".join(
+        f'<div class="card"><div class="ct"><i>후보 {i}</i>{html.escape(x.get("title") or "제목 미정")}'
+        f'{"<u>확정</u>" if x.get("used") else ""}</div><img src="{img_src(x["img"])}" alt=""></div>'
+        for i, x in enumerate(pool, 1))
+    inner = (f'<div class="ph"><h3>🔒 준비 · {int(date[5:7])}월 {int(date[8:10])}일 주일 후보 악보 {len(pool)}곡</h3>'
+             f'<span class="now">지금 확정: {html.escape(" · ".join(now) or "아직 없음")}</span></div>'
+             + (f'<div class="grid">{cards}</div>' if pool else '<div class="empty">아직 넣은 후보 악보가 없습니다.<br>텔레그램으로 악보 사진과 함께 「후보에 넣어」 라고 보내 주세요.</div>'))
+    box = seal(inner)
+    return ('<div id="prep"><div class="lock"><h3>🔒 준비자 전용</h3><p>비밀번호를 넣으면 이번 주 후보 악보가 열립니다.</p>'
+            '<form onsubmit="wsUnlock(event)"><input id="prep-pw" type="password" inputmode="numeric" autocomplete="off" placeholder="비밀번호">'
+            '<button>열기</button></form><div class="err" id="prep-err"></div></div><div class="in" hidden></div></div><div id="zoom"></div>'
+            f'<script type="application/json" id="prep-box" data-share>{json.dumps(box)}</script>')
 
 ROSTER = HERE / "roster.json"
 WEEKS_SHOWN = 6
@@ -255,7 +424,8 @@ def roster_html(date: str) -> str:
                              else '<span class="nm wide empty"></span>')
                     cells.append(f'<td class="{"now" if k == 0 else ""}"><div class="q1">{inner}</div></td>')
                     continue
-                inner = "".join(chip(v) if v else '<span class="nm empty"></span>' for v in slots)
+                off = R.get("absent", {}).get(x.isoformat(), [])   # 결석은 흐리게 (2026-10-03 교장님 지시)
+                inner = "".join((chip(v).replace('class="nm', 'title="결석" class="nm off', 1) if v in off else chip(v)) if v else '<span class="nm empty"></span>' for v in slots)
                 cells.append(f'<td class="{"now" if k == 0 else ""}"><div class="q4">{inner}</div></td>')
             rows.append(f'<tr class="{"gs" if n == 0 else ""}">{gc}<td class="role" style="color:{c}">{role}</td>{"".join(cells)}</tr>')
     sup = "".join(f'<span class="nm">{html.escape(v)}</span>' for v in R.get("support", []))
@@ -339,12 +509,59 @@ def page_html(n: int, p: dict, date: str) -> str:
             badge = f'<span class="badge">{html.escape(s["label"])}</span>' if s.get("label") else ""
             where = f'{n}쪽 {"왼쪽" if side == "L" else "오른쪽"}'
             if s.get("img"):
-                halves.append(f'<div class="half {side}"><div class="slot"><div class="shead">{badge}<span class="stt">{html.escape(s.get("title") or "")}</span></div><img src="{img_src(s["img"])}" alt="{html.escape(s.get("title", ""))}">'
+                ks = song_keys(s, date)
+                alt = html.escape(s.get("title", ""))
+                imgs = "".join(f'<img src="{img_src(f)}" alt="{alt}{" " + html.escape(k) if k else ""}"{" class=kalt" if j else ""} data-k="{j}">'
+                               for j, (k, f) in enumerate(ks))
+                halves.append(f'<div class="half {side}"><div class="slot"><div class="shead">{badge}{key_html(ks)}{stt_html(s)}</div>{imgs}'
                               f'</div></div>')
             else:
                 halves.append(f'<div class="half {side}"><div class="slot empty">{badge}<b>악보 자리</b><span>{where}{" · " + html.escape(s["label"]) if s.get("label") else ""} — 악보를 주시면 여기에 넣습니다</span></div></div>')
         inner = "".join(halves) + '<div class="divider"></div>'
     return f'<section class="page" id="p{n}">{tag}{inner}</section>'
+
+
+def song_keys(s: dict, date: str) -> list[tuple[str, str]]:
+    """곡의 코드와 악보 — [(코드, 그림 경로)] (2026-10-03 교장님 지시).
+    한 곡을 두 코드로 이어 부를 때는 data 의 "keys": [{"key":"G","img":…},{"key":"A","img":…}] — 「5 G→A 온 땅의 주인」.
+    한 코드면 "key", 없으면 악보 보관함 기록(그 곡 악보가 한 장뿐이거나, 이번 주에 쓴 코드)에서 찾는다."""
+    if s.get("keys"):
+        return [(k.get("key", ""), k["img"]) for k in s["keys"] if k.get("img")] or [("", s["img"])]
+    k = s.get("key", "")
+    if not k and s.get("title"):
+        try:
+            import bank
+            r = bank.load()["songs"]; t = bank.norm(s["title"])
+            sc = next((v["scores"] for n, v in r.items() if bank.norm(n) == t), {})
+            k = (next(iter(sc)) if len(sc) == 1
+                 else next((c for c, v in sc.items() if any(u.startswith(date) for u in v.get("used", []))), ""))
+        except Exception:
+            k = ""
+    return [(k, s["img"])]
+
+
+def key_html(ks: list[tuple[str, str]]) -> str:
+    """번호 옆 코드 — 한 코드면 「G」, 두 코드면 「G→A」 이고 코드를 누르면 그 코드 악보가 보인다."""
+    if not any(k for k, _ in ks): return ""
+    if len(ks) == 1: return f'<span class="skey">{html.escape(ks[0][0])}</span>'
+    btn = [f'<button type="button" class="skey{" on" if j == 0 else ""}" data-k="{j}" onclick="wsKey(this)">{html.escape(k or "?")}</button>'
+           for j, (k, _) in enumerate(ks)]
+    return '<span class="skeys">' + '<span class="karr">→</span>'.join(btn) + '</span>'
+
+
+def stt_html(s: dict) -> str:
+    """곡 제목 — 유튜브 주소가 있으면 제목을 누르면 열리게 (2026-10-03 교장님 지시). 없으면 악보 보관함 기록에서 찾는다."""
+    t = html.escape(s.get("title") or "")
+    u = s.get("youtube")
+    if not u and s.get("title"):
+        try:
+            import bank
+            r = bank.load()["songs"]; k = bank.norm(s["title"])
+            u = next((v.get("youtube") for n, v in r.items() if bank.norm(n) == k and v.get("youtube")), "")
+        except Exception:
+            u = ""
+    return (f'<a class="stt" href="{html.escape(u)}" target="_blank" rel="noopener">{t} <span class="yt">▶</span></a>' if u
+            else f'<span class="stt">{t}</span>')
 
 
 GROUP = {"intro": "도입곡", "main": "", "apply": "적용송"}
@@ -376,11 +593,11 @@ def build(date: str) -> Path:
             p.setdefault("title", st.get("title", "")); p.setdefault("ref", st.get("ref", ""))
     pages = "".join(page_html(i, p, date) for i, p in enumerate(d["pages"], 1))
     doc = f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{html.escape(d["title"])}</title>
+<title>{html.escape(d["title"])}</title><meta name="description" content="제곡교회 예배팀 · {int(date[5:7])}월 {int(date[8:10])}일 주일예배 예배자 악보 {len(d["pages"])}쪽">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
 <style>{CSS}</style></head><body>
-<div class="bar"><b>🎹 {html.escape(d["title"])} · {len(d["pages"])}쪽</b><button data-mode="doc" class="on" onclick="wsMode('doc')">문서 보기</button><button data-mode="sv" onclick="wsMode('sv')">🖼 슬라이드 보기</button><button data-mode="pr" onclick="wsMode('pr')">▶ 발표</button><button onclick="print()">PDF로 저장</button></div>
-<main class="pages">{pages}</main><div id="sv"><aside id="rail"></aside><div id="stage"><span id="hint">← → 방향키로 넘김 · Esc 나가기</span><span id="pn"></span></div></div><script data-share>{FIT}</script><script data-share>{VIEW}</script></body></html>"""
+<div class="bar"><b>🎹 {html.escape(d["title"])} · {len(d["pages"])}쪽</b><div class="btns"><button data-mode="doc" class="on" onclick="wsMode('doc')">악보</button><button data-mode="pr" onclick="wsMode('pr')">▶ 발표</button><button onclick="wsPpt()">PPT</button><button onclick="wsJubo()">주보</button><button data-mode="prep" onclick="wsPrep()">🔒 준비</button></div></div>
+<main class="pages">{pages}</main><div id="sv"><aside id="rail"></aside><div id="split" title="끌어서 폭 조절"></div><div id="stage"><span id="hint">← → 방향키로 넘김 · Esc 나가기</span><span id="pn"></span></div></div>{prep_html(d, date)}<script data-share>{FIT}</script><script data-share>{VIEW}</script><script data-share>{PREP}</script><script data-share>{PDF_JS.replace("@@NAME@@", f"{date} 반주자·싱어용 악보.pdf")}</script></body></html>"""
     out = HERE / "out" / f"{date}.html"; out.parent.mkdir(exist_ok=True); out.write_text(doc)
     return out
 
@@ -392,7 +609,16 @@ if __name__ == "__main__":
     if "--share" in sys.argv:
         import urllib.request, publish
         pretty = publish.prepare(sys.argv[1])   # jegok_worship_YYYYMMDD · 모음 쪽 · 노션 — 배포 전에
-        body = json.dumps({"key": f"/accomp/{sys.argv[1]}", "title": o.stem + " 반주자·싱어용 악보", "html": o.read_text()}).encode()
+        # PPT 페이지(쪽 그림·doc.pptx·ppt.html)를 공유 폴더에 먼저 둔다 — PIL·python-pptx 가 있는 파이썬으로
+        subprocess.run(["/usr/local/bin/python3", str(HERE / "pptpage.py"), sys.argv[1]], check=False)
+        # 예배 화면용 PPT(PDF)가 있으면 PPT 단추는 그것을 HTML 슬라이드로 (2026-10-03 교장님 지시) — accomp/worship_ppt/<날짜>.pdf [.pptx]
+        wp = HERE / "worship_ppt" / f"{sys.argv[1]}.pdf"
+        # 드라이브 그 주 폴더의 「주일예배 PPT」를 먼저 받아 둔다 — 없을 때만 악보집 쪽 그림 PPT (2026-10-03 교장님 지시)
+        subprocess.run(["/usr/local/bin/python3", str(HERE / "slides.py"), "fetch", sys.argv[1]], check=False)
+        if wp.exists():
+            px = wp.with_suffix(".pptx")
+            subprocess.run(["/usr/local/bin/python3", str(HERE / "slides.py"), str(wp), sys.argv[1]] + (["--pptx", str(px)] if px.exists() else []), check=False)
+        body = json.dumps({"key": f"/accomp/{sys.argv[1]}", "title": o.stem + " 예배자 악보", "html": o.read_text()}).encode()
         req = urllib.request.Request("http://127.0.0.1:8765/share", data=body, headers={"Content-Type": "application/json"})
         json.load(urllib.request.urlopen(req, timeout=180))
         print(pretty)

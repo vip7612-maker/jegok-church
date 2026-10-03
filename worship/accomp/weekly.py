@@ -6,7 +6,7 @@
      설교본문·설교요약·악보·공지는 비운다(주보·악보가 오면 채운다). 암송·사도신경은 그대로(암송 절은 날짜로 저절로 넘어감).
   2) 섬김표 기본값·규칙 채우기(roster.py fill — 교장님이 정하신 교체는 그대로)
   3) build.py --share → https://report-site-kohl.vercel.app/jegok_worship_YYYYMMDD
-  4) 그 주일 드라이브 폴더에 「YYYY MMDD 반주자 및 싱어용 악보.html」 올리기(있으면 새 내용으로 덮어씀)
+  4) 그 주일 드라이브 폴더에 「YYYY MMDD 예배자 악보.html」 올리기(있으면 새 내용으로 덮어씀, 예전 이름 「반주자 및 싱어용 악보」면 이름도 바꿈)
 
   python3 accomp/weekly.py 2026-10-11            # 열기 + 게시 + 드라이브
   python3 accomp/weekly.py 2026-10-11 --upload   # 이미 연 주를 다시 게시하고 드라이브 파일만 갱신
@@ -48,7 +48,7 @@ def open_week(d: date) -> bool:
         i = next(k for k, p in enumerate(pages) if p["type"] == "creed")
         pages[i:i] = [{"type": "songs", "group": "intro"}]
         pages += [{"type": "songs", "group": "main"}, {"type": "songs", "group": "apply"}]
-    data = {"date": d.isoformat(), "title": f"{d:%Y %m%d} 반주자 및 싱어용 악보", "source": "",
+    data = {"date": d.isoformat(), "title": f"{d:%Y %m%d} 예배자 악보", "source": "",
             "pages": pages, "songs": {"intro": [], "main": [], "apply": []}, "notices": []}
     f.write_text(json.dumps(data, ensure_ascii=False, indent=1))
     subprocess.run([sys.executable, str(HERE / "roster.py"), "fill", f"{d.month}.{d.day}",
@@ -70,9 +70,9 @@ def week_folder(g: prep.G, d: date) -> dict | None:
 
 
 def upload_html(g: prep.G, folder_id: str, d: date) -> dict:
-    name = f"{d:%Y %m%d} 반주자 및 싱어용 악보.html"
+    name = f"{d:%Y %m%d} 예배자 악보.html"   # 2026-10-03 교장님: 「반주자 및 싱어용 악보」 → 「예배자 악보」
     data = (HERE / "out" / f"{d.isoformat()}.html").read_bytes()
-    old = g.find_child(folder_id, name)
+    old = g.find_child(folder_id, name) or g.find_child(folder_id, f"{d:%Y %m%d} 반주자 및 싱어용 악보.html")   # 예전 이름이면 덮어쓰며 이름도 바꾼다
     boundary = f"b{uuid.uuid4().hex}"
     meta = json.dumps({"name": name} if old else {"name": name, "parents": [folder_id], "mimeType": HTML_MIME}).encode()
     body = (f"--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n".encode() + meta +

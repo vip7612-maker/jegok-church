@@ -98,7 +98,7 @@ ol{{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}}li{{
 .go{{position:absolute;right:16px;top:16px;font-size:12px;font-weight:700;color:#b8860b}}
 @media(max-width:560px){{.go{{display:none}}}}
 </style></head><body>
-<header><span class="k">JEGOK CHURCH · WORSHIP TEAM</span><h1>주일예배 악보집</h1><p>반주자·싱어용 · {len(dates)}주 · 최신 주가 맨 위</p></header>
+<header><span class="k">JEGOK CHURCH · WORSHIP TEAM</span><h1>주일예배 악보집</h1><p>예배자 악보 · {len(dates)}주 · 최신 주가 맨 위</p></header>
 <main>{"".join(cards) or "<p>아직 없음</p>"}</main></body></html>"""
     (SITE / INDEX).mkdir(exist_ok=True)
     (SITE / INDEX / "index.html").write_text(doc)

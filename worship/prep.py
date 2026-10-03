@@ -5,7 +5,7 @@
   1) 다음 주일(오늘이 일요일이면 오늘) 날짜 계산
   2) 구글 드라이브 「2026 예배찬양」(공유 드라이브) 안에 폴더 생성:  "2026 0920 주일예배 이경진"   (기존 폴더 이름 규칙)
   3) 「예배준비 템플릿」의 두 파일을 그 폴더로 복사, 이름의 0000 을 MMDD 로:
-       - 반주자 및 싱어용 악보 → HTML 악보집(accomp/weekly.py): 열고 jegok_worship_YYYYMMDD 로 게시 + 폴더에 .html (2026-10-03 부터)
+       - 예배자 악보(옛 반주자 및 싱어용 악보) → HTML 악보집(accomp/weekly.py): 열고 jegok_worship_YYYYMMDD 로 게시 + 폴더에 .html (2026-10-03 부터)
        - 파워포인트   "2026 0000 주일예배 PPT" (.pptx)     → 표지 "2026년  00월 00일" → "2026년  09월 20일" (XML 직접 수정 후 업로드)
   4) 결과(폴더·파일 링크) 출력. --notify 면 텔레그램(경진비서방)에도.
 이미 만들어진 폴더/파일이 있으면 다시 만들지 않는다(멱등).
@@ -40,7 +40,7 @@ WORK_FOLDER = "1sRJ7X8heOaM5BmDa0WW6Jvs__O2upcpV"        # 2026 예배찬양 (�
 TEMPLATE_FOLDER = "13opyfTn8EhcMI2LMN2FBtyhVXi9_qagD"    # 예배준비 템플릿
 TEMPLATES = {
     # id: (표시 이름 규칙(0000→MMDD), 종류)
-    # 반주자 및 싱어용 악보는 2026-10-03 부터 구글 슬라이드 대신 HTML(accomp/weekly.py) — 슬라이드 템플릿
+    # 예배자 악보(옛 반주자 및 싱어용 악보)는 2026-10-03 부터 구글 슬라이드 대신 HTML(accomp/weekly.py) — 슬라이드 템플릿
     # "1lFzyXmz5EFVQLlkqj3XncYAmZ4ibYWX4L2E3jGdD2EE" 는 더 복사하지 않는다.
     "1E_9hpG6pYuzbsew0uXnaZb1wDBwmgqhT": ("2026 0000 주일예배 PPT", "pptx"),
 }
@@ -236,17 +236,17 @@ def prepare(d: date, leader: str, suffix: str, dry_run: bool = False, g: G | Non
             f = g.upload_pptx(fid, name, patched)
             log(f"  ✅ PPT 복사: {name} ({len(patched)//1024}KB, 표지 날짜 런 {n}곳 → {d:%Y}년 {d:%m}월 {d:%d}일)")
             results.append({"name": name, "link": f.get("webViewLink"), "status": "copied", "date_edits": n})
-    # 반주자·싱어용 악보 = HTML 악보집 (2026-10-03 교장님 지시): 열기 → 게시 → 이 폴더에 .html 올리기
+    # 예배자 악보 = HTML 악보집 (2026-10-03 교장님 지시): 열기 → 게시 → 이 폴더에 .html 올리기
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent / "accomp"))
         import weekly
         w = weekly.setup(d, g, fid)
         log(f"  ✅ 악보집 HTML: {'새로 엶' if w['opened'] else '이미 있음'} · {w['url']}")
-        results.append({"name": w["drive"].get("name", "반주자 및 싱어용 악보.html"), "link": w["drive"].get("webViewLink"),
+        results.append({"name": w["drive"].get("name", "예배자 악보.html"), "link": w["drive"].get("webViewLink"),
                         "status": "copied" if w["drive"].get("status") == "created" else "exists", "web": w["url"], "kind": "html"})
     except Exception as e:  # noqa: BLE001
         log(f"  ❌ 악보집 HTML 실패: {e}")
-        results.append({"name": "반주자 및 싱어용 악보 (HTML)", "link": None, "status": "failed", "error": str(e)})
+        results.append({"name": "예배자 악보 (HTML)", "link": None, "status": "failed", "error": str(e)})
     return {**plan, "folder_link": folder.get("webViewLink") or f"https://drive.google.com/drive/folders/{fid}", "results": results}
 
 
@@ -258,7 +258,7 @@ def summary(res: dict) -> str:
         lines.append(res["folder_link"])
     for r in res.get("results", []):
         if r.get("kind") == "html":
-            lines.append(f"✅ 반주자·싱어용 악보집(HTML) — 드라이브에 올림" if r["status"] != "failed" else f"❌ 악보집 HTML 실패: {r.get('error','')}")
+            lines.append(f"✅ 예배자 악보집(HTML) — 드라이브에 올림" if r["status"] != "failed" else f"❌ 악보집 HTML 실패: {r.get('error','')}")
             if r.get("web"): lines.append(f"   {r['web']}")
             if r.get("link"): lines.append(f"   {r['link']}")
             continue

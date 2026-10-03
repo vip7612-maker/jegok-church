@@ -14,7 +14,7 @@ python3 ~/dev/jegok-church/worship/prep.py
 ```
 - 다음 주일(오늘이 일요일이면 오늘) 폴더 `2026 MMDD 주일예배 <인도자>` 를 「2026 예배찬양」에 만든다(인도자는 섬김표 accomp/roster.json 의 그 주 인도자).
 - 주일예배 PPT 는 템플릿을 복사해 표지 날짜를 바꾼다.
-- **반주자·싱어용 악보는 2026-10-03 부터 구글 슬라이드가 아니라 HTML 악보집**: 지난주 악보집을 바탕으로 새 주를 열고(설교·악보·공지는 비움, 섬김표 기본값 채움, 암송 절은 한 절 넘어감) `jegok_worship_YYYYMMDD` 로 게시한 뒤, 그 폴더에 `YYYY MMDD 반주자 및 싱어용 악보.html` 을 올린다(accomp/weekly.py). 원칙은 accomp/PRINCIPLES.md.
+- **예배자 악보(옛 이름 반주자·싱어용 악보, 2026-10-03 교장님 지시로 이름 바꿈)는 2026-10-03 부터 구글 슬라이드가 아니라 HTML 악보집**: 지난주 악보집을 바탕으로 새 주를 열고(설교·악보·공지는 비움, 섬김표 기본값 채움, 암송 절은 한 절 넘어감) `jegok_worship_YYYYMMDD` 로 게시한 뒤, 그 폴더에 `YYYY MMDD 반주자 및 싱어용 악보.html` 을 올린다(accomp/weekly.py). 원칙은 accomp/PRINCIPLES.md.
 - 이미 있으면 건너뜀. 악보집을 고친 뒤 드라이브 파일도 새로 하려면 `python3 accomp/weekly.py <날짜> --upload`.
 - 옵션: `--date YYYY-MM-DD` · `--leader 이름`(기본 이경진) · `--suffix 부활주일` · 텔레그램 요청이면 `--notify`.
 - **답장 끝에 꼭 붙인다**: "주보 HWP 파일을 올려주시면 PDF로 바꿔 폴더에 넣고, 설교 본문에 맞는 찬양 콘티(CCM 20곡·찬송가 10곡)를 추천해 드리겟습니다. 한글에서 내보낸 PDF도 있으면 함께 올려주세요(레이아웃이 정확합니다)."
