@@ -163,11 +163,15 @@ body.one:not(.pr) main .sl{{display:none;width:min(100%,calc((100vh - 120px)*16/
 const D={data};
 const deck=document.getElementById('deck');
 function fit(){{document.querySelectorAll('.sl').forEach(sl=>{{const k=sl.clientWidth/1440;sl.querySelector('.in').style.transform='scale('+k+')';}});}}
+// 글자 폭은 늘 보이는 측정 칸에서 잰다 — 발표 중 숨겨 둔 다음 장을 미리 그릴 때 폭이 0 으로 재어져
+// 가운데 정렬 자막이 칸 가운데에서 시작해 잘리던 문제(2026-10-03 교장님 화면)
+const MZ=document.createElement('div'); MZ.style.cssText='position:absolute;left:-99999px;top:0;visibility:hidden;white-space:pre;line-height:1'; document.body.appendChild(MZ);
+function measure(t){{ MZ.style.fontSize=t.s+'px'; MZ.style.fontWeight=t.b?800:500; MZ.textContent=t.t; return MZ.scrollWidth; }}
 function paint(sl){{ if(sl.dataset.p) return; sl.dataset.p=1; const s=D[+sl.dataset.i]; const inn=sl.querySelector('.in');
   inn.style.backgroundImage='url(slides/'+s.img+')';
   s.texts.forEach(t=>{{const e=document.createElement('div');e.className='tx';e.textContent=t.t;
     e.style.cssText='left:'+t.x+'px;top:'+t.y+'px;font-size:'+t.s+'px;color:'+t.c+';font-weight:'+(t.b?800:500);
-    inn.appendChild(e); const w=e.scrollWidth;
+    inn.appendChild(e); const w=measure(t);
     if(w>t.w*1.02&&t.w>4) e.style.transform='scaleX('+(t.w/w)+')';
     else if(t.a==='c') e.style.left=(t.x+(t.w-w)/2)+'px';}}); }}
 const io=new IntersectionObserver(es=>es.forEach(x=>{{if(x.isIntersecting)paint(x.target)}}),{{rootMargin:'800px'}});
@@ -345,13 +349,17 @@ def song_slides(title: str, si: int, W: int, H: int, out: Path) -> list[dict]:
         texts = []
         sub = sl.get("sub")
         if sub and sub.get("lines"):
+            lines = [{"t": part.strip(), "c": ln.get("c")} for ln in sub["lines"]
+                     for part in re.split(r"[\n\v\x0b]+", ln["t"]) if part.strip()]   # 한 줄 안의 줄바꿈은 따로 줄로
+            sub = dict(sub, lines=lines)
             bx, by, bw, bh = sub["box"]
             ImageDraw.Draw(cv).rectangle([bx, by, bx + bw, by + bh], fill=sub.get("fill") or "#000000")
             n = len(sub["lines"]); size = sub["size"]
             size = min(size, bh / (n * 1.15))                          # 줄이 많으면 칸에 맞게 줄인다
             top = by + (bh - n * size * 1.15) / 2
+            lx0, lx1 = max(bx, 0) + CW * .02, min(bx + bw, CW) - CW * .02            # 양옆 여백 2% — 긴 줄은 그 안으로 줄인다
             for i, ln in enumerate(sub["lines"]):
-                texts.append({"x": round(bx * kx), "y": round((top + i * size * 1.15) * ky), "w": round(bw * kx), "h": round(size * ky),
+                texts.append({"x": round(lx0 * kx), "y": round((top + i * size * 1.15) * ky), "w": round((lx1 - lx0) * kx), "h": round(size * ky),
                               "s": round(size * ky, 1), "c": ln.get("c") or "#ffffff", "b": True, "t": ln["t"], "a": "c"})
         name = f"song_{si:02d}_{j:02d}.jpg"
         cv.save(out / name, "JPEG", quality=85)

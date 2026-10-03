@@ -105,7 +105,8 @@ def parse(pptx: Path) -> list[dict]:
                         pass
                     r0 = next((r for pa in sh.text_frame.paragraphs for r in pa.runs), None)
                     chips.append({"t": sh.text_frame.text.strip(), "to_n": to, "on": bool(r0 and _hex(r0.font) == "#FF0000"), "box": box(sh)})
-                elif sh.shape_type in (MSO_SHAPE_TYPE.TEXT_BOX, MSO_SHAPE_TYPE.AUTO_SHAPE) and sub is None:   # 자막 글상자(예전 PPT 는 도형에)
+                elif sh.shape_type in (MSO_SHAPE_TYPE.TEXT_BOX, MSO_SHAPE_TYPE.AUTO_SHAPE) and sub is None and sh.width > W * .6:
+                    # 자막 글상자(예전 PPT 는 도형에) — 화면 폭 60% 넘는 것만. 특송자 이름(「박동민 집사」) 같은 작은 글상자는 아니다
                     lines, size = [], None
                     for pa in sh.text_frame.paragraphs:
                         tx = "".join(r.text for r in pa.runs).strip()
