@@ -237,7 +237,7 @@ def roster_html(date: str) -> str:
             rows.append(f'<tr class="{"gs" if n == 0 else ""}">{gc}<td class="role" style="color:{c}">{role}</td>{"".join(cells)}</tr>')
     sup = "".join(f'<span class="nm">{html.escape(v)}</span>' for v in R.get("support", []))
     return (f'<div class="rs"><div class="rs-h"><div><span class="kick">WORSHIP TEAM ROSTER</span><h2>예배팀 섬김표</h2></div>'
-            f'<div class="rr"><span class="lg"><span class="nm chg">이름</span> 평소와 바뀐 사람</span><span class="range">{days[0].month}.{days[0].day} ~ {days[-1].month}.{days[-1].day} · {WEEKS_SHOWN}주</span></div></div>'
+            f'<div class="rr"><span class="range">{days[0].month}.{days[0].day} ~ {days[-1].month}.{days[-1].day} · {WEEKS_SHOWN}주</span></div></div>'
             f'<table class="rt"><colgroup><col style="width:19mm"><col style="width:27mm">{"<col>" * WEEKS_SHOWN}</colgroup>'
             f'<tr><th></th><th></th>{head}</tr>{"".join(rows)}</table>'
             f'<div class="sup"><div class="sup-h"><b>지원팀</b><span>{len(R.get("support", []))}명</span></div><div class="sup-n">{sup}</div></div></div>')
