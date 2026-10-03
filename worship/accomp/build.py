@@ -230,7 +230,7 @@ def roster_html(date: str) -> str:
             f'<div class="rr"><span class="lg"><span class="nm chg">이름</span> 평소와 바뀐 사람</span><span class="range">{days[0].month}.{days[0].day} ~ {days[-1].month}.{days[-1].day} · {WEEKS_SHOWN}주</span></div></div>'
             f'<table class="rt"><colgroup><col style="width:19mm"><col style="width:27mm">{"<col>" * WEEKS_SHOWN}</colgroup>'
             f'<tr><th></th><th></th>{head}</tr>{"".join(rows)}</table>'
-            f'<div class="sup"><div class="sup-h"><b>지원팀</b><span>날짜와 상관없이 필요할 때 투입 · {len(R.get("support", []))}명</span></div><div class="sup-n">{sup}</div></div></div>')
+            f'<div class="sup"><div class="sup-h"><b>지원팀</b><span>{len(R.get("support", []))}명</span></div><div class="sup-n">{sup}</div></div></div>')
 
 
 def cover_html(p: dict) -> str:
