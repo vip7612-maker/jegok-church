@@ -211,7 +211,9 @@ if(SCREEN){
   document.title='앞 화면 · '+document.title; document.body.classList.remove('one'); document.body.classList.add('pr');
   const _show=show; show=function(i,quiet){_show(i); if(!quiet&&bc)bc.postMessage({i:cur});};
   show(+(location.hash.slice(1)||0),true);
-  if(bc){bc.onmessage=e=>{const m=e.data||{}; if(m.end){window.close();return;} if(typeof m.i==='number'&&m.i!==cur)show(m.i,true);}; bc.postMessage({hello:1});}
+  if(bc){bc.onmessage=e=>{const m=e.data||{}; if(m.end){window.close();return;}
+    if(m.bgm){bgmFS(m.bgm);return;} if(m.bgmStop){bgmFS(null);return;}
+    if(typeof m.i==='number'){ bgmFS(null); if(m.i!==cur)show(m.i,true); }}; bc.postMessage({hello:1});}
   const tip=document.createElement('div'); tip.id='fstip'; tip.textContent='화면을 한 번 누르면 꽉 찬 화면이 됩니다'; document.body.appendChild(tip);
   const fs=()=>{ if(document.fullscreenElement){tip.remove();return;} document.documentElement.requestFullscreen().then(()=>tip.remove()).catch(()=>{}); };
   fs(); document.addEventListener('fullscreenchange',()=>{ if(document.fullscreenElement)tip.remove(); });
@@ -219,6 +221,10 @@ if(SCREEN){
   addEventListener('keydown',e=>{ if(e.key==='Escape'){e.stopImmediatePropagation(); return;} if(!document.fullscreenElement)fs(); },true);
 }
 let scr=null,t0=0,tick=null;
+// BGM 을 앞 화면(두 번째 모니터)에서 꽉 차게 — 발표자 화면에서 고르면 BroadcastChannel 로 영상 번호가 온다 (2026-10-03 교장님)
+function bgmFS(id){ let o=document.getElementById('bgmfs'); if(!id){ if(o)o.remove(); return; }
+  if(!o){ o=document.createElement('div'); o.id='bgmfs'; o.style.cssText='position:fixed;inset:0;z-index:9999;background:#000'; document.body.appendChild(o); }
+  o.innerHTML='<iframe src="https://www.youtube-nocookie.com/embed/'+id+'?autoplay=1&rel=0&modestbranding=1&playsinline=1" style="width:100%;height:100%;border:0" allow="autoplay; encrypted-media; fullscreen"></iframe>'; }
 const ONE=()=>document.body.classList.contains('one');
 function view(i){ cur=Math.max(0,Math.min(all.length-1,i)); all.forEach((s,k)=>s.classList.toggle('cur',k===cur)); paint(all[cur]); if(all[cur+1])paint(all[cur+1]); fit();
   document.getElementById('vn').textContent=(cur+1)+' / '+all.length; let on=null;
@@ -319,16 +325,26 @@ def bgm_html(items: list[dict]) -> str:
     cards = "".join(f'<button class="bgmc" data-id="{html.escape(v["id"])}"><img src="https://i.ytimg.com/vi/{html.escape(v["id"])}/mqdefault.jpg" alt="" loading="lazy">'
                     f'<span>{html.escape(v["title"])}</span><small>{html.escape(v["ch"])} · {tm(v["sec"])}</small></button>' for v in items)
     return ('<div id="bgmbox"><div class="bgmh"><b>🎵 BGM · 성도의 교제를 위한 찬양</b><span id="bgmnow"></span><button class="bgmx" onclick="bgmClose()">닫기 (음악은 계속)</button></div>'
-            '<div id="bgmplay"></div><div class="bgml">' + cards + '</div><p class="bgmnote">누르면 그 영상이 나옵니다 · 다른 순서로 가도 음악은 계속 · ■ 멈춤은 영상에서</p></div>'
+            '<div id="bgmmode"></div><div id="bgmplay"></div><div class="bgml">' + cards + '</div><p class="bgmnote">누르면 그 영상이 나옵니다 · 다른 순서로 가도 음악은 계속 · ■ 멈춤은 영상에서</p></div>'
             """<script>
-function bgmOpen(){ document.body.classList.add('bgm'); document.querySelectorAll('#toc a').forEach(a=>a.classList.toggle('on',a.classList.contains('bgm'))); }
+function bgmOpen(){ bgmMode(); document.body.classList.add('bgm'); document.querySelectorAll('#toc a').forEach(a=>a.classList.toggle('on',a.classList.contains('bgm'))); }
+function bgmScreen(){ return typeof scr!=='undefined' && scr && !scr.closed && typeof bc!=='undefined' && bc; }
+function bgmStop(){ if(bgmScreen()) bc.postMessage({bgmStop:1}); document.getElementById('bgmplay').innerHTML=''; document.getElementById('bgmnow').textContent=''; document.querySelectorAll('.bgmc').forEach(x=>x.classList.remove('on')); }
+function bgmMode(){ const m=document.getElementById('bgmmode'); if(!m) return; const on=bgmScreen();
+  m.innerHTML=on?'📺 앞 화면이 열려 있습니다 — 고르면 두 번째 모니터에서 전체 화면으로 나옵니다'
+               :'앞 화면이 열려 있지 않아 이 화면에서 나옵니다 <button class="bgmx" onclick="bgmOpenScreen()">📺 앞 화면 열기</button>'; }
+async function bgmOpenScreen(){ if(typeof present==='function'){ await present(); bgmOpen(); } }
 function bgmClose(){ document.body.classList.remove('bgm'); const b=document.querySelector('#toc a.bgm'); if(b) b.classList.remove('on'); }
 addEventListener('DOMContentLoaded',()=>{
   const t=document.querySelector('#toc a.bgm'); if(t) t.onclick=e=>{ e.preventDefault(); t.blur(); bgmOpen(); };
   document.querySelector('#bgmbox .bgml').onclick=e=>{ const c=e.target.closest('.bgmc'); if(!c) return;
     document.querySelectorAll('.bgmc').forEach(x=>x.classList.toggle('on',x===c));
-    document.getElementById('bgmplay').innerHTML='<iframe src="https://www.youtube-nocookie.com/embed/'+c.dataset.id+'?autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
-    document.getElementById('bgmnow').textContent='재생: '+c.querySelector('span').textContent.slice(0,40); };
+    const name=c.querySelector('span').textContent.slice(0,40), P=document.getElementById('bgmplay');
+    if(bgmScreen()){ bc.postMessage({bgm:c.dataset.id}); P.innerHTML='<div class="bgmon">📺 앞 화면(두 번째 모니터)에서 전체 화면으로 재생 중 <button class="bgmx" onclick="bgmStop()">■ 앞 화면 멈춤</button></div>';
+      document.getElementById('bgmnow').textContent='앞 화면 재생: '+name; return; }
+    P.innerHTML='<iframe src="https://www.youtube-nocookie.com/embed/'+c.dataset.id+'?autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+    document.getElementById('bgmnow').textContent='이 화면 재생: '+name; };
+  bgmMode();
 });
 </script>""")
 
@@ -338,6 +354,8 @@ BGM_CSS = """
 body.bgm #bgmbox{display:block}body.pv #bgmbox{z-index:60;left:0}body.pr #bgmbox{display:none!important}
 .bgmh{display:flex;align-items:center;gap:12px;margin-bottom:12px}.bgmh b{font-size:18px}#bgmnow{flex:1;color:#f6c76b;font-size:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .bgmx{font:700 13px inherit;border:0;border-radius:999px;padding:7px 14px;background:#fff;color:#111;cursor:pointer}
+#bgmmode{color:#cbd5e1;font-size:13.5px;margin:-4px 0 12px}#bgmmode .bgmx{margin-left:8px}
+.bgmon{display:flex;align-items:center;gap:12px;justify-content:center;background:#1e293b;border:1px solid #f6c76b;border-radius:10px;padding:18px;margin:0 auto 14px;max-width:960px;font-weight:700;color:#f6c76b}
 #bgmplay iframe{width:min(100%,960px);aspect-ratio:16/9;border:0;border-radius:10px;display:block;margin:0 auto 14px;background:#000}
 .bgml{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
 .bgmc{display:flex;flex-direction:column;gap:6px;text-align:left;border:2px solid transparent;border-radius:10px;background:#1e293b;color:#e2e8f0;padding:6px;cursor:pointer;font:600 13.5px inherit}
