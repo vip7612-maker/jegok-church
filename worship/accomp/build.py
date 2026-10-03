@@ -70,8 +70,9 @@ body{margin:0;background:#d9dce1;font-family:'Pretendard Variable',Pretendard,'A
 .rr{display:flex;align-items:center;gap:4mm}.lg{font-size:9pt;color:#64748b;display:flex;align-items:center;gap:1.5mm}.lg .nm{width:auto;padding:0 2mm;height:5.5mm;line-height:5.2mm;font-size:9pt}
 .q4{display:grid;grid-template-columns:repeat(2,16.5mm);gap:1mm 1.2mm;justify-content:center}
 .none{color:#cbd5e1}
-.sup{margin-top:auto;border:1.5px dashed #94a3b8;border-radius:3mm;padding:2.4mm 4mm;display:flex;gap:5mm;align-items:center}
+.sup{margin-top:2.5mm;border:1.5px dashed #94a3b8;border-radius:3mm;padding:2.4mm 4mm;display:flex;gap:5mm;align-items:center}
 .sup-h{white-space:nowrap}.sup-h b{display:inline;margin-right:1.5mm;font-size:15pt;color:#0b1430}.sup-h span{font-size:8.5pt;color:#64748b}
+.notice{flex:1;min-height:0;margin-top:2.5mm;border:1.5px solid #cbd5e1;background:#f8fafc;border-radius:3mm;padding:3mm 5mm;overflow:hidden}.notice b{font-size:13pt;color:#0b1430}.notice ul{margin:1.5mm 0 0;padding-left:5mm}.notice li{font-size:12pt;line-height:1.55;color:#1f2937}
 .sup-n{display:flex;flex-wrap:wrap;gap:1mm 1.2mm}.sup-n .nm{background:#f1f5f9}
 /* 글 쪽 */
 .textpage{padding:8mm 10mm;height:100%;display:flex;flex-direction:column}
@@ -207,6 +208,14 @@ WEEKS_SHOWN = 6
 GROUP_COLOR = {"인도·세션": ("#1e3a8a", "#eef2ff"), "싱어": ("#b45309", "#fff4e5"), "미디어": ("#0e7490", "#e6f7fa")}
 
 
+def notice_html(date: str) -> str:
+    """섬김표 아래 공지사항 — data/<날짜>.json 의 notices (2026-10-03 교장님 지시)."""
+    f = HERE / "data" / f"{date}.json"
+    ns = json.loads(f.read_text()).get("notices", []) if f.exists() else []
+    items = "".join(f"<li>{html.escape(x)}</li>" for x in ns)
+    return f'<div class="notice"><b>📢 공지사항</b><ul>{items}</ul></div>'
+
+
 def roster_html(date: str) -> str:
     """섬김표 — roster.json 하나로 관리(주보마다 따로 두지 않음). 이번 주부터 6주, 지원팀은 날짜와 상관없는 명단."""
     import datetime as _dt
@@ -223,7 +232,8 @@ def roster_html(date: str) -> str:
             for k, x in enumerate(days):
                 names = R["weeks"].get(x.isoformat(), {}).get(role, [])
                 # 한 칸 = 이름 자리 4개(2×2), 폭은 모두 같게 — 빈 자리는 비워 둔다 (2026-10-03 교장님 지시)
-                slots = (names + [""] * 4)[:max(4, len(names))]
+                cap = R.get("role_slots", {}).get(role, 4)   # 촬영은 2자리(2×1)
+                slots = (names + [""] * cap)[:max(cap, len(names))]
                 base = R.get("defaults", {}).get(role)   # 평소 사람과 다르면 색을 바꿔 눈에 띄게 (2026-10-03 교장님 지시)
                 chip = lambda v: (f'<span class="nm chg">{html.escape(v)}</span>' if base and v not in base
                                   else f'<span class="nm" style="background:{soft};border-color:{c}33">{html.escape(v)}</span>')
@@ -242,7 +252,7 @@ def roster_html(date: str) -> str:
             f'<div class="rr"><span class="range">{days[0].month}.{days[0].day} ~ {days[-1].month}.{days[-1].day}</span></div></div>'
             f'<table class="rt"><colgroup><col style="width:19mm"><col style="width:27mm">{"<col>" * WEEKS_SHOWN}</colgroup>'
             f'<tr><th></th><th></th>{head}</tr>{"".join(rows)}</table>'
-            f'<div class="sup"><div class="sup-h"><b>지원팀</b><span>{len(R.get("support", []))}명</span></div><div class="sup-n">{sup}</div></div></div>')
+            f'<div class="sup"><div class="sup-h"><b>지원팀</b><span>{len(R.get("support", []))}명</span></div><div class="sup-n">{sup}</div></div>{notice_html(date)}</div>')
 
 
 RECITE = HERE / "recite.json"
