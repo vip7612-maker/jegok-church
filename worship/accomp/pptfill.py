@@ -22,6 +22,15 @@ TITLE = re.compile(r"^\s*([가-힣]+)\s*(\d+):(\d+)")
 ENDS = ("니", "며", "고", "요", "면", "라", "서", "나", "여", "지", "되", "데")
 
 
+def save(prs, pptx: Path) -> None:
+    """저장 전에 슬라이드 파일 이름을 순서대로 다시 매긴다 — 장을 빼고 더하다 보면 이름이 겹쳐 PPTX 가 깨진다."""
+    from pptx.opc.packuri import PackURI
+    parts = [s.part for s in prs.slides]
+    for k, part in enumerate(parts, 1): part.partname = PackURI(f"/ppt/slides/tmp_slide{k}.xml")
+    for k, part in enumerate(parts, 1): part.partname = PackURI(f"/ppt/slides/slide{k}.xml")
+    prs.save(str(pptx))
+
+
 def verses(book: str, ch: int, a: int, b: int) -> dict[int, str]:
     out = subprocess.run([sys.executable, str(BIBLE), f"{book} {ch}:{a}-{b}"], capture_output=True, text=True).stdout
     return {int(m[1]): m[2].strip() for m in re.finditer(r"^(\d+)\s{2,}(.+)$", out, re.M)}
@@ -157,7 +166,7 @@ def recite(pptx: Path, date: str) -> list[str]:
             fill(s, f"{book} {ch}:{v}", lines_of(text[v]))
             log.append(f"{book} {ch}:{v} 장 더함 ({last + 1}장)")
         log.append(f"{book} {ch}장 암송: {want}절까지 맞춤")
-    prs.save(str(pptx))
+    save(prs, pptx)
     return log
 
 
@@ -255,7 +264,7 @@ def creed(pptx: Path) -> list[str]:
             for j, t in enumerate(sec["ru"]): _para(tf, t, "ru", before=8 if j == 0 else 0)
             for j, t in enumerate(sec["en"]): _para(tf, t, "en", before=2 if j == 0 else 0)
         log.append(f"사도신경 장 다시 꾸밈: {secs[0]['ko'][0][:16]}… ({len(secs)}마디)")
-    prs.save(str(pptx))
+    save(prs, pptx)
     return log
 
 
@@ -475,7 +484,7 @@ def layout(pptx: Path, date: str) -> list[str]:
     from pptx import Presentation
     prs = Presentation(str(pptx))
     log = reading(prs, date) + fit_ads(prs) + fit_recite(prs) + one_line(prs, "성경암송") + creed_cover(prs)
-    prs.save(str(pptx))
+    save(prs, pptx)
     return log
 
 
@@ -517,7 +526,108 @@ def render_check(pptx: Path, pdf: Path | None = None, fix: bool = True) -> list[
                 for r in pa.runs:
                     if r.font.size: r.font.size = Pt(int(r.font.size.pt * k * 0.98))
             log.append(f"{i + 1}장 글이 넘쳐 {k * 98:.0f}% 로 줄임")
-        prs.save(str(pptx))
+        save(prs, pptx)
+    return log
+
+
+# ── 곡 장 넣기: 콘티 순서대로 찬양 자리에 곡별 PPT 의 장을 (2026-10-03 교장님: 내려받은 PPT 에도 악보가 있어야) ─────
+SONG_TAG = "songppt|"
+
+
+def _divider(slide) -> str | None:
+    t = re.sub(r"\s", "", " ".join(x.text_frame.text for x in slide.shapes if x.has_text_frame))
+    if ("찬양과경배" in t or "찬양과결단" in t) and "Praise&Worship" in t and len(t) < 160:
+        return "결단" if "찬양과결단" in t else "경배"
+    return None
+
+
+def _song_titles(date: str) -> list[str]:
+    d = json.loads((HERE / "data" / f"{date}.json").read_text()).get("songs", {})
+    return [x.get("title", "") for g in ("intro", "main", "apply") for x in d.get(g, [])]
+
+
+def is_song_slide(slide) -> bool:
+    return any(sh.name.startswith(SONG_TAG) for sh in slide.shapes)
+
+
+def strip_songs(prs) -> int:
+    n = 0
+    for i in reversed(range(len(prs.slides))):
+        if is_song_slide(prs.slides[i]): drop(prs, i); n += 1
+    return n
+
+
+def base_copy(pptx: Path, dst: Path) -> Path:
+    """곡 장을 뺀 사본 — 구글 변환(PDF·넘침 검사)은 이것으로(곡 장까지 넣으면 구글 내보내기 크기 한도를 넘는다)."""
+    from pptx import Presentation
+    prs = Presentation(str(pptx)); strip_songs(prs); save(prs, dst)
+    return dst
+
+
+def to_pdf(src: Path, dst: Path) -> Path:
+    """pptx → 구글 슬라이드로 잠깐 바꿔 PDF 로 내보내고 임시본은 지운다."""
+    import uuid
+    sys.path.insert(0, str(HERE.parent)); import prep
+    g = prep.G(prep.access_token()); b = f"b{uuid.uuid4().hex}"
+    meta = json.dumps({"name": "_임시 변환", "mimeType": "application/vnd.google-apps.presentation"}).encode()
+    body = (f"--{b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n".encode() + meta + f"\r\n--{b}\r\nContent-Type: {prep.PPTX_MIME}\r\n\r\n".encode()
+            + src.read_bytes() + f"\r\n--{b}--".encode())
+    f = g.req("POST", f"{prep.UPLOAD}/files?uploadType=multipart&fields=id", body, ctype=f"multipart/related; boundary={b}", timeout=600)
+    try:
+        dst.write_bytes(g.req("GET", f"{prep.DRIVE}/files/{f['id']}/export?mimeType=application/pdf", timeout=600))
+    finally:
+        g.req("DELETE", f"{prep.DRIVE}/files/{f['id']}")
+    return dst
+
+
+def songs(pptx: Path, date: str) -> list[str]:
+    """찬양과경배·찬양과결단 표지마다 바로 뒤에 그 순서 곡의 장을 모두(악보 그림 + 자막 글상자).
+    전에 넣은 곡 장(모양 이름 songppt|…)은 먼저 빼고 다시 넣는다 — 콘티가 바뀌어도 겹치지 않는다."""
+    import base64, io
+    from pptx import Presentation
+    from pptx.dml.color import RGBColor
+    from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+    from pptx.util import Pt
+    import songbank, songppt as SP
+    prs = Presentation(str(pptx)); W, H = prs.slide_width, prs.slide_height; kx, ky = W / 1920, H / 1080
+    strip_songs(prs)                                               # 예전에 넣은 곡 장 빼기
+    titles = _song_titles(date)
+    divs = [i for i, s in enumerate(prs.slides) if _divider(s)]
+    if len(titles) != len(divs):
+        return [f"곡 {len(titles)}개와 찬양 자리 {len(divs)}개가 맞지 않음 — 곡 장을 넣지 않음"]
+    blank = next((l for l in prs.slide_layouts if l.name.upper() == "BLANK"), prs.slide_layouts[-1])
+    ix = songbank.load_index(); log, shift = [], 0
+    for di, title in zip(divs, titles):
+        key = songbank.find(title, ix)
+        if not key:
+            log.append(f"「{title}」 곡별 PPT 없음 — 자리만 둠"); continue
+        song = json.loads((SP.DB / SP.file_name(key)[:-5] / "song.json").read_text(encoding="utf-8"))
+        at = di + shift
+        for j, sl in enumerate(song["slides"], 1):
+            new = prs.slides.add_slide(blank)
+            for ph in list(new.placeholders): ph._element.getparent().remove(ph._element)
+            bg = new.background.fill; bg.solid(); bg.fore_color.rgb = RGBColor(255, 255, 255)
+            x, y, w, h = sl["pic"]
+            pic = new.shapes.add_picture(io.BytesIO(base64.b64decode(sl["img"])), int(x * kx), int(y * ky), int(w * kx), int(h * ky))
+            pic.name = f"{SONG_TAG}{key}|{j}"
+            sub = sl.get("sub")
+            if sub and sub.get("lines"):
+                bx, by, bw, bh = sub["box"]; bx, bw = max(bx, 0), min(bw, 1920 - max(bx, 0))
+                tb = new.shapes.add_textbox(int(bx * kx), int(by * ky), int(bw * kx), int(min(bh, 1080 - by) * ky))
+                tb.name = f"{SONG_TAG}{key}|{j}|sub"
+                tb.fill.solid(); tb.fill.fore_color.rgb = RGBColor.from_string((sub.get("fill") or "#000000").lstrip("#").upper())
+                tf = tb.text_frame; tf.word_wrap = True; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+                lines = [{"t": part.strip(), "c": ln.get("c")} for ln in sub["lines"] for part in re.split(r"[\n\v]+", ln["t"]) if part.strip()]
+                size = min(sub["size"] * 0.75, bh * 0.75 / (len(lines) * 1.25))           # 1920 화면 px → pt, 줄이 많으면 줄임
+                for k, ln in enumerate(lines):
+                    pa = tf.paragraphs[0] if k == 0 else tf.add_paragraph(); pa.alignment = PP_ALIGN.CENTER
+                    r = pa.add_run(); r.text = ln["t"]; r.font.bold = True; r.font.name = "Arial"; r.font.size = Pt(size)
+                    r.font.color.rgb = RGBColor.from_string((ln.get("c") or "#ffffff").lstrip("#").upper())
+                while size > 14 and not fits(tb, size): size -= 1; set_size(tb, size)
+            lst = prs.slides._sldIdLst; last = list(lst)[-1]; lst.remove(last); list(lst)[at].addnext(last); at += 1
+        shift += len(song["slides"])
+        log.append(f"「{title}」 → {key} {len(song['slides'])}장")
+    save(prs, pptx)
     return log
 
 
@@ -538,5 +648,9 @@ def upload(pptx: Path, date: str) -> str:
 if __name__ == "__main__":
     a = sys.argv[1:]; date = a[0]
     px = HERE / "worship_ppt" / f"{date}.pptx"
-    for line in recite(px, date) + creed(px) + layout(px, date) + render_check(px): print(line)
+    from pptx import Presentation
+    prs = Presentation(str(px)); n = strip_songs(prs); save(prs, px)
+    if n: print(f"곡 장 {n}장 먼저 뺌(다시 넣음)")
+    for line in recite(px, date) + creed(px) + layout(px, date) + render_check(px, px.with_suffix(".pdf")): print(line)
+    for line in songs(px, date): print(line)
     if "--upload" in a: print("드라이브 갱신:", upload(px, date))

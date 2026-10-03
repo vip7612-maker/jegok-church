@@ -296,10 +296,11 @@ def rewrap(slides: list[dict], pptx: Path | None) -> list[dict]:
     if not pptx or not Path(pptx).exists(): return slides
     from pptx import Presentation
     prs = Presentation(str(pptx))
+    src = [x for x in prs.slides if not any(sh.name.startswith("songppt|") for sh in x.shapes)]   # PDF 는 곡 장을 뺀 사본에서 나온다
     flat = lambda t: re.sub(r"\s", "", t)
     for k, sl in enumerate(slides):
-        if k >= len(prs.slides): break
-        paras = [flat("".join(r.text for r in pa.runs)) for sh in prs.slides[k].shapes if sh.has_text_frame
+        if k >= len(src): break
+        paras = [flat("".join(r.text for r in pa.runs)) for sh in src[k].shapes if sh.has_text_frame
                  for pa in sh.text_frame.paragraphs]
         paras = [x for x in paras if x]
         out, i, T = [], 0, sl["texts"]
@@ -466,12 +467,12 @@ def fetch(date: str) -> str:
     mt = dt.datetime.fromisoformat(f["modifiedTime"].replace("Z", "+00:00")).timestamp()
     if pdf.exists() and px.exists() and px.stat().st_mtime >= mt: return "주일예배 PPT 그대로"
     px.parent.mkdir(exist_ok=True); px.write_bytes(g.download(f["id"]))
-    c = g.req("POST", f"{prep.DRIVE}/files/{f['id']}/copy?supportsAllDrives=true&fields=id",
-              {"name": f"_임시 변환 {f['name']}", "mimeType": "application/vnd.google-apps.presentation"}, timeout=300)
+    import pptfill                                   # 곡 장(악보)까지 든 PPT 는 구글 내보내기 한도를 넘는다 — 곡 장을 뺀 사본으로 PDF
+    base = pptfill.base_copy(px, px.with_name(px.stem + ".base.pptx"))
     try:
-        pdf.write_bytes(g.req("GET", f"{prep.DRIVE}/files/{c['id']}/export?mimeType=application/pdf", timeout=300))
+        pptfill.to_pdf(base, pdf)
     finally:
-        g.req("DELETE", f"{prep.DRIVE}/files/{c['id']}?supportsAllDrives=true")
+        base.unlink(missing_ok=True)
     os.utime(px, (mt, mt))
     return f"주일예배 PPT 받음 · {f['name']}"
 
