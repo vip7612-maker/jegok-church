@@ -409,7 +409,12 @@ def render(date: str, pg: list[dict], fonts: dict[str, str], back: str) -> str:
                  + "".join(block_html(b, f"p{i}b{n}") for n, b in enumerate(p.get("blocks", [])))
                  + "".join(cell_html(c, f"p{i}c{n}") for n, c in enumerate(p.get("cells", []))) + "</div>")
     sb = JF.SAVEBAR.read_text() if JF.SAVEBAR.exists() else ""
-    return PAGE.format(title=E(title), ff=ff, body=body, back=back, savebar=sb)
+    import wsnav                                       # 예배 주간 쪽 공통 상단 메뉴 (2026-10-03 교장님)
+    sub = ('<a class="sub" data-j="view" href="./">📰 보기</a><a class="sub" data-j="edit" href="edit.html">✏️ 고치기</a>')
+    nav = (wsnav.nav("jubo", wsnav.label(date), sub, [("📄 HWPX 받기", "doc.hwpx"), ("📕 PDF 받기", "doc.pdf")], date=date)
+           + "<script data-share>" + wsnav.JS + "(function(){var e=/edit\\.html$/.test(location.pathname);"
+             "document.querySelectorAll('.wsnav [data-j]').forEach(function(a){a.classList.toggle('on',(a.dataset.j==='edit')===e)})})();</script>")
+    return PAGE.format(title=E(title), ff=ff, body=body, back=back, savebar=sb, nav=nav, navcss=wsnav.CSS)
 
 
 PAGE = r"""<!doctype html><html lang="ko"><head><meta charset="utf-8">
@@ -432,10 +437,11 @@ body.showtrace .trace{{display:block}}
 .cell:hover{{background:rgba(232,163,60,.12)}}.cell:focus{{background:rgba(232,163,60,.2);box-shadow:inset 0 0 0 1px #e8a33c}}
 .blk:hover{{background:rgba(232,163,60,.08)}}.blk:focus{{background:rgba(232,163,60,.14);box-shadow:0 0 0 1px #e8a33c}}
 .ln:hover{{background:rgba(232,163,60,.12)}}.ln:focus{{background:rgba(232,163,60,.22);box-shadow:0 0 0 1px #e8a33c}}
-.savebar{{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;padding:8px;background:#2b2f33}}
+.savebar{{position:sticky;top:var(--navh,88px);z-index:20;display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;padding:8px;background:#2b2f33}}
 .savebar button,.jnav a{{font:700 13px "Noto Sans KR",sans-serif;border:0;border-radius:8px;padding:7px 13px;cursor:pointer;background:#e8a33c;color:#1a1c1e;text-decoration:none}}
 .savebar .msg{{color:#e7eaec;font-size:12.5px}}
 .jnav{{display:flex;justify-content:center;gap:8px;padding:8px 0 0}}.jnav a{{background:#fff;border:1px solid #cbd5e1}}
+{navcss}
 .tip{{text-align:center;font-size:12.5px;color:#334155;margin:6px 0 0}}
 .savebar~.jnav .editlink{{display:none}}
 .tip{{display:none}}.savebar~.tip{{display:block}}   /* 고치는 법 안내는 편집본에서만 */   /* 편집본에서는 「고치기」 링크를 숨기고, 공유본(저장 단추가 빠짐)에서만 보인다 */
@@ -445,6 +451,7 @@ body.showtrace .trace{{display:block}}
 .ln:hover,.ln:focus{{background:none;box-shadow:none}}*{{-webkit-print-color-adjust:exact;print-color-adjust:exact}}}}
 </style></head>
 <body>
+{nav}
 <div class="savebar" role="toolbar" aria-label="저장">
   <button class="main" id="b-save" type="button" style="background:#16a34a;color:#fff">💾 저장하기</button>
   <button class="main" id="b-hwpx" type="button">HWPX로 저장</button>
@@ -455,7 +462,6 @@ body.showtrace .trace{{display:block}}
 </div>
 <div id="linkbox" role="dialog" aria-modal="true"><div class="in"><b>링크</b>
   <input id="linkin" readonly><button type="button" id="b-copy">링크 복사</button> <button type="button" id="b-close">닫기</button></div></div>
-<nav class="jnav"><a href="{back}">◀ 악보집으로</a><a class="editlink" href="edit.html">✏️ 고치기</a></nav>
 <p class="tip">글자를 누르면 바로 고칠 수 있습니다 · 다 고친 뒤 <b>💾 저장하기</b>를 누르면 이 주보 링크에 바로 반영됩니다 · 「원본 겹쳐 보기」로 원본과 비교</p>
 <meta name="jubo-key" content="">
 {body}

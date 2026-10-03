@@ -120,7 +120,7 @@ body{{margin:0;background:#0f172a;color:#fff;font-family:'Pretendard Variable',P
 .top a,.top button{{font:700 13px inherit;text-decoration:none;border:0;border-radius:999px;padding:7px 14px;background:#fff;color:#111;cursor:pointer;white-space:nowrap}}
 .top .pr{{background:#f6c76b}}
 .wrap{{display:flex}}
-#toc{{position:sticky;top:46px;align-self:flex-start;width:190px;flex:0 0 190px;max-height:calc(100vh - 46px);overflow-y:auto;padding:10px 8px;background:#0b1220;font-size:13px}}
+#toc{{position:sticky;top:var(--navh,88px);align-self:flex-start;width:190px;flex:0 0 190px;max-height:calc(100vh - var(--navh,88px));overflow-y:auto;padding:10px 8px;background:#0b1220;font-size:13px}}
 #toc a{{display:block;color:#cbd5e1;text-decoration:none;padding:5px 8px;border-radius:6px}}#toc a:hover,#toc a.on{{background:#1e293b;color:#f6c76b}}
 #toc a.song{{padding-left:18px;color:#93c5fd}}#toc a:focus,#toc a:focus-visible{{outline:none!important}}#toc a.on{{background:rgba(246,199,107,.16);color:#f6c76b;box-shadow:inset 4px 0 #f6c76b;font-weight:700}}
 main{{flex:1;min-width:0;padding:14px;display:flex;flex-direction:column;align-items:center;gap:14px}}
@@ -128,10 +128,10 @@ main{{flex:1;min-width:0;padding:14px;display:flex;flex-direction:column;align-i
 .sl .in{{position:absolute;left:0;top:0;width:1440px;height:810px;transform-origin:0 0;background-size:100% 100%}}
 .sl .tx{{position:absolute;white-space:pre;line-height:1;transform-origin:0 0}}
 .sl .no{{position:absolute;right:8px;bottom:6px;font-size:11px;color:#fff;background:rgba(0,0,0,.45);border-radius:999px;padding:1px 7px;z-index:2}}
-body.pr .top,body.pr #toc,body.pr .no{{display:none}}body.pr main{{padding:0;gap:0}}body.pr{{background:#000;overflow:hidden}}
+body.pr .top,body.pr .wsnav,body.pv .wsnav,body.pr #toc,body.pr .no{{display:none}}body.pr main{{padding:0;gap:0}}body.pr{{background:#000;overflow:hidden}}
 body.pr .sl{{display:none;position:fixed;inset:0;margin:auto;width:min(100vw,calc(100vh*16/9));border-radius:0;box-shadow:none}}body.pr .sl.cur{{display:block}}
 /* 한 장 보기(기본) — 목차를 누르면 스크롤 없이 그 장만 바로 (2026-10-03 교장님 지시) */
-body.one:not(.pr) main .sl{{display:none;width:min(100%,calc((100vh - 120px)*16/9))}}body.one:not(.pr) main .sl.cur{{display:block}}
+body.one:not(.pr) main .sl{{display:none;width:min(100%,calc((100vh - var(--navh,88px) - 80px)*16/9))}}body.one:not(.pr) main .sl.cur{{display:block}}
 #vbar{{display:none;align-items:center;gap:10px;font-weight:700}}body.one #vbar{{display:flex}}body.pr #vbar{{display:none}}
 #vbar button{{font:700 14px inherit;border:0;border-radius:999px;padding:8px 18px;background:#fff;color:#111;cursor:pointer}}
 /* 발표자 보기(메인 모니터) — 청중 화면은 두 번째 모니터 창 (2026-10-03 교장님 지시) */
@@ -151,8 +151,8 @@ body.one:not(.pr) main .sl{{display:none;width:min(100%,calc((100vh - 120px)*16/
 .pvstop{{flex:0 0 auto;background:#475569;color:#fff}}.pvnote{{font-size:12px;color:#94a3b8;line-height:1.5}}
 #fstip{{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:30;background:rgba(0,0,0,.7);color:#fff;padding:10px 18px;border-radius:999px;font-size:16px}}
 @media (max-width:760px){{#pv{{left:0}}#toc{{display:none}}.top b{{flex:1 0 100%}}main{{padding:8px}}}}
-</style></head><body class="one">
-<div class="top"><b>📽️ {title} · {n}장</b><button class="pr" onclick="present()">▶ 예배용</button><button id="lbtn" onclick="toggleList()">☰ 목록으로 보기</button>{dl}<a href="./">◀ 악보집으로</a></div>
+{navcss}</style></head><body class="one">
+{nav}
 <div class="wrap"><nav id="toc">{toc}</nav><main id="deck">{slides}<div id="vbar"><button onclick="view(cur-1)">◀ 이전</button><span id="vn"></span><button onclick="view(cur+1)">다음 ▶</button></div></main></div>
 <div id="pv"><div class="pvl"><div class="pvlab">지금 앞 화면</div><div id="pvcur" class="pvbox"></div></div>
 <div class="pvr"><div class="pvlab">다음 장</div><div id="pvnext" class="pvbox"></div>
@@ -226,8 +226,10 @@ function view(i){ cur=Math.max(0,Math.min(all.length-1,i)); all.forEach((s,k)=>s
   if(on){on.classList.add('on'); on.scrollIntoView({block:'nearest'});} window.scrollTo(0,0); }
 function back(){ if(ONE()) view(cur); else all[cur].scrollIntoView({block:'center'}); }
 function toggleList(){ const b=document.getElementById('lbtn');
-  if(ONE()){ document.body.classList.remove('one'); all.forEach(s=>s.classList.remove('cur')); b.textContent='▣ 한 장씩 보기'; fit(); all[cur].scrollIntoView({block:'start'}); }
-  else { const i=firstVisible(); document.body.classList.add('one'); b.textContent='☰ 목록으로 보기'; view(i); } }
+  if(ONE()){ document.body.classList.remove('one'); all.forEach(s=>s.classList.remove('cur')); fit(); all[cur].scrollIntoView({block:'start'}); }
+  else { const i=firstVisible(); document.body.classList.add('one'); view(i); }
+  document.getElementById('b-one').classList.toggle('on',ONE()); if(b) b.classList.toggle('on',!ONE()); }
+function wsView(one){ if(one!==ONE()) toggleList(); }
 if(!SCREEN){ view(0);
   addEventListener('keydown',e=>{ const c=document.body.classList; if(!ONE()||c.contains('pr')||c.contains('pv')) return;
     if(['ArrowRight','ArrowDown','PageDown',' '].includes(e.key)){e.preventDefault();view(cur+1)}
@@ -285,7 +287,16 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
     sl = "".join(f'<section class="sl" id="s{s["n"]}" data-i="{k}"><div class="in"></div><span class="no">{s["n"]}</span></section>'
                  for k, s in enumerate(slides))
     toc = "".join(f'<a href="#s{n}" class="{"song" if name.startswith("♪") else ""}">{html.escape(name)}</a>' for n, name in outline(slides, list(songs or [])))
-    return PAGE.format(title=html.escape(title), n=len(slides), slides=sl, toc=toc, dl=dl,
+    import re as _re, wsnav                      # 공통 상단 메뉴 (2026-10-03 교장님: 쪽마다 상단 통일)
+    m = _re.search(r"\d+월 \d+일", title)
+    dls = [(("📊 PPT 받기" if h.endswith(".pptx") else "📕 PDF 받기"), h) for h in _re.findall(r'href="([^"]+)"', dl or "")]
+    note = "" if dls else _re.sub(r"<[^>]+>", "", dl or "")
+    sub = ('<button class="sub on" id="b-one" onclick="wsView(true)">▣ 한 장씩</button>'
+           '<button class="sub" id="lbtn" onclick="wsView(false)">☰ 목록</button>'
+           '<button class="sub" onclick="present()">▶ 예배용(두 화면)</button>'
+           + (f'<span class="note">{html.escape(note)}</span>' if note.strip() else ""))
+    nav = wsnav.nav("ppt", m.group(0) if m else title, sub, dls) + f"<script>{wsnav.JS}</script>"
+    return PAGE.format(title=html.escape(title), n=len(slides), slides=sl, toc=toc, dl=dl, nav=nav, navcss=wsnav.CSS,
                        data=json.dumps(data, ensure_ascii=False, separators=(",", ":")), pvjs=PVJS)
 
 

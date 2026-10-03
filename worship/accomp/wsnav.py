@@ -1,0 +1,90 @@
+"""예배 주간 쪽(악보 · PPT · 주보 · 🔒 준비) 공통 상단 메뉴 — 2단 고정 (2026-10-03 교장님: 쪽마다 상단이 달라 어수선하다)
+
+  1단  ⛪ 제곡교회 예배 · 10월 4일   [악보] [PPT] [주보] [🔒 준비]  [⋯]     ← 어느 쪽에서나 똑같다
+  2단  그 탭의 하위 메뉴 ……………………………………  [⬇ 내려받기 ▾]          ← 지금 쪽에 맞는 것만
+
+docsave 공유본에 붙던 주황 [HWPX·PDF·링크 복사] 줄은 data-wsnav 가 있으면 붙지 않고, 「내려받기 ▾」 안으로 들어간다.
+옛 `.bar` 자리를 그대로 쓰므로(class="bar wsnav") 악보집의 보기 전환·준비 탭 스크립트는 손대지 않아도 된다.
+"""
+from __future__ import annotations
+
+import html as H
+
+BASE = "https://report-site-kohl.vercel.app"
+
+CSS = """
+.wsnav{position:sticky;top:0;z-index:40;display:block!important;padding:0!important;background:#1f2937;color:#fff;font:14px 'Pretendard Variable',Pretendard,'Noto Sans KR',system-ui,sans-serif;word-break:keep-all}
+.wsnav .r1{display:flex;align-items:center;gap:6px;padding:7px 12px;min-height:48px}
+.wsnav .ttl{margin-right:auto;font-weight:800;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;color:#fff;text-decoration:none}
+.wsnav .tabs{display:flex;gap:4px;flex:0 0 auto}
+.wsnav .tab{width:auto;font:700 14px inherit;border:0;border-radius:999px;padding:7px 15px;background:none;color:#e2e8f0;text-decoration:none;cursor:pointer;white-space:nowrap}
+.wsnav .tab:hover{background:#334155}
+.wsnav .tab.cur{background:#f6c76b;color:#412402}
+body.prep .wsnav .tab.cur:not([data-mode]){background:none;color:#e2e8f0}
+body.prep .wsnav .tab[data-mode=prep]{background:#f6c76b;color:#412402}
+.wsnav .r2{display:flex;align-items:center;gap:4px;padding:5px 12px;background:#334155;min-height:40px;flex-wrap:wrap}
+.wsnav .sub{width:auto;font:600 13px inherit;border:0;border-radius:7px;padding:6px 12px;background:none;color:#e2e8f0;text-decoration:none;cursor:pointer;white-space:nowrap}
+.wsnav .sub:hover{background:#475569}
+.wsnav .sub.on{background:#475569;color:#fff;box-shadow:inset 0 -2px 0 #f6c76b}
+.wsnav .note{font-size:12.5px;color:#cbd5e1;padding:0 6px}
+.wsnav details{position:relative}
+.wsnav summary{list-style:none;cursor:pointer}.wsnav summary::-webkit-details-marker{display:none}
+.wsnav .dl>summary{font:700 13px inherit;border-radius:7px;padding:6px 12px;background:#e8a33c;color:#412402;white-space:nowrap}
+.wsnav .more>summary{font:800 15px inherit;border:1px solid #475569;border-radius:999px;padding:4px 11px;color:#e2e8f0;line-height:1.2}
+.wsnav .menu{position:absolute;right:0;top:calc(100% + 6px);z-index:50;min-width:190px;background:#fff;color:#111;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);padding:4px;display:flex;flex-direction:column}
+.wsnav .menu a,.wsnav .menu button{font:600 14px inherit;text-align:left;border:0;background:none;color:#111;padding:10px 12px;border-radius:7px;text-decoration:none;cursor:pointer}
+.wsnav .menu a:hover,.wsnav .menu button:hover{background:#f1f5f9}
+.wsnav .push{margin-left:auto}
+.wsnav .msg{font-size:12.5px;color:#fde68a}.wsnav .msg:empty{display:none}
+@media (max-width:640px){
+  .wsnav .r1{flex-wrap:wrap;gap:5px;padding:6px 8px}
+  .wsnav .ttl{flex:1 0 100%;font-size:13px}
+  .wsnav .tabs{flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+  .wsnav .tab{padding:7px 2px;font-size:13px;text-align:center}
+  .wsnav .r2{padding:4px 8px}.wsnav .sub{padding:6px 9px;font-size:12.5px}
+}
+@media print{.wsnav{display:none!important}}
+"""
+
+JS = r"""
+(function(){
+  // 열린 메뉴(내려받기·더보기)는 바깥을 누르면 닫는다
+  // 메뉴 높이를 --navh 로 알려 준다(목차·옆 칸이 메뉴 바로 아래 붙도록)
+  const nh=()=>{ const n=document.querySelector('.wsnav'); if(n) document.documentElement.style.setProperty('--navh',n.offsetHeight+'px'); };
+  nh(); addEventListener('resize',nh); addEventListener('load',nh);
+  document.addEventListener('click',e=>{ document.querySelectorAll('.wsnav details[open]').forEach(d=>{ if(!d.contains(e.target)) d.open=false; }); });
+  window.wsCopyLink=function(btn){ const u=location.href.split('#')[0], m=document.querySelector('.wsnav .msg');
+    const ok=()=>{ if(m){ m.textContent='링크가 복사되었습니다'; setTimeout(()=>m.textContent='',2500);} const d=btn.closest('details'); if(d) d.open=false; };
+    if(navigator.clipboard) navigator.clipboard.writeText(u).then(ok,()=>prompt('이 주소를 복사하세요',u)); else prompt('이 주소를 복사하세요',u); };
+})();
+"""
+
+
+def label(date: str) -> str:
+    return f"{int(date[5:7])}월 {int(date[8:10])}일"
+
+
+def nav(cur: str, when: str, sub: str = "", dl: list[tuple[str, str]] | None = None,
+        date: str | None = None, prep_js: bool = False) -> str:
+    """cur: 'score'|'ppt'|'jubo' · when: '10월 4일' · sub: 2단 왼쪽(하위 메뉴) HTML · dl: [(이름, href 또는 'js:함수()')]
+    date 를 주면 탭 주소를 절대 주소로(주보처럼 다른 폴더에 사는 쪽), 없으면 같은 폴더 상대 주소.
+    prep_js: 악보집 안에서는 🔒 준비를 같은 쪽 안에서 연다(wsPrep)."""
+    root = f"{BASE}/jegok_worship_{date.replace('-', '')}/" if date else "./"
+    def tab(key, name, href):
+        c = " cur" if key == cur else ""
+        return f'<a class="tab{c}" href="{href}">{name}</a>'
+    prep = ('<button class="tab" data-mode="prep" onclick="wsPrep()">🔒 준비</button>' if prep_js
+            else f'<a class="tab" href="{root}#prep">🔒 준비</a>')
+    items = []
+    for name, href in (dl or []):
+        if href.startswith("js:"):
+            items.append(f'<button type="button" onclick="{H.escape(href[3:])}">{name}</button>')
+        else:
+            items.append(f'<a href="{H.escape(href)}" download>{name}</a>')
+    items.append('<button type="button" onclick="wsCopyLink(this)">🔗 링크 복사</button>')
+    return (f'<header class="bar wsnav" data-wsnav><div class="r1"><a class="ttl" href="{root}">⛪ 제곡교회 예배 · {H.escape(when)}</a>'
+            f'<nav class="tabs">{tab("score", "악보", root)}{tab("ppt", "PPT", root + "ppt.html")}{tab("jubo", "주보", root + "jubo.html")}{prep}</nav>'
+            f'<details class="more"><summary aria-label="더보기">⋯</summary><div class="menu">'
+            f'<a href="{BASE}/jegok_worship">🏠 예배 플랫폼 처음</a><a href="{BASE}/jegok_worship/song.html">🎵 곡별 PPT</a></div></details></div>'
+            f'<div class="r2">{sub}<span class="msg" aria-live="polite"></span>'
+            f'<details class="dl push"><summary>⬇ 내려받기 ▾</summary><div class="menu">{"".join(items)}</div></details></div></header>')

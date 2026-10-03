@@ -14,6 +14,7 @@ from __future__ import annotations
 import base64, html, json, re, subprocess, sys
 from pathlib import Path
 
+import wsnav  # 예배 주간 쪽 공통 상단 메뉴 (2026-10-03)
 HERE = Path(__file__).resolve().parent
 KIND = {"cover": "표지", "roster": "섬김표", "recite": "암송", "sermon_text": "설교본문",
         "sermon_summary": "설교요약", "creed": "사도신경", "scores": "악보"}
@@ -165,6 +166,12 @@ body.prep{overflow:hidden}body.prep #prep{display:block}
 #prep .card .ct u{text-decoration:none;font-size:11px;color:#0e7490;background:#e6f7fa;border-radius:6px;padding:2px 6px;margin-left:auto}
 #prep .card img{display:block;width:100%;height:auto}
 #prep .empty{color:#64748b;text-align:center;padding:60px 0}
+#prep .conti{margin-top:22px;background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+#prep .conti h3{margin:0 0 6px;font-size:16px}#prep .conti .th{margin:0 0 8px;color:#475569;font-size:13px}
+#prep .conti .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}#prep .conti h4{margin:6px 0;font-size:14px;color:#1e3a8a}
+#prep .conti .tp i{font-style:normal;font-size:12px;font-weight:700;color:#b45309}#prep .conti ol{margin:4px 0 10px;padding-left:22px;font-size:14px;line-height:1.7}
+#prep .conti a{color:#1d4ed8;text-decoration:none}#prep .conti a.sh{font-size:12px;color:#64748b;border:1px solid #cbd5e1;border-radius:6px;padding:0 5px;margin-left:4px}
+#prep .conti .empty{padding:20px 0}
 #zoom{display:none;position:fixed;inset:0;z-index:60;background:rgba(15,23,42,.92);overflow:auto;cursor:zoom-out}
 #zoom img{display:block;max-width:min(1100px,100%);margin:20px auto;background:#fff}
 @media print{#prep,#zoom{display:none!important}}
@@ -268,7 +275,7 @@ PREP = r"""
     const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
     const key=await crypto.subtle.deriveKey({name:'PBKDF2',hash:'SHA-256',salt:b64(box.salt),iterations:box.it},base,{name:'AES-GCM',length:256},false,['decrypt']);
     const t=new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(box.iv)},key,b64(box.ct)));
-    inner.innerHTML=t; inner.hidden=false; lock.hidden=true;
+    inner.innerHTML=t; inner.hidden=false; lock.hidden=true; if(window.wsBoardInit) wsBoardInit(inner);
     inner.querySelectorAll('.card').forEach(c=>c.onclick=()=>{zoom.innerHTML='';zoom.appendChild(c.querySelector('img').cloneNode());zoom.style.display='block';zoom.scrollTop=0});
   }
   zoom.onclick=()=>{zoom.style.display='none'};
@@ -285,6 +292,105 @@ PREP = r"""
   };
   const m0=window.wsMode; window.wsMode=x=>{ document.body.classList.remove('prep'); zoom.style.display='none'; m0(x); };
   if(location.hash==='#prep') wsPrep();
+})();
+"""
+
+BOARD = r"""
+// 🎼 콘티 편집판 (2026-10-03 교장님) — 악보 카드를 끌어 도입곡·진행곡·적용곡·후보함 사이를 옮기고(놓은 자리의 카드는 밀림),
+// 칸을 누른 뒤 ⌘V 로 악보 그림을 붙여 넣고, 악보 DB 에서 찾아 넣고, 「확정 저장」 → 예배 DB → 맥미니가 악보집·예배 PPT 를 다시 만든다.
+(function(){
+  const css=`#board{margin:12px 0 18px}#board .bd-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  #board .bd-top b{font-size:16px}#board .bd-msg{font-size:13px;color:#475569;flex:1}
+  #board .bd-save{font:800 14px inherit;border:0;border-radius:10px;padding:9px 16px;background:#16a34a;color:#fff;cursor:pointer}
+  #board .bd-row{display:grid;grid-template-columns:1fr 3fr 1fr;gap:8px}
+  #board .zone{background:#fff;border:2px solid #cbd5e1;border-radius:12px;padding:6px;min-height:140px}
+  #board .zone.act{border-color:#e8a33c;box-shadow:0 0 0 3px rgba(232,163,60,.2)}
+  #board .zone h5{margin:2px 4px 6px;font-size:14px;color:#1e3a8a}#board .zone h5 small{font-weight:400;color:#64748b;font-size:11.5px}
+  #board .zc{display:flex;flex-wrap:wrap;gap:6px;min-height:100px}#board .pool{margin-top:8px}
+  #board .cd{position:relative;width:118px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:4px;cursor:grab;user-select:none}
+  #board .cd img{width:100%;height:120px;object-fit:contain;background:#fff;display:block;pointer-events:none}
+  #board .cd .ct{font-size:11.5px;line-height:1.3;margin-top:3px;word-break:keep-all}#board .cd .ct i{font-style:normal;font-weight:800;color:#b45309;margin-right:3px}
+  #board .cd .ct b{color:#1e3a8a;margin-left:3px}
+  #board .cd .x{position:absolute;right:2px;top:2px;border:0;border-radius:999px;width:22px;height:22px;background:rgba(15,23,42,.65);color:#fff;cursor:pointer;font-size:12px}
+  #board .cd .hd{position:absolute;left:2px;top:2px;width:26px;height:26px;border-radius:6px;background:rgba(232,163,60,.9);color:#fff;text-align:center;line-height:26px;font-size:14px;touch-action:none;cursor:grab}
+  #board .cd.mark{box-shadow:-4px 0 0 #e8a33c}#board .zc.mark-end{box-shadow:inset -4px 0 0 #e8a33c}
+  .bd-ghost{position:fixed;z-index:9999;pointer-events:none;opacity:.85;transform:rotate(2deg);width:118px}
+  #board .bd-find{margin-top:10px;background:#fff;border-radius:12px;padding:8px}#board .bd-find input{width:100%;font-size:15px;padding:8px 12px;border:1px solid #cbd5e1;border-radius:10px}
+  #board .bd-res{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}#board .bd-res .cd{cursor:pointer}
+  @media(max-width:700px){#board .bd-row{grid-template-columns:1fr}#board .cd{width:30%}#board .cd img{height:100px}}`;
+  const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
+  const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const ZN={intro:'도입',main:'',apply:'적용',pool:'후보'};
+  window.wsBoardInit=function(root){
+    const B=root.querySelector('#board'); if(!B||B.dataset.ready) return; B.dataset.ready=1;
+    const DATE=B.dataset.date, KEY=B.dataset.key; let S={intro:[],main:[],apply:[],pool:[]}, dirty=false, active='pool', rev=0;
+    B.innerHTML=`<div class="bd-top"><b>🎼 콘티 편집판</b><span class="bd-msg"></span><button class="bd-save">💾 확정 저장</button></div>
+      <div class="bd-row"><div class="zone" data-z="intro"><h5>도입곡</h5><div class="zc"></div></div>
+      <div class="zone" data-z="main"><h5>진행곡</h5><div class="zc"></div></div><div class="zone" data-z="apply"><h5>적용곡</h5><div class="zc"></div></div></div>
+      <div class="zone pool" data-z="pool"><h5>후보함 <small>카드를 끌어 위 칸에 놓으면 그 자리 카드가 밀립니다 · 칸을 누르고 ⌘V(붙여넣기)로 악보 그림 넣기 · ✕ 는 후보함으로</small></h5><div class="zc"></div></div>
+      <div class="bd-find"><input placeholder="🔍 악보 찾기 — 곡명을 넣으면 악보 DB(1,375장)에서 찾아 누른 칸에 넣습니다"><div class="bd-res"></div></div>`;
+    const msg=t=>{B.querySelector('.bd-msg').textContent=t;};
+    const zoneEl=z=>B.querySelector(`.zone[data-z="${z}"]`);
+    function setActive(z){active=z; B.querySelectorAll('.zone').forEach(e=>e.classList.toggle('act',e.dataset.z===z));}
+    function card(x,z,i){ const lab=z==='main'?(i+1)+'번':ZN[z];
+      return `<div class="cd" data-z="${z}" data-i="${i}"><span class="hd" title="끌어 옮기기">⠿</span><img src="${esc(x.img)}" alt="" loading="lazy">
+        <div class="ct"><i>${lab}</i>${esc(x.title||'제목 미정')}${x.key?'<b>'+esc(x.key)+'</b>':''}</div><button class="x" title="${z==='pool'?'빼기':'후보함으로'}">✕</button></div>`; }
+    function render(){ ['intro','main','apply','pool'].forEach(z=>{ zoneEl(z).querySelector('.zc').innerHTML=S[z].map((x,i)=>card(x,z,i)).join('')||'<div style="color:#94a3b8;font-size:12px;padding:8px">비어 있음</div>'; }); }
+    function move(z0,i0,z1,i1){ const [it]=S[z0].splice(i0,1); if(z0===z1&&i0<i1) i1--; S[z1].splice(Math.max(0,Math.min(i1,S[z1].length)),0,it); dirty=true; render(); msg('바뀐 순서가 있습니다 — 💾 확정 저장을 눌러 주세요'); }
+    // 끌기 — 마우스는 카드 어디든, 손가락은 ⠿ 손잡이로
+    let drag=null;
+    B.addEventListener('pointerdown',e=>{ const c=e.target.closest('.cd'); if(!c||e.target.closest('.x')||!c.closest('.zone')) return;
+      if(e.pointerType!=='mouse'&&!e.target.closest('.hd')) return;
+      drag={c,z:c.dataset.z,i:+c.dataset.i,x:e.clientX,y:e.clientY,on:false,id:e.pointerId}; });
+    function target(x,y){ const el=document.elementFromPoint(x,y); const zn=el&&el.closest('.zone'); if(!zn) return null;
+      const cs=[...zn.querySelectorAll('.cd')]; let idx=cs.length;
+      for(let k=0;k<cs.length;k++){ const r=cs[k].getBoundingClientRect(); if(y<r.bottom&&(x<r.left+r.width/2||y<r.top)){ idx=k; break; } }
+      return {z:zn.dataset.z,i:idx,cs,zn}; }
+    addEventListener('pointermove',e=>{ if(!drag||e.pointerId!==drag.id) return;
+      if(!drag.on){ if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)<6) return; drag.on=true; drag.g=drag.c.cloneNode(true); drag.g.className='cd bd-ghost'; document.body.appendChild(drag.g); drag.c.style.opacity=.35; }
+      e.preventDefault(); drag.g.style.left=(e.clientX-55)+'px'; drag.g.style.top=(e.clientY-30)+'px';
+      B.querySelectorAll('.mark,.mark-end').forEach(x=>x.classList.remove('mark','mark-end'));
+      const t=target(e.clientX,e.clientY); if(t){ if(t.cs[t.i]) t.cs[t.i].classList.add('mark'); else t.zn.querySelector('.zc').classList.add('mark-end'); } },{passive:false});
+    addEventListener('pointerup',e=>{ if(!drag||e.pointerId!==drag.id) return; const d=drag; drag=null;
+      B.querySelectorAll('.mark,.mark-end').forEach(x=>x.classList.remove('mark','mark-end'));
+      if(!d.on){ return; } d.g.remove(); d.c.style.opacity=''; const t=target(e.clientX,e.clientY); if(t) move(d.z,d.i,t.z,t.i); else render(); });
+    B.addEventListener('click',e=>{ const x=e.target.closest('.x'); const zn=e.target.closest('.zone'); if(zn) setActive(zn.dataset.z);
+      if(x){ const c=x.closest('.cd'), z=c.dataset.z, i=+c.dataset.i;
+        if(z==='pool'){ if(confirm('후보함에서 뺄까요?')){ S.pool.splice(i,1); dirty=true; render(); msg('바뀐 것이 있습니다 — 💾 확정 저장을 눌러 주세요'); } }
+        else move(z,i,'pool',S.pool.length); return; }
+      const c=e.target.closest('.cd'); if(c&&c.closest('.zone')){ const z=document.getElementById('zoom'); if(z){ z.innerHTML=''; const im=new Image(); im.src=c.querySelector('img').src; z.appendChild(im); z.style.display='block'; z.scrollTop=0; } } });
+    // 붙여넣기 — 누른 칸(테두리 주황)에 들어간다
+    document.addEventListener('paste',async e=>{ if(!B.isConnected||!document.body.classList.contains('prep')) return;
+      if(e.target&&e.target.tagName==='INPUT') return;
+      const it=[...(e.clipboardData||{}).items||[]].find(i=>i.type&&i.type.startsWith('image/')); if(!it) return; e.preventDefault();
+      const f=it.getAsFile(); const title=prompt('곡명을 넣어 주세요',''); if(title===null) return; const mk=prompt('코드(예: G, A, Bb) — 모르면 비워 두세요','');
+      msg('그림을 올리는 중…');
+      const img=await new Promise(r=>{ const u=URL.createObjectURL(f), im=new Image(); im.onload=()=>r(im); im.src=u; });
+      const k=Math.min(1,1800/Math.max(img.width,img.height)), cv=document.createElement('canvas'); cv.width=Math.round(img.width*k); cv.height=Math.round(img.height*k);
+      const cx=cv.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,cv.width,cv.height); cx.drawImage(img,0,0,cv.width,cv.height);
+      const r=await fetch('/api/conti',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'upload',key:KEY,title:title.trim(),music_key:(mk||'').trim(),data:cv.toDataURL('image/jpeg',0.88)})});
+      const j=await r.json(); if(!j.ok){ msg('올리기 실패: '+(j.error||'')); return; }
+      S[active].push(j.card); dirty=true; render(); msg('「'+j.card.title+'」 악보를 '+({intro:'도입곡',main:'진행곡',apply:'적용곡',pool:'후보함'}[active])+'에 넣었습니다 — 💾 확정 저장을 눌러 주세요'); });
+    // 악보 찾기
+    let tm=null; const inp=B.querySelector('.bd-find input'), res=B.querySelector('.bd-res');
+    inp.addEventListener('input',()=>{ clearTimeout(tm); tm=setTimeout(async()=>{ const v=inp.value.trim(); if(!v){ res.innerHTML=''; return; }
+      const rows=await (await fetch('/api/worship?scores='+encodeURIComponent(v))).json();
+      res.innerHTML=rows.slice(0,24).map((x,i)=>`<div class="cd" data-r="${i}"><img src="${esc(x.url)}" alt="" loading="lazy"><div class="ct"><i>${esc(x.kind)}</i>${esc(x.title)}${x.key?'<b>'+esc(x.key)+'</b>':''}</div></div>`).join('')||'<span style="color:#64748b;font-size:13px">찾은 악보가 없습니다</span>';
+      res.onclick=e=>{ const c=e.target.closest('.cd'); if(!c) return; const x=rows[+c.dataset.r];
+        S[active].push({title:x.title,key:x.key,img:x.url,score_id:+x.id,src:'db'}); dirty=true; render();
+        msg('「'+x.title+'」 을(를) '+({intro:'도입곡',main:'진행곡',apply:'적용곡',pool:'후보함'}[active])+'에 넣었습니다 — 💾 확정 저장을 눌러 주세요'); }; },300); });
+    // 저장 → 맥미니가 악보집·예배 PPT 를 다시 만든다
+    B.querySelector('.bd-save').onclick=async()=>{ msg('저장 중…');
+      const r=await fetch('/api/conti',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:DATE,key:KEY,...S})});
+      const j=await r.json(); if(!j.ok){ msg('저장 실패: '+(j.error||'')); return; } dirty=false; rev=j.rev;
+      msg('✅ 저장했습니다 — 맥미니가 악보집·예배 PPT 를 다시 만드는 중입니다(몇 분)'); let n=0;
+      const t=setInterval(async()=>{ n++; const g=await (await fetch(`/api/conti?date=${DATE}&key=${KEY}`,{cache:'no-store'})).json();
+        if(g.built_rev>=rev){ clearInterval(t); msg('✅ 악보집·예배 PPT 에 반영됐습니다 — 새로고침하면 보입니다'); } else if(n>45){ clearInterval(t); msg('저장은 됐습니다 · 반영이 늦어지고 있습니다(맥미니 확인 필요)'); } },20000); };
+    addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue='저장하지 않은 콘티가 있습니다'; } });
+    fetch(`/api/conti?date=${DATE}&key=${KEY}`,{cache:'no-store'}).then(r=>r.json()).then(j=>{ if(j.error){ msg(j.error); return; }
+      S={intro:j.intro||[],main:j.main||[],apply:j.apply||[],pool:j.pool||[]}; rev=j.rev||0; setActive('pool'); render();
+      msg(j.updated?('마지막 저장 '+j.updated+' (UTC)'):''); }).catch(e=>msg('불러오기 실패: '+e));
+  };
 })();
 """
 
@@ -331,6 +437,7 @@ wsFit(); if(document.fonts) document.fonts.ready.then(wsFit);
 
 
 def img_src(rel: str) -> str:
+    if str(rel).startswith(("http://", "https://")): return rel     # 그림 창고(Blob) 주소 — 복사하지 않고 그대로 (2026-10-03)
     p = HERE / rel
     return f"data:image/{p.suffix[1:].replace('jpg', 'jpeg')};base64," + base64.b64encode(p.read_bytes()).decode()
 
@@ -363,14 +470,48 @@ def prep_html(d: dict, date: str) -> str:
         f'<div class="card"><div class="ct"><i>후보 {i}</i>{html.escape(x.get("title") or "제목 미정")}'
         f'{"<u>확정</u>" if x.get("used") else ""}</div><img src="{img_src(x["img"])}" alt=""></div>'
         for i, x in enumerate(pool, 1))
-    inner = (f'<div class="ph"><h3>🔒 준비 · {int(date[5:7])}월 {int(date[8:10])}일 주일 후보 악보 {len(pool)}곡</h3>'
+    import hmac, hashlib
+    sec = next((ln.split("=", 1)[1].strip() for ln in (Path.home() / "dev/daily-briefing/.env").read_text().splitlines() if ln.startswith("JUBO_SECRET=")), "")
+    bkey = hmac.new(sec.encode(), b"conti", hashlib.sha256).hexdigest()[:32] if sec else ""
+    inner = (f'<div class="ph"><h3>🔒 준비 · {int(date[5:7])}월 {int(date[8:10])}일 주일 콘티 편집판</h3>'
              f'<span class="now">지금 확정: {html.escape(" · ".join(now) or "아직 없음")}</span></div>'
-             + (f'<div class="grid">{cards}</div>' if pool else '<div class="empty">아직 넣은 후보 악보가 없습니다.<br>텔레그램으로 악보 사진과 함께 「후보에 넣어」 라고 보내 주세요.</div>'))
+             f'<div id="board" data-date="{date}" data-key="{bkey}"><div class="empty">편집판을 불러오는 중…</div></div>')
+    inner += conti_html(date)
     box = seal(inner)
     return ('<div id="prep"><div class="lock"><h3>🔒 준비자 전용</h3><p>비밀번호를 넣으면 이번 주 후보 악보가 열립니다.</p>'
             '<form onsubmit="wsUnlock(event)"><input id="prep-pw" type="password" inputmode="numeric" autocomplete="off" placeholder="비밀번호">'
             '<button>열기</button></form><div class="err" id="prep-err"></div></div><div class="in" hidden></div></div><div id="zoom"></div>'
             f'<script type="application/json" id="prep-box" data-share>{json.dumps(box)}</script>')
+
+def conti_html(date: str) -> str:
+    """준비 탭 아래 — 주보로 뽑은 콘티 추천(CCM·찬송가, 빠른·중간·느린, 코드·유튜브·악보 검색). 2026-10-03 교장님 지시:
+    텔레그램으로 따로 보내던 콘티를 여기에 넣는다. 원본은 out/<YYYYMMDD>-conti.json(conti.py)."""
+    import urllib.parse as up
+    f = HERE.parent / "out" / f"{date.replace('-', '')}-conti.json"
+    if not f.exists():
+        return '<div class="conti"><h3>🎵 콘티 추천</h3><div class="empty">주보를 보내 주시면 설교에 맞는 콘티 추천이 여기에 들어옵니다.</div></div>'
+    c = json.loads(f.read_text()); s, r = c.get("sermon", {}), c.get("rec", {})
+    def rows(items):
+        out = []
+        for tempo in ("빠른곡", "중간곡", "느린곡"):
+            xs = [x for x in items if x.get("tempo") == tempo]
+            if not xs: continue
+            li = []
+            for i, x in enumerate(xs, 1):
+                name = (f"{x['no']}장 " if x.get("no") else "") + x.get("title", "")
+                q = (f"새찬송가 {x['no']}장 " if x.get("no") else "") + f"{x.get('title', '')} 악보"
+                t_ = (f'<a href="{html.escape(x["url"])}" target="_blank" rel="noopener">{html.escape(name)} ▶</a>' if x.get("url")
+                      else html.escape(name))
+                li.append(f'<li>{t_}{" <b>" + html.escape(x["key"]) + "</b>" if x.get("key") else ""}'
+                          f' <a class="sh" href="https://www.google.com/search?tbm=isch&q={up.quote_plus(q)}" target="_blank" rel="noopener">악보</a></li>')
+            out.append(f'<div class="tp"><i>{tempo}</i><ol>{"".join(li)}</ol></div>')
+        return "".join(out)
+    head = f'설교 「{html.escape(s.get("title") or "-")}」 {html.escape(s.get("scripture") or "")}'
+    theme = f'<p class="th">주제: {html.escape(r["theme"])}</p>' if r.get("theme") else ""
+    return (f'<div class="conti"><h3>🎵 콘티 추천 · {head}</h3>{theme}'
+            f'<div class="cols"><div><h4>CCM {len(r.get("ccm", []))}곡</h4>{rows(r.get("ccm", []))}</div>'
+            f'<div><h4>찬송가 {len(r.get("hymns", []))}곡</h4>{rows(r.get("hymns", []))}</div></div></div>')
+
 
 ROSTER = HERE / "roster.json"
 WEEKS_SHOWN = 6
@@ -595,9 +736,9 @@ def build(date: str) -> Path:
     doc = f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{html.escape(d["title"])}</title><meta name="description" content="제곡교회 예배팀 · {int(date[5:7])}월 {int(date[8:10])}일 주일예배 예배자 악보 {len(d["pages"])}쪽">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
-<style>{CSS}</style></head><body>
-<div class="bar"><b>🎹 {html.escape(d["title"])} · {len(d["pages"])}쪽</b><div class="btns"><button data-mode="doc" class="on" onclick="wsMode('doc')">악보</button><button data-mode="pr" onclick="wsMode('pr')">▶ 발표</button><button onclick="wsPpt()">PPT</button><button onclick="wsJubo()">주보</button><button data-mode="prep" onclick="wsPrep()">🔒 준비</button></div></div>
-<main class="pages">{pages}</main><div id="sv"><aside id="rail"></aside><div id="split" title="끌어서 폭 조절"></div><div id="stage"><span id="hint">← → 방향키로 넘김 · Esc 나가기</span><span id="pn"></span></div></div>{prep_html(d, date)}<script data-share>{FIT}</script><script data-share>{VIEW}</script><script data-share>{PREP}</script><script data-share>{PDF_JS.replace("@@NAME@@", f"{date} 반주자·싱어용 악보.pdf")}</script></body></html>"""
+<style>{CSS}{wsnav.CSS}</style></head><body>
+{wsnav.nav("score", wsnav.label(date), '<button class="sub on" data-mode="doc" onclick="wsMode(\'doc\')">📖 악보집</button><button class="sub" data-mode="sv" onclick="wsMode(\'sv\')">▣ 한 장씩</button><button class="sub" data-mode="pr" onclick="wsMode(\'pr\')">▶ 예배용 넘기기</button>', [("📄 HWPX 받기", "doc.hwpx"), ("📕 PDF 받기", "js:wsPdf()")], prep_js=True)}
+<main class="pages">{pages}</main><div id="sv"><aside id="rail"></aside><div id="split" title="끌어서 폭 조절"></div><div id="stage"><span id="hint">← → 방향키로 넘김 · Esc 나가기</span><span id="pn"></span></div></div>{prep_html(d, date)}<script data-share>{wsnav.JS}</script><script data-share>{FIT}</script><script data-share>{VIEW}</script><script data-share>{PREP}</script><script data-share>{BOARD}</script><script data-share>{PDF_JS.replace("@@NAME@@", f"{date} 예배자 악보.pdf")}</script></body></html>"""
     out = HERE / "out" / f"{date}.html"; out.parent.mkdir(exist_ok=True); out.write_text(doc)
     return out
 
@@ -614,10 +755,13 @@ if __name__ == "__main__":
         # 예배 화면용 PPT(PDF)가 있으면 PPT 단추는 그것을 HTML 슬라이드로 (2026-10-03 교장님 지시) — accomp/worship_ppt/<날짜>.pdf [.pptx]
         wp = HERE / "worship_ppt" / f"{sys.argv[1]}.pdf"
         # 드라이브 그 주 폴더의 「주일예배 PPT」를 먼저 받아 둔다 — 없을 때만 악보집 쪽 그림 PPT (2026-10-03 교장님 지시)
-        subprocess.run(["/usr/local/bin/python3", str(HERE / "slides.py"), "fetch", sys.argv[1]], check=False)
+        # 2026-10-03 교장님 지시: 드라이브에서 불러오지 않고 예배 PPT 템플릿(ppt_template, 10/4 PPT)으로 날짜마다 찍는다.
+        # worship_ppt/<날짜>.pdf 를 교장님이 따로 주신 주만 그것을 그대로 쓴다.
         if wp.exists():
             px = wp.with_suffix(".pptx")
             subprocess.run(["/usr/local/bin/python3", str(HERE / "slides.py"), str(wp), sys.argv[1]] + (["--pptx", str(px)] if px.exists() else []), check=False)
+        elif (HERE / "ppt_template" / "slides.json").exists():
+            subprocess.run(["/usr/local/bin/python3", str(HERE / "ppt_tpl.py"), "make", sys.argv[1]], check=False)
         body = json.dumps({"key": f"/accomp/{sys.argv[1]}", "title": o.stem + " 예배자 악보", "html": o.read_text()}).encode()
         req = urllib.request.Request("http://127.0.0.1:8765/share", data=body, headers={"Content-Type": "application/json"})
         json.load(urllib.request.urlopen(req, timeout=180))
