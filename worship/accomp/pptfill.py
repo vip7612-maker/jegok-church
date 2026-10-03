@@ -163,7 +163,7 @@ def recite(pptx: Path, date: str) -> list[str]:
 
 # ── 사도신경 장 (2026-10-03 교장님: 가독성 좋고 보기 쉽게 가운데 정렬로) ─────────────
 CREED_FIX = [("본디오빌라도", "본디오 빌라도"), ("못박혀", "못 박혀"), ("судитьживых", "судить живых"), ("믿습니다.     아멘", "믿습니다. 아멘")]
-INK = {"ko": ("FFFFFF", 52, True, "Noto Sans KR"), "ru": ("F6C76B", 30, True, "Arial"), "en": ("D6E2F5", 30, False, "Arial")}
+INK = {"ko": ("FFFFFF", 58, True, "Noto Sans KR"), "ru": ("F6C76B", 40, True, "Arial"), "en": ("D6E2F5", 38, False, "Arial")}
 
 
 def script(t: str) -> str:
@@ -171,13 +171,14 @@ def script(t: str) -> str:
 
 
 def creed_slides(prs) -> list:
-    """세 언어 사도신경 장 — 머리에 「사도신경」과 «Апостольский», 본문 글상자에 한글과 러시아어가 함께 있는 장."""
+    """세 언어 사도신경 장 — 본문 글상자에 한글·러시아어·영어가 함께 있는 장. (장, 머리 글상자 또는 None, 본문)"""
     out = []
     for s in prs.slides:
         texts = [x for x in s.shapes if x.has_text_frame and x.text_frame.text.strip()]
-        head = next((x for x in texts if "사도신경" in x.text_frame.text and "Апостольский" in x.text_frame.text), None)
-        body = next((x for x in texts if x is not head and re.search(r"[가-힣]", x.text_frame.text) and re.search(r"[А-Яа-я]", x.text_frame.text)), None)
-        if head and body: out.append((s, head, body))
+        head = next((x for x in texts if "사도신경" in x.text_frame.text and "Апостольский" in x.text_frame.text and len(x.text_frame.text) < 80), None)
+        body = next((x for x in texts if x is not head and re.search(r"[가-힣]", x.text_frame.text) and re.search(r"[А-Яа-я]", x.text_frame.text)
+                     and re.search(r"[A-Za-z]{4}", x.text_frame.text)), None)
+        if body: out.append((s, head, body))
     return out
 
 
@@ -238,18 +239,12 @@ def creed(pptx: Path) -> list[str]:
     for s, head, body in creed_slides(prs):
         secs = creed_sections(body)
         if not secs: continue
-        for sh in s.shapes:                                   # 사진 위 막: 진한 갈색 반투명(글자가 또렷하게)
+        for sh in list(s.shapes):                             # 사진 위 막: 진한 갈색 반투명(글자가 또렷하게)
             if sh.shape_type == 1 and sh.width > W * .9 and sh.height > H * .9 and not sh.text_frame.text.strip():
                 _alpha_fill(sh, "2A1F1A", 78); sh.left, sh.top, sh.width, sh.height = 0, 0, W, H   # 화면을 꽉 덮게
-            if sh.shape_type == 9:                            # 머리 아래 선: 가운데 짧은 금빛 선
-                sh.left, sh.width, sh.top, sh.height = int(W * .38), int(W * .24), int(H * .135), 0
-                sh.line.color.rgb = RGBColor.from_string("F6C76B"); sh.line.width = Pt(2)
-        head.left, head.width, head.top, head.height = int(W * .04), int(W * .92), int(H * .03), int(H * .09)
-        tf = head.text_frame; tf.clear(); tf.word_wrap = True; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-        pa = tf.paragraphs[0]; pa.alignment = PP_ALIGN.CENTER
-        for txt, size, col in (("사도신경", 46, "FFFFFF"), ("   Апостольский Символ веры · Apostles’ Creed", 24, "E8DCCB")):
-            r = pa.add_run(); r.text = txt; r.font.size = Pt(size); r.font.bold = True; r.font.name = "Noto Sans KR"; r.font.color.rgb = RGBColor.from_string(col)
-        body.left, body.width, body.top, body.height = int(W * .05), int(W * .90), int(H * .17), int(H * .80)
+            if sh.shape_type == 9: sh._element.getparent().remove(sh._element)       # 머리 아래 선은 뺀다
+        if head is not None: head._element.getparent().remove(head._element)      # 「사도신경 · Апостольский … · Apostles’ Creed」 머리는 뺀다(교장님)
+        body.left, body.width, body.top, body.height = int(W * .04), int(W * .92), int(H * .04), int(H * .92)   # 위아래 여백까지 본문에
         tf = body.text_frame; tf.clear(); tf.word_wrap = True; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
         bp = tf._txBody.find(A + "bodyPr")
         for x in list(bp): bp.remove(x)                       # 자동 줄임 끄기(글자 크기는 위에서 정한 대로)
@@ -448,10 +443,38 @@ def one_line(prs, word: str = "성경암송") -> list[str]:
     return out
 
 
+def creed_cover(prs) -> list[str]:
+    """사도신경 표지 장(「사도신경」 큰 제목 + 한글 전문) — 전문 글상자를 흰 바탕 폭으로 넓히고 한 문장 한 줄,
+    제목 아래부터 흰 바탕 아래 끝 안에 들어가는 크기로(2026-10-03 교장님: 줄이 벗어나 넘친다)."""
+    from pptx.util import Pt
+    W, H = prs.slide_width, prs.slide_height; out = []
+    for i, s in enumerate(prs.slides):
+        texts = [x for x in s.shapes if x.has_text_frame and x.text_frame.text.strip()]
+        if not any(x.text_frame.text.strip() == "사도신경" for x in texts): continue
+        body = next((x for x in texts if "전능하신" in x.text_frame.text and not re.search(r"[А-Яа-я]", x.text_frame.text)
+                     and len([p for p in x.text_frame.paragraphs if p.runs]) >= 6), None)
+        if body is None: continue
+        for pa in body.text_frame.paragraphs:
+            for r in pa.runs: r.text = re.sub(r",(?=\S)", ", ", r.text)
+            pa.line_spacing = 1.25; pa.space_before = None; pa.space_after = None
+        body.left, body.width = int(W * .065), int(W * .60)            # 흰 바탕(오른쪽 사진 앞까지) 안
+        body.top, body.height = int(H * .475), int(H * .44)            # 제목 밑 선 아래 ~ 흰 바탕 아래 끝 위
+        bp = body.text_frame._txBody.find(A + "bodyPr")
+        for x in list(bp): bp.remove(x)
+        size = 30
+        while size > 14 and not (fits(body, size) and all(_lines_needed("".join(r.text for r in pa.runs), size, _inner(body)[0]) <= 1
+                                                          for pa in body.text_frame.paragraphs if pa.runs)):
+            size -= 0.5
+        set_size(body, size)
+        out.append(f"{i + 1}장 사도신경 표지 전문: 한 문장 한 줄, {size:g}pt")
+        break
+    return out
+
+
 def layout(pptx: Path, date: str) -> list[str]:
     from pptx import Presentation
     prs = Presentation(str(pptx))
-    log = reading(prs, date) + fit_ads(prs) + fit_recite(prs) + one_line(prs, "성경암송")
+    log = reading(prs, date) + fit_ads(prs) + fit_recite(prs) + one_line(prs, "성경암송") + creed_cover(prs)
     prs.save(str(pptx))
     return log
 

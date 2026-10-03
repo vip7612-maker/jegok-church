@@ -94,7 +94,7 @@ def parse(pptx: Path) -> list[dict]:
             rec["title_sig"] = "".join("1" if x > avg else "0" for x in v)
             sub, chips = None, []
             for sh in s.shapes:
-                if not sh.has_text_frame or not sh.text_frame.text.strip() or sh.top < H * .6:
+                if not sh.has_text_frame or not sh.text_frame.text.strip() or sh.top < H * .5 or sh.top + sh.height < H * .8:   # 아래쪽 칸(자막·절 단추) — 위가 57%쯤에서 시작하는 자막 상자도 있다(8/23 충만)
                     continue
                 if sh.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE and sh.height < H * .08:      # 절 바로가기 단추
                     to = None
@@ -109,18 +109,22 @@ def parse(pptx: Path) -> list[dict]:
                     # 자막 글상자(예전 PPT 는 도형에) — 화면 폭 60% 넘는 것만. 특송자 이름(「박동민 집사」) 같은 작은 글상자는 아니다
                     lines, size = [], None
                     for pa in sh.text_frame.paragraphs:
-                        tx = "".join(r.text for r in pa.runs).strip()
-                        if not tx: continue
+                        if not pa.runs: continue
                         r0 = pa.runs[0]
                         if r0.font.size and not size: size = r0.font.size.pt
-                        lines.append({"t": tx, "c": _hex(r0.font) or "#ffffff"})
+                        for tx in pa.text.split("\v"):             # 문단 안 줄바꿈(<a:br/>)은 따로 줄 — 「enoughIn Jesus」처럼 붙지 않게
+                            if tx.strip(): lines.append({"t": tx.strip(), "c": _hex(r0.font) or "#ffffff"})
                     if lines:
                         fill = None
                         try:
                             fill = _hex(sh.fill) if sh.fill.type == 1 else None
                         except Exception:
                             pass
-                        sub = {"box": box(sh), "size": round((size or 40) * pt2px), "fill": fill or "#000000", "lines": lines}
+                        bx = box(sh)
+                        if not fill:                         # 바탕색 없는 자막 상자는 악보 그림 아래부터만 검게(악보를 가리지 않게)
+                            pb = box(pic)[1] + box(pic)[3]
+                            if bx[1] < pb < bx[1] + bx[3]: bx = [bx[0], pb, bx[2], bx[1] + bx[3] - pb]
+                        sub = {"box": bx, "size": round((size or 40) * pt2px), "fill": fill or "#000000", "lines": lines}
             rec.update({"blob": blob, "pic": box(pic), "sub": sub, "chips": chips})
         out.append(rec)
     return out

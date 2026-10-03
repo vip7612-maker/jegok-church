@@ -94,6 +94,8 @@ def outline(slides: list[dict], songs: list[str] | None = None) -> list[tuple[in
             # 가사가 아직 없는 틀(2026-10-03): 곡마다 「찬양과경배」 표지 장만 있다 — 같은 표지가 또 나오면 곡 자리로 보고 곡 이름을 단다
             ph = sec in ("찬양과경배", "찬양과결단") and "Praise&Worship" in flat
             empty = k + 1 >= len(slides) or is_mark(slides[k + 1])   # 바로 다음이 또 표지 = 가사 장이 없는 자리
+            if ph and sec in seen and not empty and songs:          # 곡마다 다시 나오는 「찬양과경배」 표지 = 다음 곡의 시작(목차도 그 곡으로)
+                marks.append((s["n"], "♪ " + songs.pop(0))); last = "song"; continue
             if not (ph and sec in seen):
                 marks.append((s["n"], name))
             seen.add(sec); last = sec
@@ -120,7 +122,7 @@ body{{margin:0;background:#0f172a;color:#fff;font-family:'Pretendard Variable',P
 .wrap{{display:flex}}
 #toc{{position:sticky;top:46px;align-self:flex-start;width:190px;flex:0 0 190px;max-height:calc(100vh - 46px);overflow-y:auto;padding:10px 8px;background:#0b1220;font-size:13px}}
 #toc a{{display:block;color:#cbd5e1;text-decoration:none;padding:5px 8px;border-radius:6px}}#toc a:hover,#toc a.on{{background:#1e293b;color:#f6c76b}}
-#toc a.song{{padding-left:18px;color:#93c5fd}}
+#toc a.song{{padding-left:18px;color:#93c5fd}}#toc a:focus{{outline:none}}#toc a.on{{background:rgba(246,199,107,.16);color:#f6c76b;box-shadow:inset 4px 0 #f6c76b;font-weight:700}}
 main{{flex:1;min-width:0;padding:14px;display:flex;flex-direction:column;align-items:center;gap:14px}}
 .sl{{position:relative;width:min(100%,1100px);aspect-ratio:16/9;overflow:hidden;background:#000;box-shadow:0 4px 18px rgba(0,0,0,.4);border-radius:6px}}
 .sl .in{{position:absolute;left:0;top:0;width:1440px;height:810px;transform-origin:0 0;background-size:100% 100%}}
@@ -169,8 +171,13 @@ const MZ=document.createElement('div'); MZ.style.cssText='position:absolute;left
 function measure(t){{ MZ.style.fontSize=t.s+'px'; MZ.style.fontWeight=t.b?800:500; MZ.textContent=t.t; return MZ.scrollWidth; }}
 function paint(sl){{ if(sl.dataset.p) return; sl.dataset.p=1; const s=D[+sl.dataset.i]; const inn=sl.querySelector('.in');
   inn.style.backgroundImage='url(slides/'+s.img+')';
+  let dy=0;   // 이어 붙인 문단이 PDF 보다 줄이 줄면, 그 아래 왼쪽 맞춤 글을 그만큼 올린다(빈 줄이 남지 않게)
   s.texts.forEach(t=>{{const e=document.createElement('div');e.className='tx';e.textContent=t.t;
-    e.style.cssText='left:'+t.x+'px;top:'+t.y+'px;font-size:'+t.s+'px;color:'+t.c+';font-weight:'+(t.b?800:500);
+    e.style.cssText='left:'+t.x+'px;top:'+(t.y-(t.a==='l'?dy:0))+'px;font-size:'+t.s+'px;color:'+t.c+';font-weight:'+(t.b?800:500);
+    if(t.wrap){{ e.style.width=t.w+'px'; e.style.whiteSpace='normal'; e.style.wordBreak='keep-all'; e.style.lineHeight=(t.lh||1.2); inn.appendChild(e);   // 원본 한 문단 = 칸 폭에서 저절로 줄바꿈
+      MZ.style.cssText+=';width:'+t.w+'px;white-space:normal;word-break:keep-all;line-height:'+(t.lh||1.2); MZ.style.fontSize=t.s+'px'; MZ.style.fontWeight=t.b?800:500; MZ.textContent=t.t;
+      const lines=Math.round(MZ.offsetHeight/(t.s*(t.lh||1.2))), was=Math.round(t.h/(t.s*(t.lh||1.2)));
+      dy+=Math.max(0,was-lines)*t.s*(t.lh||1.2); MZ.style.cssText='position:absolute;left:-99999px;top:0;visibility:hidden;white-space:pre;line-height:1'; return; }}
     inn.appendChild(e); const w=measure(t);
     if(w>t.w&&t.w>4) e.style.transform='scaleX('+(t.w/w)+')';
     else if(t.a==='c') e.style.left=(t.x+(t.w-w)/2)+'px';}}); }}
@@ -190,7 +197,7 @@ document.addEventListener('fullscreenchange',()=>{{ if(!SCREEN&&!document.fullsc
 deck.addEventListener('click',e=>{{ if(!document.body.classList.contains('pr')) return; show(cur+(e.clientX>innerWidth/2?1:-1)); }});
 let x0=null; deck.addEventListener('touchstart',e=>x0=e.touches[0].clientX,{{passive:true}});
 deck.addEventListener('touchend',e=>{{ if(x0===null||!document.body.classList.contains('pr'))return; const dx=e.changedTouches[0].clientX-x0; if(Math.abs(dx)>40)show(cur+(dx<0?1:-1)); x0=null; }});
-document.querySelectorAll('#toc a').forEach(a=>a.onclick=ev=>{{ev.preventDefault(); const el=document.getElementById(a.getAttribute('href').slice(1)); if(document.body.classList.contains('pv')){{go(all.indexOf(el));return;}} if(ONE()){{view(all.indexOf(el));return;}} el.scrollIntoView({{behavior:'instant',block:'start'}});}});
+document.querySelectorAll('#toc a').forEach(a=>a.onclick=ev=>{{ev.preventDefault(); a.blur(); const el=document.getElementById(a.getAttribute('href').slice(1)); if(document.body.classList.contains('pv')){{go(all.indexOf(el));return;}} if(ONE()){{view(all.indexOf(el));return;}} el.scrollIntoView({{behavior:'instant',block:'start'}});}});
 {pvjs}
 </script></body></html>"""
 
@@ -279,6 +286,43 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
     toc = "".join(f'<a href="#s{n}" class="{"song" if name.startswith("♪") else ""}">{html.escape(name)}</a>' for n, name in outline(slides, list(songs or [])))
     return PAGE.format(title=html.escape(title), n=len(slides), slides=sl, toc=toc, dl=dl,
                        data=json.dumps(data, ensure_ascii=False, separators=(",", ":")), pvjs=PVJS)
+
+
+def rewrap(slides: list[dict], pptx: Path | None) -> list[dict]:
+    """PDF 는 줄마다 끊겨 있다 — 원본 PPT 의 한 문단이 여러 줄로 꺾인 것은 다시 한 덩어리로 이어,
+    화면 글꼴 폭에 맞춰 자연스럽게 줄이 바뀌게 한다(2026-10-03 교장님: 오른쪽 여백이 남지 않게, 교회소식·봉독 본문).
+    왼쪽 맞춤 글만. 이어 붙인 줄들이 원본 문단과 글자 그대로 같을 때만 합친다."""
+    if not pptx or not Path(pptx).exists(): return slides
+    from pptx import Presentation
+    prs = Presentation(str(pptx))
+    flat = lambda t: re.sub(r"\s", "", t)
+    for k, sl in enumerate(slides):
+        if k >= len(prs.slides): break
+        paras = [flat("".join(r.text for r in pa.runs)) for sh in prs.slides[k].shapes if sh.has_text_frame
+                 for pa in sh.text_frame.paragraphs]
+        paras = [x for x in paras if x]
+        out, i, T = [], 0, sl["texts"]
+        while i < len(T):
+            t = dict(T[i]); j = i
+            if t.get("a") == "l":
+                acc = flat(t["t"])
+                while (j + 1 < len(T) and T[j + 1].get("a") == "l" and abs(T[j + 1]["x"] - t["x"]) < 6 and abs(T[j + 1]["s"] - t["s"]) < 1
+                       and acc not in paras and any(p.startswith(acc + flat(T[j + 1]["t"])) for p in paras)):
+                    j += 1; acc += flat(T[j]["t"])
+                if j > i and acc in paras:
+                    seg = T[i:j + 1]
+                    t["t"] = " ".join(x["t"].strip() for x in seg)
+                    t["b"] = any(x["b"] for x in seg)
+                    t["lh"] = round((seg[-1]["y"] - seg[0]["y"]) / (len(seg) - 1) / t["s"], 2)
+                    t["w"] = max(max(x["w"] for x in seg), sl["w"] - 2 * t["x"])     # 칸 폭(좌우 같은 여백)까지
+                    t["h"] = seg[-1]["y"] + seg[-1]["h"] - t["y"]
+                    t["wrap"] = 1
+                else:
+                    j = i
+            out.append(t); i = j + 1
+        sl["texts"] = out
+        sl["plain"] = " ".join(x["t"] for x in out)
+    return slides
 
 
 def add_song_frames(slides: list[dict], date: str, out: Path) -> list[dict]:
@@ -390,6 +434,7 @@ def song_titles(date: str) -> list[str]:
 def make(pdf: Path, date: str, sid: str, pptx: Path | None = None) -> Path:
     folder = SITE / "d" / sid; folder.mkdir(parents=True, exist_ok=True)
     slides = parse(pdf, folder / "slides")
+    slides = rewrap(slides, pptx)
     import fitz                                   # 모음 쪽(jegok_worship) 「오늘」 칸에 쓸 첫 장 그림(글자까지 그대로)
     fitz.open(pdf)[0].get_pixmap(dpi=110).save(str(folder / "cover.jpg"))
     slides = add_song_frames(slides, date, folder / "slides")
