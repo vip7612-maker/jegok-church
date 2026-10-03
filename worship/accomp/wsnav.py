@@ -86,6 +86,6 @@ def nav(cur: str, when: str, sub: str = "", dl: list[tuple[str, str]] | None = N
     return (f'<header class="bar wsnav" data-wsnav><div class="r1"><a class="ttl" href="{root}">⛪ 제곡교회 예배 · {H.escape(when)}</a>'
             f'<nav class="tabs">{tab("score", "악보", root)}{tab("ppt", "PPT", root + "ppt.html")}{tab("jubo", "주보", root + "jubo.html")}{prep}</nav>'
             f'<details class="more"><summary aria-label="더보기">⋯</summary><div class="menu">'
-            f'<a href="{BASE}/jegok_worship">🏠 예배 플랫폼 처음</a><a href="{BASE}/jegok_worship/song.html">🎵 곡별 PPT</a></div></details></div>'
+            f'<a href="{BASE}/jegok_worship">🏠 예배 플랫폼 처음</a><a href="{BASE}/jegok_worship/song.html">🎵 악보와 PPT</a></div></details></div>'
             f'<div class="r2">{sub}<span class="msg" aria-live="polite"></span>'
             f'<details class="dl push"><summary>⬇ 내려받기 ▾</summary><div class="menu">{"".join(items)}</div></details></div></header>')
