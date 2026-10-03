@@ -106,7 +106,7 @@ ol{{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}}li{{
 
 # ── 노션 ──────────────────────────────────────────────
 def notion(date: str) -> str:
-    import notion_conti as NC   # 같은 토큰·요청 함수(제곡교회 찬양팀 페이지 아래)
+    import notion_conti as NC   # 같은 토큰·요청 함수(제곡교회 예배팀 페이지 아래)
     s = summary(date)
     if NOTION_CFG.exists():
         db = json.loads(NOTION_CFG.read_text())["db"]
