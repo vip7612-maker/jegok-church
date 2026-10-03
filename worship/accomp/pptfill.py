@@ -424,10 +424,34 @@ def fit_recite(prs) -> list[str]:
     return out
 
 
+# ── 표지 장 문구는 한 문단 한 줄로 (2026-10-03 교장님: 「네 마음을 다하고 뜻을 다하고 힘을 다하여」는 한 줄에) ─────
+def one_line(prs, word: str = "성경암송") -> list[str]:
+    """그 순서 표지 장의 부제 글상자 — 문단마다 한 줄에 들어가는 크기로(넘으면 줄인다, 문단끼리 같은 크기)."""
+    from pptx.util import Pt
+    out = []
+    for i, s in enumerate(prs.slides):
+        texts = [x for x in s.shapes if x.has_text_frame and x.text_frame.text.strip()]
+        if not any(x.text_frame.text.strip() == word for x in texts): continue
+        for sh in texts:
+            paras = [pa for pa in sh.text_frame.paragraphs if "".join(r.text for r in pa.runs).strip()]
+            if len(paras) < 2 or any(len("".join(r.text for r in pa.runs)) < 8 for pa in paras): continue
+            w = _inner(sh)[0]
+            size = max(r.font.size.pt for pa in paras for r in pa.runs if r.font.size)
+            new = size
+            while new > 24 and any(_lines_needed("".join(r.text for r in pa.runs).strip(), new, w) > 1 for pa in paras): new -= 1
+            new = min(size, new - 1) if new < size else size              # 렌더링 글꼴 차이를 생각해 1pt 더 여유
+            if new < size:
+                for pa in paras:
+                    for r in pa.runs: r.font.size = Pt(new)
+                out.append(f"{i + 1}장 「{word}」 부제: 문단마다 한 줄로 {size:.0f}→{new:.0f}pt")
+        break
+    return out
+
+
 def layout(pptx: Path, date: str) -> list[str]:
     from pptx import Presentation
     prs = Presentation(str(pptx))
-    log = reading(prs, date) + fit_ads(prs) + fit_recite(prs)
+    log = reading(prs, date) + fit_ads(prs) + fit_recite(prs) + one_line(prs, "성경암송")
     prs.save(str(pptx))
     return log
 

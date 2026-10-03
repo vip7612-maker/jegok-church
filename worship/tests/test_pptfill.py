@@ -23,6 +23,9 @@ class PptFillTests(unittest.TestCase):
         # 60pt 한 줄(안쪽 폭 1327pt)에 「제곡교회를 찾아 주신 여러분들을 진심으로 환영합니다.」는 두 줄(실제 구글 렌더링과 같음)
         self.assertEqual(F._lines_needed("제곡교회를 찾아 주신 여러분들을 진심으로 환영합니다.", 60, 1327), 2)
         self.assertEqual(F._lines_needed("2. 모임", 60, 1327), 1)
+        # 성경암송 표지 부제(칸 안쪽 폭 883pt): 46pt 면 두 줄로 넘어가고 44pt 면 한 줄(교장님: 한 줄에 들어가야)
+        t = "네 마음을 다하고 뜻을 다하고 힘을 다하여"
+        self.assertEqual(F._lines_needed(t, 46.24, 883), 2); self.assertEqual(F._lines_needed(t, 44, 883), 1)
 
 
 if __name__ == "__main__":
