@@ -112,3 +112,6 @@ if __name__ == "__main__":
         for date in a[1:]: print(seed(date))
     else:
         sync("--dry-run" in a)
+        if "--dry-run" not in a:                       # 악보와 PPT 「➕ 올리기」도 같은 1분 주기로 (uploads.py)
+            import uploads
+            uploads.run()
