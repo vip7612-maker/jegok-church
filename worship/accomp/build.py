@@ -71,7 +71,7 @@ body{margin:0;background:#d9dce1;font-family:'Pretendard Variable',Pretendard,'A
 .q4{display:grid;grid-template-columns:repeat(2,16.5mm);gap:1mm 1.2mm;justify-content:center}
 .none{color:#cbd5e1}
 .sup{margin-top:auto;border:1.5px dashed #94a3b8;border-radius:3mm;padding:2.4mm 4mm;display:flex;gap:5mm;align-items:center}
-.sup-h b{display:block;font-size:15pt;color:#0b1430}.sup-h span{font-size:8.5pt;color:#64748b}
+.sup-h{white-space:nowrap}.sup-h b{display:inline;margin-right:1.5mm;font-size:15pt;color:#0b1430}.sup-h span{font-size:8.5pt;color:#64748b}
 .sup-n{display:flex;flex-wrap:wrap;gap:1mm 1.2mm}.sup-n .nm{background:#f1f5f9}
 /* 글 쪽 */
 .textpage{padding:8mm 10mm;height:100%;display:flex;flex-direction:column}
