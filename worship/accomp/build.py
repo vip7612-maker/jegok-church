@@ -120,7 +120,7 @@ body.sv #sv,body.pr #sv{display:flex;position:fixed;inset:44px 0 0 0}
 #stage .page{transform-origin:center center;flex:0 0 auto}
 #hint{position:absolute;right:14px;bottom:10px;font-size:12px;color:#64748b}
 body.pr{background:#000}
-body.pr .bar,body.pr #rail,body.pr #hint{display:none}
+body.pr .bar,body.pr #rail,body.pr #hint,body.pr .dlbar{display:none!important}
 body.pr #sv{inset:0;background:#000}
 body.pr #stage .page{box-shadow:none}
 body.pr .tag,body.sv #stage .tag{display:none}
