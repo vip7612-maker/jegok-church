@@ -15,7 +15,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SITE = Path.home() / "dev/daily-briefing/report-site"
-SECTIONS = ["주일예배", "성경암송", "찬양과경배", "사도신경", "대표기도", "교회소식", "봉헌", "성경봉독", "특송", "설교", "찬양과결단", "축도", "예배를마칩니다"]
+SECTIONS = ["주일예배", "성경암송", "찬양과경배", "사도신경", "대표기도", "교회소식", "봉헌", "성경봉독", "특송", "선교보고", "설교", "찬양과결단", "축도", "예배를마칩니다"]
 
 
 def css_color(c: int) -> str:
@@ -90,7 +90,7 @@ def outline(slides: list[dict], songs: list[str] | None = None) -> list[tuple[in
         flat = re.sub(r"\s", "", s["plain"])
         sec = next((x for x in SECTIONS if x in flat[:40]), "")
         if sec and (len(flat) < 160 or sec == "사도신경" and "사도신경" in flat[:30] and last != "사도신경"):
-            name = {"교회소식": "교회 소식", "성경봉독": "성경 봉독", "특송": "특송", "찬양과결단": "찬양과 결단", "예배를마칩니다": "마침"}.get(sec, sec)
+            name = {"교회소식": "교회 소식", "성경봉독": "성경 봉독", "특송": "특송", "선교보고": "선교 보고", "찬양과결단": "찬양과 결단", "예배를마칩니다": "마침"}.get(sec, sec)
             # 가사가 아직 없는 틀(2026-10-03): 곡마다 「찬양과경배」 표지 장만 있다 — 같은 표지가 또 나오면 곡 자리로 보고 곡 이름을 단다
             ph = sec in ("찬양과경배", "찬양과결단") and "Praise&Worship" in flat
             empty = k + 1 >= len(slides) or is_mark(slides[k + 1])   # 바로 다음이 또 표지 = 가사 장이 없는 자리
@@ -197,7 +197,7 @@ document.addEventListener('fullscreenchange',()=>{{ if(!SCREEN&&!document.fullsc
 deck.addEventListener('click',e=>{{ if(!document.body.classList.contains('pr')) return; show(cur+(e.clientX>innerWidth/2?1:-1)); }});
 let x0=null; deck.addEventListener('touchstart',e=>x0=e.touches[0].clientX,{{passive:true}});
 deck.addEventListener('touchend',e=>{{ if(x0===null||!document.body.classList.contains('pr'))return; const dx=e.changedTouches[0].clientX-x0; if(Math.abs(dx)>40)show(cur+(dx<0?1:-1)); x0=null; }});
-document.querySelectorAll('#toc a').forEach(a=>a.onclick=ev=>{{ev.preventDefault(); a.blur(); const el=document.getElementById(a.getAttribute('href').slice(1)); if(document.body.classList.contains('pv')){{go(all.indexOf(el));return;}} if(ONE()){{view(all.indexOf(el));return;}} el.scrollIntoView({{behavior:'instant',block:'start'}});}});
+document.querySelectorAll('#toc a:not(.bgm)').forEach(a=>a.onclick=ev=>{{ev.preventDefault(); a.blur(); if(window.bgmClose) bgmClose(); const el=document.getElementById(a.getAttribute('href').slice(1)); if(document.body.classList.contains('pv')){{go(all.indexOf(el));return;}} if(ONE()){{view(all.indexOf(el));return;}} el.scrollIntoView({{behavior:'instant',block:'start'}});}});
 {pvjs}
 </script></body></html>"""
 
@@ -222,7 +222,7 @@ let scr=null,t0=0,tick=null;
 const ONE=()=>document.body.classList.contains('one');
 function view(i){ cur=Math.max(0,Math.min(all.length-1,i)); all.forEach((s,k)=>s.classList.toggle('cur',k===cur)); paint(all[cur]); if(all[cur+1])paint(all[cur+1]); fit();
   document.getElementById('vn').textContent=(cur+1)+' / '+all.length; let on=null;
-  document.querySelectorAll('#toc a').forEach(a=>{ const k=all.indexOf(document.getElementById(a.getAttribute('href').slice(1))); if(k<=cur)on=a; a.classList.remove('on'); });
+  document.querySelectorAll('#toc a').forEach(a=>{ const k=all.indexOf(document.getElementById(a.getAttribute('href').slice(1))); if(k>=0&&k<=cur)on=a; a.classList.remove('on'); });
   if(on){on.classList.add('on'); on.scrollIntoView({block:'nearest'});} window.scrollTo(0,0); }
 function back(){ if(ONE()) view(cur); else all[cur].scrollIntoView({block:'center'}); }
 function toggleList(){ const b=document.getElementById('lbtn');
@@ -269,7 +269,7 @@ function go(i,quiet){ const fe=document.activeElement; if(fe&&fe.closest&&fe.clo
   cur=Math.max(0,Math.min(all.length-1,i)); mount('pvcur',cur); mount('pvnext',cur+1); thumbs(); fit();
   document.getElementById('pvn').textContent=(cur+1)+' / '+all.length;
   let on=null;
-  document.querySelectorAll('#toc a').forEach(a=>{ const k=all.indexOf(document.getElementById(a.getAttribute('href').slice(1))); if(k<=cur)on=a; a.classList.remove('on'); });
+  document.querySelectorAll('#toc a').forEach(a=>{ const k=all.indexOf(document.getElementById(a.getAttribute('href').slice(1))); if(k>=0&&k<=cur)on=a; a.classList.remove('on'); });
   if(on){on.classList.add('on'); on.scrollIntoView({block:'nearest'});}
   if(!quiet&&bc) bc.postMessage({i:cur}); }
 function endPV(){ document.body.classList.remove('pv'); clearInterval(tick); if(bc)bc.postMessage({end:1}); try{scr&&scr.close()}catch(e){} scr=null; back(); }
@@ -282,7 +282,73 @@ addEventListener('keydown',e=>{ if(!document.body.classList.contains('pv')) retu
 """
 
 
-def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = None) -> str:
+# ── BGM — 예배를 마친 뒤 성도의 교제 때 틀 신나는 CCM (2026-10-03 교장님) ─────────────────
+# ppt.html 을 만들 때 유튜브에서 찾아 퍼가기(임베드)가 되는 것만 5개. 같은 주는 out/bgm/<날짜>.json 에 두어 다시 만들어도 그대로.
+BGM_Q = ["신나는 CCM 찬양 모음", "기쁨의 찬양 CCM 플레이리스트", "경쾌한 CCM 찬양 연속듣기", "밝은 CCM 예배찬양 플레이리스트",
+         "신나는 찬양 메들리", "드라이브 CCM 찬양 플레이리스트", "업비트 CCM 찬양 모음"]
+
+
+def bgm(date: str, n: int = 5) -> list[dict]:
+    import datetime as dt, subprocess
+    f = HERE / "out" / "bgm" / f"{date}.json"
+    if f.exists(): return json.loads(f.read_text())
+    wk = dt.date.fromisoformat(date).isocalendar()[1]
+    seen, out, extra = set(), [], []
+    for q in (BGM_Q[wk % len(BGM_Q)], BGM_Q[(wk + 3) % len(BGM_Q)]):
+        try:
+            r = subprocess.run(["yt-dlp", "--no-warnings", "--skip-download", "--print",
+                                "%(id)s\t%(title)s\t%(duration)s\t%(playable_in_embed)s\t%(channel)s", f"ytsearch8:{q}"],
+                               capture_output=True, text=True, timeout=180)
+        except Exception:
+            continue
+        for ln in r.stdout.splitlines():
+            p = ln.split("\t")
+            if len(p) < 5 or p[0] in seen or p[3] != "True" or not p[2].isdigit() or int(p[2]) < 180: continue
+            if re.search(r"(?i)shorts|MR|반주|inst", p[1]): continue
+            seen.add(p[0]); v = {"id": p[0], "title": p[1], "sec": int(p[2]), "ch": p[4]}
+            (out if v["ch"] not in {x["ch"] for x in out} else extra).append(v)      # 채널이 겹치지 않게 먼저
+    out = (out + extra)[:n]
+    if out:
+        f.parent.mkdir(parents=True, exist_ok=True); f.write_text(json.dumps(out, ensure_ascii=False, indent=1))
+    return out
+
+
+def bgm_html(items: list[dict]) -> str:
+    if not items: return ""
+    tm = lambda s: f"{s // 3600}시간 {s % 3600 // 60}분" if s >= 3600 else f"{s // 60}분"
+    cards = "".join(f'<button class="bgmc" data-id="{html.escape(v["id"])}"><img src="https://i.ytimg.com/vi/{html.escape(v["id"])}/mqdefault.jpg" alt="" loading="lazy">'
+                    f'<span>{html.escape(v["title"])}</span><small>{html.escape(v["ch"])} · {tm(v["sec"])}</small></button>' for v in items)
+    return ('<div id="bgmbox"><div class="bgmh"><b>🎵 BGM · 성도의 교제를 위한 찬양</b><span id="bgmnow"></span><button class="bgmx" onclick="bgmClose()">닫기 (음악은 계속)</button></div>'
+            '<div id="bgmplay"></div><div class="bgml">' + cards + '</div><p class="bgmnote">누르면 그 영상이 나옵니다 · 다른 순서로 가도 음악은 계속 · ■ 멈춤은 영상에서</p></div>'
+            """<script>
+function bgmOpen(){ document.body.classList.add('bgm'); document.querySelectorAll('#toc a').forEach(a=>a.classList.toggle('on',a.classList.contains('bgm'))); }
+function bgmClose(){ document.body.classList.remove('bgm'); const b=document.querySelector('#toc a.bgm'); if(b) b.classList.remove('on'); }
+addEventListener('DOMContentLoaded',()=>{
+  const t=document.querySelector('#toc a.bgm'); if(t) t.onclick=e=>{ e.preventDefault(); t.blur(); bgmOpen(); };
+  document.querySelector('#bgmbox .bgml').onclick=e=>{ const c=e.target.closest('.bgmc'); if(!c) return;
+    document.querySelectorAll('.bgmc').forEach(x=>x.classList.toggle('on',x===c));
+    document.getElementById('bgmplay').innerHTML='<iframe src="https://www.youtube-nocookie.com/embed/'+c.dataset.id+'?autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+    document.getElementById('bgmnow').textContent='재생: '+c.querySelector('span').textContent.slice(0,40); };
+});
+</script>""")
+
+
+BGM_CSS = """
+#bgmbox{display:none;position:fixed;top:var(--navh,88px);left:190px;right:0;bottom:0;z-index:25;background:#0f172a;overflow:auto;padding:16px 20px}
+body.bgm #bgmbox{display:block}body.pv #bgmbox{z-index:60;left:0}body.pr #bgmbox{display:none!important}
+.bgmh{display:flex;align-items:center;gap:12px;margin-bottom:12px}.bgmh b{font-size:18px}#bgmnow{flex:1;color:#f6c76b;font-size:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.bgmx{font:700 13px inherit;border:0;border-radius:999px;padding:7px 14px;background:#fff;color:#111;cursor:pointer}
+#bgmplay iframe{width:min(100%,960px);aspect-ratio:16/9;border:0;border-radius:10px;display:block;margin:0 auto 14px;background:#000}
+.bgml{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.bgmc{display:flex;flex-direction:column;gap:6px;text-align:left;border:2px solid transparent;border-radius:10px;background:#1e293b;color:#e2e8f0;padding:6px;cursor:pointer;font:600 13.5px inherit}
+.bgmc:hover{border-color:#475569}.bgmc.on{border-color:#f6c76b}.bgmc img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px}
+.bgmc span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.bgmc small{color:#94a3b8;font-weight:400}
+.bgmnote{color:#94a3b8;font-size:12.5px}#toc a.bgm{margin-top:8px;border-top:1px solid #1e293b;color:#f6c76b}
+@media (max-width:760px){#bgmbox{left:0}}
+"""
+
+
+def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = None, date: str | None = None) -> str:
     data = [{"img": s["img"], "texts": s["texts"]} for s in slides]
     sl = "".join(f'<section class="sl" id="s{s["n"]}" data-i="{k}"><div class="in"></div><span class="no">{s["n"]}</span></section>'
                  for k, s in enumerate(slides))
@@ -295,8 +361,15 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
            '<button class="sub" id="lbtn" onclick="wsView(false)">☰ 목록</button>'
            '<button class="sub" onclick="present()">▶ 예배용(두 화면)</button>'
            + (f'<span class="note">{html.escape(note)}</span>' if note.strip() else ""))
-    nav = wsnav.nav("ppt", m.group(0) if m else title, sub, dls) + f"<script>{wsnav.JS}</script>"
-    return PAGE.format(title=html.escape(title), n=len(slides), slides=sl, toc=toc, dl=dl, nav=nav, navcss=wsnav.CSS,
+    if not date and m:                            # 날짜를 안 받았으면 제목(「10월 11일」)에서
+        import datetime as dt
+        mo, da = map(int, re.findall(r"\d+", m.group(0))); date = f"{dt.date.today().year}-{mo:02d}-{da:02d}"
+    items = bgm(date) if date else []
+    if items:
+        toc += '<a href="#bgm" class="bgm">🎵 BGM</a>'
+        sub += '<button class="sub" onclick="bgmOpen()">🎵 BGM</button>'
+    nav = wsnav.nav("ppt", m.group(0) if m else title, sub, dls) + f"<script>{wsnav.JS}</script>" + bgm_html(items)
+    return PAGE.format(title=html.escape(title), n=len(slides), slides=sl, toc=toc, dl=dl, nav=nav, navcss=wsnav.CSS + BGM_CSS,
                        data=json.dumps(data, ensure_ascii=False, separators=(",", ":")), pvjs=PVJS)
 
 
@@ -417,6 +490,44 @@ def song_slides(title: str, si: int, W: int, H: int, out: Path) -> list[dict]:
     return res
 
 
+def add_extra(slides: list[dict], date: str, out: Path | None = None) -> list[dict]:
+    """그 주에만 끼우는 순서 장 — data/<날짜>.json 의 ppt_extra (2026-10-03 교장님 지시: 특송 다음 「선교 보고 · 디마 선교사」).
+    [{"after": "SpecialPraise", "base": "ScriptureReading", "label": "Mission Report", "title": "선교 보고", "name": "디마 선교사"}]
+    base 장(제목 상자 크기가 맞는 순서 표지)의 배경을 빌려 글자만 바꾼다. after 장 바로 뒤에 넣는다."""
+    try:
+        extra = json.loads((HERE / "data" / f"{date}.json").read_text()).get("ppt_extra", [])
+    except Exception:
+        return slides
+    flat = lambda s: re.sub(r"\s", "", s["plain"])
+    for x in extra:
+        base = next((s for s in slides if flat(s).startswith(x.get("base", "ScriptureReading"))), None)
+        k = next((i for i, s in enumerate(slides) if flat(s).startswith(x["after"])), None)
+        if base is None or k is None: continue
+        s = json.loads(json.dumps(base)); texts = []
+        for t in s["texts"]:
+            if t["s"] >= 100: val = x.get("title", "")
+            elif t["s"] < 30 and t["y"] < 300: val = x.get("label", "")
+            elif 40 <= t["s"] < 100: val = x.get("name", "")
+            else: val = x.get("sub", "")
+            if not val: continue
+            cx = t["x"] + t["w"] / 2; w = t["w"] * max(1.0, len(val) / max(1, len(t["t"])))
+            texts.append({**t, "t": val, "w": int(w), "x": int(cx - w / 2)})
+        s.update(texts=texts, plain=" ".join(t["t"] for t in texts), hidden="")
+        add = [s]
+        # 보고 자료(PDF)가 있으면 장마다 그림 한 장씩 표지 뒤에 이어 붙인다 — 글자까지 원본 그대로 (2026-10-03 디마 선교사 몽골 단기선교 보고)
+        src = HERE / "extra" / date / x["pdf"] if x.get("pdf") else None
+        if src and src.exists() and out is not None:
+            import fitz
+            doc = fitz.open(src); tag = re.sub(r"\W", "", x.get("name", "extra"))[:8] or "extra"
+            for i, pg in enumerate(doc, 1):
+                name = f"x_{tag}_{i:02d}.jpg"
+                pg.get_pixmap(matrix=fitz.Matrix(1920 / pg.rect.width, 1920 / pg.rect.width)).save(str(out / name), jpg_quality=88)
+                add.append({"n": 0, "w": s["w"], "h": s["h"], "img": name, "texts": [], "plain": "", "hidden": ""})
+        slides[k + 1:k + 1] = add
+    for n, s in enumerate(slides, 1): s["n"] = n
+    return slides
+
+
 def song_titles(date: str) -> list[str]:
     """그 주 악보집 곡 순서(도입곡 → 1~N → 적용송). 없으면 악보 보관함의 「쓴 날」 기록에서."""
     try:
@@ -444,13 +555,14 @@ def make(pdf: Path, date: str, sid: str, pptx: Path | None = None) -> Path:
     import fitz                                   # 모음 쪽(jegok_worship) 「오늘」 칸에 쓸 첫 장 그림(글자까지 그대로)
     fitz.open(pdf)[0].get_pixmap(dpi=110).save(str(folder / "cover.jpg"))
     slides = add_song_frames(slides, date, folder / "slides")
+    slides = add_extra(slides, date, folder / "slides")
     shutil.copy(pdf, folder / "worship.pdf")
     dl = '<a href="worship.pdf" download="{0} 주일예배 PPT.pdf">⬇ PDF</a>'.format(date)
     if pptx:
         shutil.copy(pptx, folder / "worship.pptx")
         dl = f'<a href="worship.pptx" download="{date} 주일예배 PPT.pptx">⬇ PPT</a>' + dl
     title = f"{int(date[5:7])}월 {int(date[8:10])}일 주일예배 PPT"
-    (folder / "ppt.html").write_text(render(slides, title, dl, song_titles(date)))
+    (folder / "ppt.html").write_text(render(slides, title, dl, song_titles(date), date=date))
     return folder
 
 

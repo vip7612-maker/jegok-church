@@ -31,7 +31,10 @@ body.prep .wsnav .tab[data-mode=prep]{background:#f6c76b;color:#412402}
 .wsnav details{position:relative}
 .wsnav summary{list-style:none;cursor:pointer}.wsnav summary::-webkit-details-marker{display:none}
 .wsnav .dl>summary{font:700 13px inherit;border-radius:7px;padding:6px 12px;background:#e8a33c;color:#412402;white-space:nowrap}
-.wsnav .more>summary{font:800 15px inherit;border:1px solid #475569;border-radius:999px;padding:4px 11px;color:#e2e8f0;line-height:1.2}
+.wsnav .wk{font:800 14px inherit;color:#f6c76b;text-decoration:none;padding:7px 12px;margin-right:6px;border:1px solid #475569;border-radius:999px;white-space:nowrap}
+.wsnav .wk:hover{background:#334155}
+.wsnav .lib .menu{right:auto;left:0;min-width:170px}.wsnav .menu a.on{background:#fef3c7;font-weight:800}
+.wsnav summary.tab{display:inline-block}
 .wsnav .menu{position:absolute;right:0;top:calc(100% + 6px);z-index:50;min-width:190px;background:#fff;color:#111;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);padding:4px;display:flex;flex-direction:column}
 .wsnav .menu a,.wsnav .menu button{font:600 14px inherit;text-align:left;border:0;background:none;color:#111;padding:10px 12px;border-radius:7px;text-decoration:none;cursor:pointer}
 .wsnav .menu a:hover,.wsnav .menu button:hover{background:#f1f5f9}
@@ -40,7 +43,9 @@ body.prep .wsnav .tab[data-mode=prep]{background:#f6c76b;color:#412402}
 @media (max-width:640px){
   .wsnav .r1{flex-wrap:wrap;gap:5px;padding:6px 8px}
   .wsnav .ttl{flex:1 0 100%;font-size:13px}
-  .wsnav .tabs{flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+  .wsnav .tabs{flex:1 0 100%;display:grid;grid-template-columns:1.6fr repeat(4,1fr);gap:4px}
+  .wsnav .wk{margin:0;padding:7px 4px;font-size:12.5px;text-align:center}
+  .wsnav .lib summary.tab{display:block}.wsnav .lib .menu{left:auto;right:0}
   .wsnav .tab{padding:7px 2px;font-size:13px;text-align:center}
   .wsnav .r2{padding:4px 8px}.wsnav .r2 input{flex:1 0 100%;order:9;margin:4px 0 2px;width:auto}.wsnav .sub{padding:6px 9px;font-size:12.5px}
 }
@@ -65,17 +70,26 @@ def label(date: str) -> str:
     return f"{int(date[5:7])}월 {int(date[8:10])}일"
 
 
-def nav(cur: str, when: str, sub: str = "", dl: list[tuple[str, str]] | None = None,
-        date: str | None = None, prep_js: bool = False) -> str:
-    """cur: 'score'|'ppt'|'jubo' · when: '10월 4일' · sub: 2단 왼쪽(하위 메뉴) HTML · dl: [(이름, href 또는 'js:함수()')]
-    date 를 주면 탭 주소를 절대 주소로(주보처럼 다른 폴더에 사는 쪽), 없으면 같은 폴더 상대 주소.
-    prep_js: 악보집 안에서는 🔒 준비를 같은 쪽 안에서 연다(wsPrep)."""
+def r1(cur: str, when: str, date: str | None = None, prep_js: bool = False) -> str:
+    """1단: 🏠 제곡교회 예배 플랫폼 ……… [10월 4일 주일예배] [악보] [PPT] [자료실 ▾ 주보·악보와 PPT] [🔒 준비] (2026-10-03 교장님)"""
     root = f"{BASE}/jegok_worship_{date.replace('-', '')}/" if date else "./"
     def tab(key, name, href):
-        c = " cur" if key == cur else ""
-        return f'<a class="tab{c}" href="{href}">{name}</a>'
+        return f'<a class="tab{" cur" if key == cur else ""}" href="{href}">{name}</a>'
     prep = ('<button class="tab" data-mode="prep" onclick="wsPrep()">🔒 준비</button>' if prep_js
             else f'<a class="tab" href="{root}#prep">🔒 준비</a>')
+    lib = (f'<details class="lib"><summary class="tab{" cur" if cur in ("jubo", "song") else ""}">자료실 ▾</summary><div class="menu">'
+           f'<a href="{root}jubo.html"{" class=on" if cur == "jubo" else ""}>📰 주보</a>'
+           f'<a href="{BASE}/jegok_worship/song.html"{" class=on" if cur == "song" else ""}>🎼 악보와 PPT</a></div></details>')
+    return (f'<div class="r1"><a class="ttl" href="{BASE}/jegok_worship">🏠 제곡교회 예배 플랫폼</a>'
+            f'<nav class="tabs"><a class="wk" href="{root}">{H.escape(when)} 주일예배</a>'
+            f'{tab("score", "악보", root)}{tab("ppt", "PPT", root + "ppt.html")}{lib}{prep}</nav></div>')
+
+
+def nav(cur: str, when: str, sub: str = "", dl: list[tuple[str, str]] | None = None,
+        date: str | None = None, prep_js: bool = False) -> str:
+    """cur: 'score'|'ppt'|'jubo'|'song' · when: '10월 4일' · sub: 2단 왼쪽(하위 메뉴) HTML · dl: [(이름, href 또는 'js:함수()')]
+    date 를 주면 탭 주소를 절대 주소로(주보처럼 다른 폴더에 사는 쪽), 없으면 같은 폴더 상대 주소.
+    prep_js: 악보집 안에서는 🔒 준비를 같은 쪽 안에서 연다(wsPrep)."""
     items = []
     for name, href in (dl or []):
         if href.startswith("js:"):
@@ -83,9 +97,6 @@ def nav(cur: str, when: str, sub: str = "", dl: list[tuple[str, str]] | None = N
         else:
             items.append(f'<a href="{H.escape(href)}" download>{name}</a>')
     items.append('<button type="button" onclick="wsCopyLink(this)">🔗 링크 복사</button>')
-    return (f'<header class="bar wsnav" data-wsnav><div class="r1"><a class="ttl" href="{root}">⛪ 제곡교회 예배 · {H.escape(when)}</a>'
-            f'<nav class="tabs">{tab("score", "악보", root)}{tab("ppt", "PPT", root + "ppt.html")}{tab("jubo", "주보", root + "jubo.html")}{prep}</nav>'
-            f'<details class="more"><summary aria-label="더보기">⋯</summary><div class="menu">'
-            f'<a href="{BASE}/jegok_worship">🏠 예배 플랫폼 처음</a><a href="{BASE}/jegok_worship/song.html">🎵 악보와 PPT</a></div></details></div>'
+    return (f'<header class="bar wsnav" data-wsnav>{r1(cur, when, date, prep_js)}'
             f'<div class="r2">{sub}<span class="msg" aria-live="polite"></span>'
             f'<details class="dl push"><summary>⬇ 내려받기 ▾</summary><div class="menu">{"".join(items)}</div></details></div></header>')
