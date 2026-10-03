@@ -295,11 +295,15 @@ def add_song_frames(slides: list[dict], date: str, out: Path) -> list[dict]:
     if not songs or len(empty) < len(divs):   # 가사 장이 이미 들어 있는 PPT
         return slides
     W, H = int(slides[0]["w"]), int(slides[0]["h"])
+    for f in out.glob("song_*.jpg"): f.unlink()
     res, si = [], 0
     for k, s in enumerate(slides):
         res.append(s)
         if k in divs and si < len(songs):
             lab, x = songs[si]; si += 1
+            got = song_slides(x.get("title", ""), si, W, H, out)       # 곡별 PPT DB 에 있으면 그 곡의 장을 모두
+            if got:
+                res += got; continue
             name = f"frame_{si:02d}.jpg"
             cv = Image.new("RGB", (W, H), "white")
             if x.get("img") and (HERE / x["img"]).exists():
@@ -314,6 +318,44 @@ def add_song_frames(slides: list[dict], date: str, out: Path) -> list[dict]:
                 texts.append({"x": 40, "y": H // 2, "w": W - 80, "h": 40, "s": 32, "c": "#9ca3af", "b": False, "t": "악보·가사 준비 중", "a": "c"})
             res.append({"n": 0, "w": W, "h": H, "img": name, "texts": texts, "plain": x.get("title", ""), "hidden": x.get("title", "")})
     for n, s in enumerate(res, 1): s["n"] = n
+    return res
+
+
+def song_slides(title: str, si: int, W: int, H: int, out: Path) -> list[dict]:
+    """곡별 PPT DB(songppt/db)에서 곡을 찾아 예배 PPT 장으로 — 악보 그림 + 자막 바탕(검정)은 그림에, 자막 글은 글자로
+    (2026-10-03 교장님 지시: 콘티 순서대로 찬양 자리에 곡 PPT 를 자동으로)."""
+    import base64, io
+    from PIL import Image, ImageDraw
+    sys.path.insert(0, str(HERE)); sys.path.insert(0, str(HERE.parent))
+    try:
+        import songbank, songppt
+        t = songbank.find(title)
+        if not t: return []
+        song = json.loads((songppt.DB / songppt.file_name(t)[:-5] / "song.json").read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    CW, CH = 1920, 1080; kx, ky = W / CW, H / CH
+    res = []
+    for j, sl in enumerate(song["slides"], 1):
+        cv = Image.new("RGB", (CW, CH), "white")
+        im = Image.open(io.BytesIO(base64.b64decode(sl["img"]))).convert("RGBA")
+        x, y, w, h = sl["pic"]
+        im = im.resize((max(1, w), max(1, h)))
+        cv.paste(im, (x, y), im)
+        texts = []
+        sub = sl.get("sub")
+        if sub and sub.get("lines"):
+            bx, by, bw, bh = sub["box"]
+            ImageDraw.Draw(cv).rectangle([bx, by, bx + bw, by + bh], fill=sub.get("fill") or "#000000")
+            n = len(sub["lines"]); size = sub["size"]
+            size = min(size, bh / (n * 1.15))                          # 줄이 많으면 칸에 맞게 줄인다
+            top = by + (bh - n * size * 1.15) / 2
+            for i, ln in enumerate(sub["lines"]):
+                texts.append({"x": round(bx * kx), "y": round((top + i * size * 1.15) * ky), "w": round(bw * kx), "h": round(size * ky),
+                              "s": round(size * ky, 1), "c": ln.get("c") or "#ffffff", "b": True, "t": ln["t"], "a": "c"})
+        name = f"song_{si:02d}_{j:02d}.jpg"
+        cv.save(out / name, "JPEG", quality=85)
+        res.append({"n": 0, "w": W, "h": H, "img": name, "texts": texts, "plain": t, "hidden": t, "song": t})
     return res
 
 
