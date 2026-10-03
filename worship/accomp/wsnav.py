@@ -26,6 +26,7 @@ body.prep .wsnav .tab[data-mode=prep]{background:#f6c76b;color:#412402}
 .wsnav .sub{width:auto;font:600 13px inherit;border:0;border-radius:7px;padding:6px 12px;background:none;color:#e2e8f0;text-decoration:none;cursor:pointer;white-space:nowrap}
 .wsnav .sub:hover{background:#475569}
 .wsnav .sub.on{background:#475569;color:#fff;box-shadow:inset 0 -2px 0 #f6c76b}
+.wsnav .r2 input{font:14px inherit;border:0;border-radius:999px;padding:6px 14px;width:min(280px,46vw);margin:0 4px}
 .wsnav .note{font-size:12.5px;color:#cbd5e1;padding:0 6px}
 .wsnav details{position:relative}
 .wsnav summary{list-style:none;cursor:pointer}.wsnav summary::-webkit-details-marker{display:none}
@@ -41,7 +42,7 @@ body.prep .wsnav .tab[data-mode=prep]{background:#f6c76b;color:#412402}
   .wsnav .ttl{flex:1 0 100%;font-size:13px}
   .wsnav .tabs{flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
   .wsnav .tab{padding:7px 2px;font-size:13px;text-align:center}
-  .wsnav .r2{padding:4px 8px}.wsnav .sub{padding:6px 9px;font-size:12.5px}
+  .wsnav .r2{padding:4px 8px}.wsnav .r2 input{flex:1 0 100%;order:9;margin:4px 0 2px;width:auto}.wsnav .sub{padding:6px 9px;font-size:12.5px}
 }
 @media print{.wsnav{display:none!important}}
 """
