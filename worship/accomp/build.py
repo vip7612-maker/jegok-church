@@ -77,6 +77,7 @@ body{margin:0;background:#d9dce1;font-family:'Pretendard Variable',Pretendard,'A
 .textpage .body{flex:1;min-height:0;overflow:hidden;line-height:1.45}
 .red{color:#dc2626;font-style:normal}
 .verses{line-height:1.75}
+.sm-head{background:#e8edf8;border-left:2mm solid #1e3a8a;border-radius:2mm;padding:2.6mm 4mm;margin-bottom:4mm;flex:0 0 auto}.sm-head b{display:block;font-size:21pt;color:#0b1430}.sm-head span{font-size:14pt;color:#334155;font-weight:600}
 .creed{padding:9mm 14mm}.creed h2{font-size:32pt;margin-bottom:6mm}.creed .body{white-space:nowrap;line-height:1.62;font-weight:600;letter-spacing:-.01em}
 .vn{color:#1e3a8a;margin-right:1.5mm}
 .sermon-head{display:flex;gap:6mm;align-items:baseline}
@@ -275,7 +276,8 @@ def page_html(n: int, p: dict, date: str) -> str:
         inner = (f'<div class="textpage"><div class="sermon-head"><h2>설교본문:</h2><span class="ref">{p["ref"]}</span>'
                  f'<span class="tt">{p["title"]}</span></div><div class="body verses" data-max="18">{p["body"]}</div></div>')
     elif t == "sermon_summary":
-        inner = (f'<div class="col" style="left:0"><div class="body" data-max="20">{p["left"]}</div></div><div class="divider"></div>'
+        head = (f'<div class="sm-head"><b>{html.escape(p["title"])}</b><span>{html.escape(p.get("ref", ""))}</span></div>' if p.get("title") else "")
+        inner = (f'<div class="col" style="left:0;display:flex;flex-direction:column">{head}<div class="body" data-max="20" style="flex:1;min-height:0;height:auto">{p["left"]}</div></div><div class="divider"></div>'
                  f'<div class="col" style="left:50%"><div class="body" data-max="20">{p["right"]}</div></div>')
     else:  # scores — 칸마다 배지(도입곡 · 1 · 2 … · 적용송)
         by = {s["side"]: s for s in p.get("slots", [])}
@@ -316,6 +318,10 @@ def expand(d: dict) -> list[dict]:
 def build(date: str) -> Path:
     d = json.loads((HERE / "data" / f"{date}.json").read_text())
     d["pages"] = expand(d)
+    st = next((p for p in d["pages"] if p["type"] == "sermon_text"), {})
+    for p in d["pages"]:
+        if p["type"] == "sermon_summary":
+            p.setdefault("title", st.get("title", "")); p.setdefault("ref", st.get("ref", ""))
     pages = "".join(page_html(i, p, date) for i, p in enumerate(d["pages"], 1))
     doc = f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{html.escape(d["title"])}</title>
