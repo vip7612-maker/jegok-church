@@ -92,7 +92,8 @@ body{margin:0;background:#d9dce1;font-family:'Pretendard Variable',Pretendard,'A
 .slot img{width:100%;flex:1;min-height:0;object-fit:contain;object-position:top center}
 .slot.empty{border:2px dashed #93c5fd;border-radius:3mm;align-items:center;justify-content:center;color:#3b82f6;background:#f8fbff}
 .slot.empty b{font-size:16pt}.slot.empty span{font-size:10pt;margin-top:2mm;color:#64748b}
-.slot .badge{position:static;align-self:flex-start;flex:0 0 auto;margin-bottom:1.5mm;min-width:11mm;text-align:center;font-size:13pt;font-weight:900;color:#fff;background:#1e3a8a;border-radius:2mm;padding:.8mm 3.5mm}
+.shead{display:flex;align-items:center;gap:2.5mm;flex:0 0 auto;margin-bottom:1.5mm}.shead .stt{font-size:11pt;font-weight:700;color:#1e3a8a}
+.slot .badge{position:static;align-self:flex-start;flex:0 0 auto;min-width:11mm;text-align:center;font-size:13pt;font-weight:900;color:#fff;background:#1e3a8a;border-radius:2mm;padding:.8mm 3.5mm}
 .slot.empty .badge{position:absolute;left:0;top:0}
 .slot .st{position:absolute;left:0;bottom:0;font-size:8pt;color:#fff;background:rgba(37,99,235,.85);padding:.5mm 2mm;border-radius:0 2mm 0 0}
 @media print{
@@ -317,8 +318,8 @@ def page_html(n: int, p: dict, date: str) -> str:
             badge = f'<span class="badge">{html.escape(s["label"])}</span>' if s.get("label") else ""
             where = f'{n}쪽 {"왼쪽" if side == "L" else "오른쪽"}'
             if s.get("img"):
-                halves.append(f'<div class="half {side}"><div class="slot">{badge}<img src="{img_src(s["img"])}" alt="{html.escape(s.get("title", ""))}">'
-                              f'<span class="st">{where} · {html.escape(s.get("title") or "제목 미정")}</span></div></div>')
+                halves.append(f'<div class="half {side}"><div class="slot"><div class="shead">{badge}<span class="stt">{html.escape(s.get("title") or "")}</span></div><img src="{img_src(s["img"])}" alt="{html.escape(s.get("title", ""))}">'
+                              f'</div></div>')
             else:
                 halves.append(f'<div class="half {side}"><div class="slot empty">{badge}<b>악보 자리</b><span>{where}{" · " + html.escape(s["label"]) if s.get("label") else ""} — 악보를 주시면 여기에 넣습니다</span></div></div>')
         inner = "".join(halves) + '<div class="divider"></div>'
