@@ -92,7 +92,9 @@ def pages(pdf: bytes) -> tuple[list[dict], dict[str, str]]:
                                   "dir": l.get("dir", (1, 0)), "runs": runs, "lead": lead, "trail": trail,
                                   "size": max(r["size"] for r in runs)})
         lines, cells = make_cells(lines, grids)
+        lines = merge_rows(lines)
         lines, blocks = make_blocks(lines)
+        lines = unmerge_rows(lines)                       # 상자로 안 묶인 줄은 원래 조각으로(예배 순서 등 모양 그대로)
         # 글자 지운 배경
         p2 = fitz.open(); p2.insert_pdf(doc, from_page=pg.number, to_page=pg.number); q = p2[0]
         for b in q.get_text("dict")["blocks"]:
@@ -222,6 +224,38 @@ def cell_html(c: dict, k: str = "") -> str:
             f'width:{c["w"]:.2f}mm;height:{c["h"]:.2f}mm">{rows}</div>')
 
 
+def merge_rows(lines: list[dict]) -> list[dict]:
+    """같은 줄에서 가까이(10mm 안) 떨어진 조각들을 한 줄로 — 생일 명단처럼 한 줄에 여럿이 적힌 목록(2026-10-03 교장님: 한 덩어리로).
+    사이 간격은 빈칸으로 채운다. 원래 조각은 parts 에 두어, 상자로 안 묶이면 되돌린다. 줄 순서(읽는 순서)는 그대로."""
+    absorbed, merged = set(), {}
+    for a, l in enumerate(lines):
+        if a in absorbed or l["dir"][0] == 0: continue
+        row, idx = [l], [a]
+        while True:
+            last = row[-1]
+            cand = [(b, n) for b, n in enumerate(lines) if b not in absorbed and b not in idx and n["dir"][0] != 0
+                    and abs(n["base"] - l["base"]) <= 0.6                         # 같은 기준선이면 글자 크기가 달라도(작은 「집사」) 한 줄
+                    and -1 <= n["x"] - (last["x"] + last["w"]) <= 10]
+            if not cand: break
+            b, n = min(cand, key=lambda t: t[1]["x"])
+            row.append(n); idx.append(b)
+        if len(row) == 1: continue
+        runs = list(row[0]["runs"])
+        for prev, n in zip(row, row[1:]):
+            gap = n["x"] - (prev["x"] + prev["w"])
+            if gap > l["size"] * 0.3528 * 0.6: runs.append(dict(row[0]["runs"][0], t=" ", tab=n["x"]))   # 다음 조각이 원본 자리에서 시작하게(보이지 않는 칸 맞춤)
+            elif gap > 0.3: runs.append(dict(row[0]["runs"][0], t=" "))
+            runs += n["runs"]
+        merged[a] = dict(row[0], runs=runs, w=row[-1]["x"] + row[-1]["w"] - row[0]["x"], row=True, parts=row,
+                         trail=row[-1]["trail"], h=max(r["h"] for r in row))
+        absorbed.update(idx[1:])
+    return [merged.get(i, l) for i, l in enumerate(lines) if i not in absorbed]
+
+
+def unmerge_rows(lines: list[dict]) -> list[dict]:
+    return [p for l in lines for p in (l["parts"] if l.get("parts") else [l])]
+
+
 def make_blocks(lines: list[dict]) -> tuple[list[dict], list[dict]]:
     """여러 줄로 이어지는 글(오늘의 말씀·샘터 질문·공동기도문·소식 문단 …)은 한 글상자로 — 한 곳에서 쓰고 고치면 줄이
     저절로 다시 바뀐다(2026-10-03 교장님). 본문 줄 간격(글자 크기의 1.45배 이하)으로 3줄 넘게 붙어 있으면 한 묶음,
@@ -273,15 +307,18 @@ def make_blocks(lines: list[dict]) -> tuple[list[dict], list[dict]]:
             for pa in paras:                                   # 첫 줄 자리(fx)와 둘째 줄 자리(cx) → 왼쪽 여백·첫 줄 들여쓰기
                 cx = pa.get("cx", 0.0) if pa.get("cx", 0.0) > 0.2 else 0.0
                 pa["pad"] = cx; pa["indent"] = pa["fx"] - cx
+            listmode = any(g.get("row") for g in G)
+            if listmode:                                       # 한 줄에 여럿 적힌 목록(생일 명단 등) — 줄 하나가 한 문단, 다시 흐르지 않게
+                paras = [{"fx": g["x"] - bx, "pad": 0, "indent": g["x"] - bx, "gap": 0, "runs": [dict(r) for r in g["runs"]]} for g in G]
             mids = [g["x"] + g["w"] / 2 for g in G]
-            centered = max(mids) - min(mids) < 1.2 and max(g["w"] for g in G) - min(g["w"] for g in G) > 3
+            centered = not listmode and max(mids) - min(mids) < 1.2 and max(g["w"] for g in G) - min(g["w"] for g in G) > 3
             if centered:                                       # 줄마다 가운데 맞춘 글(큐알 옆 안내 등) — 줄 하나가 한 문단
                 paras = [{"fx": 0, "pad": 0, "indent": 0, "gap": 0, "runs": [dict(r) for r in g["runs"]]} for g in G]
             full = [g for g in G if g["w"] > maxw * 0.95]              # 꽉 찬 줄 — 글자 간격 맞추는 기준
             ref = max(full or G, key=lambda g: g["w"])
             blocks.append({"x": bx, "y": G[0]["y"], "h": G[0]["h"], "w": maxw, "pitch": pitch, "size": l["size"],
                            "font": l["runs"][0]["font"], "color": l["runs"][0]["color"], "paras": paras,
-                           "ref": text(ref), "refw": ref["w"], "center": centered})
+                           "ref": text(ref), "refw": ref["w"], "center": centered, "list": listmode})
             used.update(grp); i = j
         else:
             i += 1
@@ -290,14 +327,15 @@ def make_blocks(lines: list[dict]) -> tuple[list[dict], list[dict]]:
 
 def block_html(b: dict, k: str = "") -> str:
     def runs(rs):
-        return "".join(f'<span style="font-family:\'{E(r["font"])}\',\'Noto Sans KR\',sans-serif;color:{r["color"]}'
-                       f'{";font-weight:700" if r["bold"] else ""}">{E(r["t"])}</span>' for r in rs)
+        return "".join((f'<span class="tab" contenteditable="false" data-tx="{r["tab"]:.2f}"> </span>' if r.get("tab") is not None else
+                        f'<span style="font-family:\'{E(r["font"])}\',\'Noto Sans KR\',sans-serif;color:{r["color"]};font-size:{r["size"]:.2f}pt'
+                       f'{";font-weight:700" if r["bold"] else ""}">{E(r["t"])}</span>') for r in rs)
     paras = "".join(f'<div class="pa" style="padding-left:{p["pad"]:.2f}mm;text-indent:{p["indent"]:.2f}mm;margin-top:{max(0, p["gap"]):.2f}mm">{runs(p["runs"])}</div>'
                     for p in b["paras"])
     t = "".join(r["t"] for pa in b["paras"] for r in pa["runs"])
     return (f'<div class="blk" contenteditable="true" spellcheck="false" data-k="{k}" data-o="{_o(t)}" data-x="{b["x"]:.2f}" data-y="{b["y"]:.2f}" data-h="{b["h"]:.2f}" '
-            f'data-refw="{b["refw"]:.2f}" data-ref="{E(b["ref"])}" style="left:{b["x"]:.2f}mm;top:{b["y"]:.2f}mm;width:{b["w"] + 0.3:.2f}mm;'
-            f'{"text-align:center;" if b.get("center") else ""}'
+            f'data-refw="{b["refw"]:.2f}" data-ref="{"" if b.get("list") else E(b["ref"])}" style="left:{b["x"]:.2f}mm;top:{b["y"]:.2f}mm;width:{b["w"] + 0.3:.2f}mm;'
+            f'{"text-align:center;" if b.get("center") else ""}{"text-align:left;white-space:pre;word-break:normal;line-break:auto;" if b.get("list") else ""}'
             f'font-size:{b["size"]:.2f}pt;line-height:{b["pitch"]:.2f}mm;font-family:\'{E(b["font"])}\',\'Noto Sans KR\',sans-serif;color:{b["color"]}">'
             f'{paras}</div>')
 
@@ -335,7 +373,7 @@ body.showtrace .trace{{display:block}}
 .ln{{position:absolute;white-space:pre;outline:none;z-index:2}}
 .fix{{position:absolute;z-index:1}}
 .blk{{position:absolute;outline:none;z-index:2;text-align:justify;word-break:break-all;line-break:anywhere;white-space:pre-wrap}}
-.blk .pa{{min-height:1em}}
+.blk .pa{{min-height:1em}}.blk .tab{{display:inline-block}}
 .cell{{position:absolute;display:flex;flex-direction:column;justify-content:center;outline:none;z-index:2;white-space:nowrap}}
 .cell:hover{{background:rgba(232,163,60,.12)}}.cell:focus{{background:rgba(232,163,60,.2);box-shadow:inset 0 0 0 1px #e8a33c}}
 .blk:hover{{background:rgba(232,163,60,.08)}}.blk:focus{{background:rgba(232,163,60,.14);box-shadow:0 0 0 1px #e8a33c}}
@@ -379,6 +417,10 @@ body.showtrace .trace{{display:block}}
     b=r.getBoundingClientRect();                                                       // 세로: 글자 상자 가운데를 원본 가운데에
     var cy=((b.top+b.bottom)/2-pg.top)/k, wy=(parseFloat(el.dataset.y)+parseFloat(el.dataset.h)/2)*PX;
     el.style.top=(parseFloat(el.style.top)*PX+(wy-cy))/PX+'mm'; }}); }}
+  function tabs(){{document.querySelectorAll('.blk .tab').forEach(function(t){{          // 목록의 둘째 칸이 원본 자리에서 시작하게
+    var pg=t.closest('.page').getBoundingClientRect(), k=pg.width/(297*PX)||1; t.style.width='0';
+    var left=(t.getBoundingClientRect().left-pg.left)/k/PX; t.style.width=Math.max(0.8,parseFloat(t.dataset.tx)-left)+'mm'; }}); }}
+  if(document.fonts&&document.fonts.ready) document.fonts.ready.then(tabs); addEventListener('load',tabs);
   function fitBlocks(){{document.querySelectorAll('.blk').forEach(function(el){{ if(el.dataset.fitted) return;
     var pg=el.parentNode.getBoundingClientRect(), k=pg.width/(297*PX)||1;
     var probe=document.createElement('span'); probe.style.cssText='position:absolute;visibility:hidden;white-space:pre;letter-spacing:0';
@@ -389,7 +431,7 @@ body.showtrace .trace{{display:block}}
     if(t){{ var r=document.createRange(), i=t.nodeValue.search(/\S/); r.setStart(t,i); r.setEnd(t,i+1); var b=r.getBoundingClientRect();
       var cy=((b.top+b.bottom)/2-pg.top)/k, wy=(parseFloat(el.dataset.y)+parseFloat(el.dataset.h)/2)*PX;
       el.style.top=(parseFloat(el.style.top)*PX+(wy-cy))/PX+'mm'; }}
-    el.dataset.fitted=1; }}); }}
+    el.dataset.fitted=1; }}); tabs(); }}
   document.addEventListener('input',function(e){{ var el=e.target.closest&&e.target.closest('.ln'); if(el){{ el.dataset.edited=1; el.style.letterSpacing='0'; }} }});
   if(document.fonts&&document.fonts.ready) document.fonts.ready.then(fitBlocks); addEventListener('load',fitBlocks);
   if(document.fonts&&document.fonts.ready) document.fonts.ready.then(fit); addEventListener('load',fit); fit();
