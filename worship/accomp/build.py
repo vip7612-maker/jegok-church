@@ -64,7 +64,9 @@ body{margin:0;background:#d9dce1;font-family:'Pretendard Variable',Pretendard,'A
 .rt td.now{background:#fff7e0}
 .nm{display:inline-block;width:16.5mm;text-align:center;font-size:12pt;font-weight:600;border:1px solid #e2e8f0;border-radius:1.6mm;height:7mm;line-height:6.6mm;padding:0;white-space:nowrap;letter-spacing:-.02em}
 .nm.empty{visibility:hidden}
-.nm.chg{background:#dc2626;border-color:#dc2626;color:#fff;font-weight:800}
+.nm.chg{background:#7c3aed;border-color:#7c3aed;color:#fff;font-weight:800}
+.nm.wide{width:34.2mm}
+.q1{display:flex;justify-content:center}
 .rr{display:flex;align-items:center;gap:4mm}.lg{font-size:9pt;color:#64748b;display:flex;align-items:center;gap:1.5mm}.lg .nm{width:auto;padding:0 2mm;height:5.5mm;line-height:5.2mm;font-size:9pt}
 .q4{display:grid;grid-template-columns:repeat(2,16.5mm);gap:1mm 1.2mm;justify-content:center}
 .none{color:#cbd5e1}
@@ -200,7 +202,7 @@ def img_src(rel: str) -> str:
 
 ROSTER = HERE / "roster.json"
 WEEKS_SHOWN = 6
-GROUP_COLOR = {"인도·연주": ("#1e3a8a", "#eef2ff"), "싱어": ("#b45309", "#fff4e5"), "미디어": ("#0e7490", "#e6f7fa")}
+GROUP_COLOR = {"인도·세션": ("#1e3a8a", "#eef2ff"), "싱어": ("#b45309", "#fff4e5"), "미디어": ("#0e7490", "#e6f7fa")}
 
 
 def roster_html(date: str) -> str:
@@ -223,6 +225,13 @@ def roster_html(date: str) -> str:
                 base = R.get("defaults", {}).get(role)   # 평소 사람과 다르면 색을 바꿔 눈에 띄게 (2026-10-03 교장님 지시)
                 chip = lambda v: (f'<span class="nm chg">{html.escape(v)}</span>' if base and v not in base
                                   else f'<span class="nm" style="background:{soft};border-color:{c}33">{html.escape(v)}</span>')
+                if g.get("single"):   # 인도·세션: 한 줄, 두 칸을 합친 긴 칸 하나 (2026-10-03 교장님 지시)
+                    v = ", ".join(names)
+                    inner = (f'<span class="nm wide chg">{html.escape(v)}</span>' if v and base and any(n not in base for n in names)
+                             else f'<span class="nm wide" style="background:{soft};border-color:{c}33">{html.escape(v)}</span>' if v
+                             else '<span class="nm wide empty"></span>')
+                    cells.append(f'<td class="{"now" if k == 0 else ""}"><div class="q1">{inner}</div></td>')
+                    continue
                 inner = "".join(chip(v) if v else '<span class="nm empty"></span>' for v in slots)
                 cells.append(f'<td class="{"now" if k == 0 else ""}"><div class="q4">{inner}</div></td>')
             rows.append(f'<tr class="{"gs" if n == 0 else ""}">{gc}<td class="role" style="color:{c}">{role}</td>{"".join(cells)}</tr>')
