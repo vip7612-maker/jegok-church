@@ -1,6 +1,6 @@
 ---
 name: worship-prep
-description: "제곡교회 주일예배 찬양 인도 준비. ① 교장님이 '예배 준비하자', '예배 준비 시작', '사전 준비해', '찬양 준비', '주일예배 세팅', '/worship-prep' 라고 하면 즉시 다음 주일 폴더·템플릿(악보 슬라이드·주일예배 PPT)을 구글 드라이브에 세팅하고 주보 HWP 를 올려달라고 답한다. ② 주보 HWP(.hwp) 파일이 첨부되거나 '콘티 추천', '찬양 골라줘' 라고 하면 PDF 변환·드라이브 저장 후 설교 본문·요약에 맞는 CCM 20곡 + 찬송가 10곡(빠름 30/중간 40/느림 30, 코드·유튜브 링크)을 추천한다."
+description: "제곡교회 주일예배 찬양 인도 준비. ① 교장님이 '예배 준비하자', '예배 준비 시작', '사전 준비해', '찬양 준비', '주일예배 세팅', '/worship-prep' 라고 하면 즉시 다음 주일 폴더·HTML 악보집(jegok_worship_YYYYMMDD, 폴더에 .html)·주일예배 PPT 를 구글 드라이브에 세팅하고 주보 HWP 를 올려달라고 답한다. ② 주보 HWP(.hwp) 파일이 첨부되거나 '콘티 추천', '찬양 골라줘' 라고 하면 PDF 변환·드라이브 저장 후 설교 본문·요약에 맞는 CCM 20곡 + 찬송가 10곡(빠름 30/중간 40/느림 30, 코드·유튜브 링크)을 추천한다."
 ---
 
 # 주일예배 찬양 준비 (제곡교회)
@@ -12,7 +12,10 @@ description: "제곡교회 주일예배 찬양 인도 준비. ① 교장님이 '
 ```bash
 python3 ~/dev/jegok-church/worship/prep.py
 ```
-- 다음 주일(오늘이 일요일이면 오늘) 폴더 `2026 MMDD 주일예배 이경진` 를 「2026 예배찬양」에 만들고, 「예배준비 템플릿」의 악보 슬라이드·주일예배 PPT 를 날짜 이름으로 복사하며 표지 날짜를 바꾼다. 이미 있으면 건너뜀.
+- 다음 주일(오늘이 일요일이면 오늘) 폴더 `2026 MMDD 주일예배 <인도자>` 를 「2026 예배찬양」에 만든다(인도자는 섬김표 accomp/roster.json 의 그 주 인도자).
+- 주일예배 PPT 는 템플릿을 복사해 표지 날짜를 바꾼다.
+- **반주자·싱어용 악보는 2026-10-03 부터 구글 슬라이드가 아니라 HTML 악보집**: 지난주 악보집을 바탕으로 새 주를 열고(설교·악보·공지는 비움, 섬김표 기본값 채움, 암송 절은 한 절 넘어감) `jegok_worship_YYYYMMDD` 로 게시한 뒤, 그 폴더에 `YYYY MMDD 반주자 및 싱어용 악보.html` 을 올린다(accomp/weekly.py). 원칙은 accomp/PRINCIPLES.md.
+- 이미 있으면 건너뜀. 악보집을 고친 뒤 드라이브 파일도 새로 하려면 `python3 accomp/weekly.py <날짜> --upload`.
 - 옵션: `--date YYYY-MM-DD` · `--leader 이름`(기본 이경진) · `--suffix 부활주일` · 텔레그램 요청이면 `--notify`.
 - **답장 끝에 꼭 붙인다**: "주보 HWP 파일을 올려주시면 PDF로 바꿔 폴더에 넣고, 설교 본문에 맞는 찬양 콘티(CCM 20곡·찬송가 10곡)를 추천해 드리겟습니다. 한글에서 내보낸 PDF도 있으면 함께 올려주세요(레이아웃이 정확합니다)."
 
@@ -49,6 +52,12 @@ python3 ~/dev/jegok-church/worship/conti.py "<파일 경로>" [--pdf "<pdf 경�
 - `kordoc 변환 실패` → 파일이 HWP 5.x 인지 확인(HWPX·PDF 도 kordoc 이 읽으니 `conti.py` 에 그대로 넘겨도 된다).
 - `hwp5html 없음` → `cd ~/dev/jegok-church && /Library/Frameworks/Python.framework/Versions/3.12/bin/python3 -m venv .venv && .venv/bin/pip install -r worship/requirements-hwp.txt`
 - 그 외 오류는 메시지를 그대로 전하고 드라이브 폴더 링크(https://drive.google.com/drive/folders/1sRJ7X8heOaM5BmDa0WW6Jvs__O2upcpV)를 함께 준다.
+
+## 2-1. 주보가 들어온 뒤 — 악보집 설교 쪽 채우기
+conti.py 가 끝나면 `out/<YYYYMMDD>-conti.json` 의 sermon(title·scripture·summary)으로 악보집 `accomp/data/<날짜>.json` 을 채운다:
+- sermon_text: ref·title + 본문(`bible_lookup.py` 출력, 절 번호 `<b class='vn'>N</b>`)
+- sermon_summary: title·ref 와 요약 — 주보 줄바꿈으로 끊긴 낱말을 이어 문단으로 되살려 left(앞 두 문단)·right(나머지)에 나눠 넣는다. 지어내지 않는다.
+- 그 뒤 `python3 accomp/weekly.py <날짜> --upload` (게시 + 드라이브 html 갱신).
 
 ## 하지 않는 것
 - 최종 콘티 확정·「콘티 기록」 문서 기입은 교장님이 한다(추천은 후보). 주보 작성도 범위 밖.
