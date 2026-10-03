@@ -94,6 +94,7 @@ def pages(pdf: bytes) -> tuple[list[dict], dict[str, str]]:
         lines, cells = make_cells(lines, grids)
         lines = merge_rows(lines)
         lines, blocks = make_blocks(lines)
+        lines, blocks = make_sections(lines, blocks)
         lines = unmerge_rows(lines)                       # 상자로 안 묶인 줄은 원래 조각으로(예배 순서 등 모양 그대로)
         # 글자 지운 배경
         p2 = fitz.open(); p2.insert_pdf(doc, from_page=pg.number, to_page=pg.number); q = p2[0]
@@ -256,6 +257,42 @@ def unmerge_rows(lines: list[dict]) -> list[dict]:
     return [p for l in lines for p in (l["parts"] if l.get("parts") else [l])]
 
 
+CIRCLED = re.compile(r"^\s*[①-⑳]")
+
+
+def make_sections(lines: list[dict], blocks: list[dict]) -> tuple[list[dict], list[dict]]:
+    """①②③… 로 이어지는 순서 묶음(샘터모임 등)은 ①부터 그 단 끝까지 통째로 한 상자(2026-10-03 교장님: 여기는 한 덩어리로).
+    안의 줄·문단은 원래 자리(세로 간격·들여쓰기) 그대로, 문단(질문·기도문)은 고치면 그 너비 안에서 다시 흐른다."""
+    text = lambda g: "".join(r["t"] for r in g["runs"])
+    heads = sorted([l for l in lines if l["dir"][0] != 0 and CIRCLED.match(text(l))], key=lambda l: (round(l["x"] / 20), l["y"]))
+    used_l, used_b, out_blocks = set(), set(), []
+    for h in heads:
+        if id(h) in used_l: continue
+        x0 = h["x"] - 4; x1 = h["x"] + 70
+        col = [l for l in lines if id(l) not in used_l and l["dir"][0] != 0 and x0 <= l["x"] <= x1 and l["y"] >= h["y"] - 0.5]
+        if sum(1 for l in col if CIRCLED.match(text(l))) < 2: continue
+        bl = [b for k, b in enumerate(blocks) if k not in used_b and x0 <= b["x"] <= x1 and b["y"] >= h["y"] - 0.5]
+        units = [("l", l["y"], l) for l in col] + [("b", b["y"], b) for b in bl]
+        units.sort(key=lambda u: (u[1], u[2]["x"]))
+        bx = min(u[2]["x"] for u in units); right = max(u[2]["x"] + u[2]["w"] for u in units)
+        items, bottom = [], h["y"]
+        for kind, y, u in units:
+            if kind == "l":
+                lh = u["size"] * 0.3528 * 1.25
+                items.append({"kind": "l", "gap": max(0.0, y - bottom), "pad": u["x"] - bx, "lh": lh, "runs": u["runs"]})
+                bottom = y + lh
+            else:
+                hgt = u["mh"] - 1.0
+                items.append({"kind": "b", "gap": max(0.0, y - bottom), "pad": u["x"] - bx, "w": u["w"], "pitch": u["pitch"], "paras": u["paras"],
+                              "center": u.get("center"), "list": u.get("list"), "size": u["size"]})
+                bottom = y + hgt
+        out_blocks.append({"sect": True, "x": bx, "y": h["y"], "h": h["h"], "w": right - bx, "mh": bottom - h["y"] + 1.0,
+                           "size": h["size"], "font": h["runs"][0]["font"], "color": h["runs"][0]["color"], "items": items,
+                           "paras": [], "pitch": h["size"] * 0.3528 * 1.25, "ref": "", "refw": 0})
+        used_l.update(id(l) for l in col); used_b.update(k for k, b in enumerate(blocks) if b in bl)
+    return [l for l in lines if id(l) not in used_l], [b for k, b in enumerate(blocks) if k not in used_b] + out_blocks
+
+
 def make_blocks(lines: list[dict]) -> tuple[list[dict], list[dict]]:
     """여러 줄로 이어지는 글(오늘의 말씀·샘터 질문·공동기도문·소식 문단 …)은 한 글상자로 — 한 곳에서 쓰고 고치면 줄이
     저절로 다시 바뀐다(2026-10-03 교장님). 본문 줄 간격(글자 크기의 1.45배 이하)으로 3줄 넘게 붙어 있으면 한 묶음,
@@ -317,6 +354,7 @@ def make_blocks(lines: list[dict]) -> tuple[list[dict], list[dict]]:
             full = [g for g in G if g["w"] > maxw * 0.95]              # 꽉 찬 줄 — 글자 간격 맞추는 기준
             ref = max(full or G, key=lambda g: g["w"])
             blocks.append({"x": bx, "y": G[0]["y"], "h": G[0]["h"], "w": maxw, "pitch": pitch, "size": l["size"],
+                           "mh": G[-1]["y"] + G[-1]["h"] - G[0]["y"] + 1.0,
                            "font": l["runs"][0]["font"], "color": l["runs"][0]["color"], "paras": paras,
                            "ref": text(ref), "refw": ref["w"], "center": centered, "list": listmode})
             used.update(grp); i = j
@@ -325,16 +363,32 @@ def make_blocks(lines: list[dict]) -> tuple[list[dict], list[dict]]:
     return [l for k, l in enumerate(lines) if k not in used], blocks
 
 
+def sect_inner(b: dict, runs) -> str:
+    out = []
+    for it in b["items"]:
+        if it["kind"] == "l":
+            out.append(f'<div class="su" style="margin-top:{it["gap"]:.2f}mm;padding-left:{it["pad"]:.2f}mm;line-height:{it["lh"]:.2f}mm;white-space:pre">{runs(it["runs"])}</div>')
+        else:
+            al = "text-align:center;" if it.get("center") else ("white-space:pre;" if it.get("list") else "text-align:justify;")
+            paras = "".join(f'<div class="pa" style="padding-left:{p["pad"]:.2f}mm;text-indent:{p["indent"]:.2f}mm;margin-top:{max(0, p["gap"]):.2f}mm">{runs(p["runs"])}</div>'
+                            for p in it["paras"])
+            out.append(f'<div class="su" style="margin-top:{it["gap"]:.2f}mm;margin-left:{it["pad"]:.2f}mm;width:{it["w"] + 0.3:.2f}mm;'
+                       f'line-height:{it["pitch"]:.2f}mm;{al}white-space:{"pre" if it.get("list") else "pre-wrap"}">{paras}</div>')
+    return "".join(out)
+
+
 def block_html(b: dict, k: str = "") -> str:
     def runs(rs):
         return "".join((f'<span class="tab" contenteditable="false" data-tx="{r["tab"]:.2f}"> </span>' if r.get("tab") is not None else
                         f'<span style="font-family:\'{E(r["font"])}\',\'Noto Sans KR\',sans-serif;color:{r["color"]};font-size:{r["size"]:.2f}pt'
                        f'{";font-weight:700" if r["bold"] else ""}">{E(r["t"])}</span>') for r in rs)
-    paras = "".join(f'<div class="pa" style="padding-left:{p["pad"]:.2f}mm;text-indent:{p["indent"]:.2f}mm;margin-top:{max(0, p["gap"]):.2f}mm">{runs(p["runs"])}</div>'
-                    for p in b["paras"])
-    t = "".join(r["t"] for pa in b["paras"] for r in pa["runs"])
-    return (f'<div class="blk" contenteditable="true" spellcheck="false" data-k="{k}" data-o="{_o(t)}" data-x="{b["x"]:.2f}" data-y="{b["y"]:.2f}" data-h="{b["h"]:.2f}" '
-            f'data-refw="{b["refw"]:.2f}" data-ref="{"" if b.get("list") else E(b["ref"])}" style="left:{b["x"]:.2f}mm;top:{b["y"]:.2f}mm;width:{b["w"] + 0.3:.2f}mm;'
+    paras = sect_inner(b, runs) if b.get("sect") else "".join(
+        f'<div class="pa" style="padding-left:{p["pad"]:.2f}mm;text-indent:{p["indent"]:.2f}mm;margin-top:{max(0, p["gap"]):.2f}mm">{runs(p["runs"])}</div>'
+        for p in b["paras"])
+    t = "".join(r["t"] for pa in b["paras"] for r in pa["runs"]) + "".join(
+        r["t"] for it in b.get("items", []) for r in (it["runs"] if it["kind"] == "l" else [x for p in it["paras"] for x in p["runs"]]))
+    return (f'<div class="blk{" sect" if b.get("sect") else ""}" contenteditable="true" spellcheck="false" data-k="{k}" data-o="{_o(t)}" data-x="{b["x"]:.2f}" data-y="{b["y"]:.2f}" data-h="{b["h"]:.2f}" '
+            f'data-mh="{b.get("mh", 0):.2f}" data-refw="{b["refw"]:.2f}" data-ref="{"" if b.get("list") else E(b["ref"])}" style="left:{b["x"]:.2f}mm;top:{b["y"]:.2f}mm;width:{b["w"] + 0.3:.2f}mm;'
             f'{"text-align:center;" if b.get("center") else ""}{"text-align:left;white-space:pre;word-break:normal;line-break:auto;" if b.get("list") else ""}'
             f'font-size:{b["size"]:.2f}pt;line-height:{b["pitch"]:.2f}mm;font-family:\'{E(b["font"])}\',\'Noto Sans KR\',sans-serif;color:{b["color"]}">'
             f'{paras}</div>')
@@ -373,8 +427,8 @@ body.showtrace .trace{{display:block}}
 .ln{{position:absolute;white-space:pre;outline:none;z-index:2}}
 .fix{{position:absolute;z-index:1}}
 .blk{{position:absolute;outline:none;z-index:2;text-align:justify;word-break:break-all;line-break:anywhere;white-space:pre-wrap}}
-.blk .pa{{min-height:1em}}.blk .tab{{display:inline-block}}
-.cell{{position:absolute;display:flex;flex-direction:column;justify-content:center;outline:none;z-index:2;white-space:nowrap}}
+.blk .pa{{min-height:1em}}.blk.sect{{text-align:left;white-space:normal}}.blk.sect .su{{min-height:1em}}.blk .tab{{display:inline-block}}
+.cell{{position:absolute;display:flex;flex-direction:column;justify-content:center;outline:none;z-index:2;white-space:nowrap;overflow:visible}}
 .cell:hover{{background:rgba(232,163,60,.12)}}.cell:focus{{background:rgba(232,163,60,.2);box-shadow:inset 0 0 0 1px #e8a33c}}
 .blk:hover{{background:rgba(232,163,60,.08)}}.blk:focus{{background:rgba(232,163,60,.14);box-shadow:0 0 0 1px #e8a33c}}
 .ln:hover{{background:rgba(232,163,60,.12)}}.ln:focus{{background:rgba(232,163,60,.22);box-shadow:0 0 0 1px #e8a33c}}
@@ -440,10 +494,20 @@ body.showtrace .trace{{display:block}}
   var ED=[].slice.call(document.querySelectorAll('[data-k]'));
   ED.forEach(function(el){{ ORIG[el.dataset.k]=el.innerHTML; }});
   if(SID) fetch('/api/jubo?sid='+SID,{{cache:'no-store'}}).then(function(r){{return r.json()}}).then(function(j){{
-    var E=j.edits||{{}}; ED.forEach(function(el){{ var e=E[el.dataset.k]; if(e&&e.o===el.dataset.o){{ el.innerHTML=e.h; el.dataset.edited=1; el.style.letterSpacing='0'; }} }});
+    var E=j.edits||{{}}; ED.forEach(function(el){{ var e=E[el.dataset.k]; if(e&&e.o===el.dataset.o){{ el.innerHTML=e.h; el.dataset.edited=1; el.style.letterSpacing='0'; fitBox(el); }} }});
     if(j.updated){{ var t=document.getElementById('msg'); if(t&&!t.textContent) t.textContent='마지막 저장 '+j.updated.replace('T',' ').slice(0,16)+' (UTC)'; }}
   }}).catch(function(){{}});
-  document.addEventListener('input',function(e){{ if(e.target.closest&&e.target.closest('[data-k]')) dirty=true; }});
+  /* 고친 글이 칸을 넘지 않게 — 넘치면 그 칸을 비율대로 줄인다(2026-10-03 교장님: 수정할 때 칸을 넘어가면 안 돼) */
+  function fitBox(el){{
+    el.style.transform=''; var k=1;
+    if(el.classList.contains('ln')){{ var r=document.createRange(); r.selectNodeContents(el); var pg=el.parentNode.getBoundingClientRect(), z=pg.width/(297*PX)||1;
+      var w=r.getBoundingClientRect().width/z, max=parseFloat(el.dataset.w)*PX*1.03; if(w>max) k=max/w; }}
+    else {{ var mw=el.clientWidth, mh=el.classList.contains('cell')?el.clientHeight:parseFloat(el.dataset.mh||0)*PX;
+      if(el.scrollWidth>mw+1) k=Math.min(k,mw/el.scrollWidth);
+      if(mh&&el.scrollHeight>mh+1) k=Math.min(k,mh/el.scrollHeight); }}
+    if(k<0.999){{ el.style.transformOrigin=el.classList.contains('cell')?'center center':'left top'; el.style.transform='scale('+k.toFixed(3)+')'; }} }}
+  window.fitAllBoxes=function(){{ [].forEach.call(document.querySelectorAll('[data-k]'),fitBox); }};
+  document.addEventListener('input',function(e){{ var el=e.target.closest&&e.target.closest('[data-k]'); if(el){{ dirty=true; fitBox(el); }} }});
   addEventListener('beforeunload',function(e){{ if(dirty){{ e.preventDefault(); e.returnValue='저장하지 않은 고친 내용이 있습니다'; }} }});
   var sb=document.getElementById('b-save'), KEY=(document.querySelector('meta[name=jubo-key]')||{{}}).content||'';
   if(sb){{ if(!KEY||!SID) sb.style.display='none';
