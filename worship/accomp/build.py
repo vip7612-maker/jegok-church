@@ -94,13 +94,96 @@ body{margin:0;background:#d9dce1;font-family:'Pretendard Variable',Pretendard,'A
   .slot.empty{border:0;background:none}.slot.empty b,.slot.empty span:not(.badge){display:none}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+/* 슬라이드 보기 · 발표 (2026-10-03) */
+.bar .on{background:#f6c76b}
+body.sv{overflow:hidden;background:#e5e7eb}
+body.sv #sv .page,body.pr #sv .page{zoom:1}
+body.sv .pages{display:none}
+#sv{display:none}
+body.sv #sv,body.pr #sv{display:flex;position:fixed;inset:44px 0 0 0}
+#rail{width:210px;flex:0 0 210px;overflow-y:auto;background:#f8fafc;border-right:1px solid #d1d5db;padding:10px 12px 40px}
+.th{position:relative;display:flex;gap:6px;margin-bottom:10px;cursor:pointer}
+.th .n{font-size:12px;color:#64748b;width:16px;text-align:right;padding-top:2px}
+.th .box{width:168px;height:118.8px;overflow:hidden;border-radius:4px;border:2px solid transparent;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.th.cur .box{border-color:#2563eb}
+.th .box .page{transform-origin:0 0;box-shadow:none}
+#stage{flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#stage .page{transform-origin:center center;flex:0 0 auto}
+#hint{position:absolute;right:14px;bottom:10px;font-size:12px;color:#64748b}
+body.pr{background:#000}
+body.pr .bar,body.pr #rail,body.pr #hint{display:none}
+body.pr #sv{inset:0;background:#000}
+body.pr #stage .page{box-shadow:none}
+body.pr .tag,body.sv #stage .tag{display:none}
+#pn{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);font-size:12px;color:#9ca3af;display:none}
+body.pr #pn{display:block}
+@media print{#sv{display:none!important}body.sv .pages,body.pr .pages{display:block!important}}
 @media screen and (max-width:1150px){.page{zoom:calc(100vw / 1150px)}}
 """
 
+VIEW = r"""
+// 슬라이드 보기(왼쪽 작은 쪽 목록 + 오른쪽 큰 쪽) · 발표(전체 화면) — ←→ ↑↓ 스페이스 PgUp/PgDn, Esc 나가기
+(function(){
+  const pages=[...document.querySelectorAll('.pages > .page')];
+  const rail=document.getElementById('rail'), stage=document.getElementById('stage'), pn=document.getElementById('pn');
+  const PW=pages[0].offsetWidth, PH=pages[0].offsetHeight;
+  let cur=0, built=false, big=null;
+  function build(){
+    if(built) return; built=true;
+    pages.forEach((p,i)=>{
+      const t=document.createElement('div'); t.className='th'; t.innerHTML='<span class="n">'+(i+1)+'</span><div class="box"></div>';
+      const c=p.cloneNode(true); c.removeAttribute('id'); c.style.transform='scale('+(168/PW)+')';
+      t.querySelector('.box').appendChild(c); t.onclick=()=>go(i); rail.appendChild(t);
+    });
+  }
+  function fit(){
+    if(!big) return;
+    const r=stage.getBoundingClientRect(), pad=document.body.classList.contains('pr')?0:40;
+    big.style.transform='scale('+Math.min((r.width-pad)/PW,(r.height-pad)/PH)+')';
+  }
+  function go(i){
+    cur=Math.max(0,Math.min(pages.length-1,i));
+    stage.querySelectorAll('.page').forEach(x=>x.remove());
+    big=pages[cur].cloneNode(true); big.removeAttribute('id'); stage.prepend(big); fit();
+    rail.querySelectorAll('.th').forEach((t,k)=>t.classList.toggle('cur',k===cur));
+    const th=rail.children[cur]; if(th) th.scrollIntoView({block:'nearest'});
+    pn.textContent=(cur+1)+' / '+pages.length;
+  }
+  function mode(m){
+    document.body.classList.remove('sv','pr');
+    document.querySelectorAll('.bar [data-mode]').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));
+    if(m==='doc'){ if(document.fullscreenElement) document.exitFullscreen(); return; }
+    build(); document.body.classList.add(m);
+    const bar=document.querySelector('.bar'); document.getElementById('sv').style.top=(m==='pr'?0:Math.max(0,bar.getBoundingClientRect().bottom))+'px';
+    if(m==='pr' && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(()=>{});
+    go(cur); setTimeout(fit,60);
+  }
+  window.wsMode=mode;
+  document.addEventListener('keydown',e=>{
+    const on=document.body.classList.contains('sv')||document.body.classList.contains('pr');
+    if(!on) return;
+    if(['ArrowRight','ArrowDown','PageDown',' ','Enter'].includes(e.key)){e.preventDefault();go(cur+1)}
+    else if(['ArrowLeft','ArrowUp','PageUp','Backspace'].includes(e.key)){e.preventDefault();go(cur-1)}
+    else if(e.key==='Home') go(0); else if(e.key==='End') go(pages.length-1);
+    else if(e.key==='Escape') mode(document.body.classList.contains('pr')?'sv':'doc');
+  });
+  stage.addEventListener('click',e=>{ if(!document.body.classList.contains('pr')) return;
+    go(cur+(e.clientX>innerWidth/2?1:-1)); });
+  let x0=null; stage.addEventListener('touchstart',e=>x0=e.touches[0].clientX,{passive:true});
+  stage.addEventListener('touchend',e=>{ if(x0===null) return; const dx=e.changedTouches[0].clientX-x0; if(Math.abs(dx)>40) go(cur+(dx<0?1:-1)); x0=null; });
+  document.addEventListener('fullscreenchange',()=>{ if(!document.fullscreenElement && document.body.classList.contains('pr')) mode('sv'); });
+  addEventListener('resize',fit);
+  const start=()=>{ if(location.hash==='#slides') mode('sv'); else if(location.hash==='#present') mode('pr'); };
+  (document.fonts?document.fonts.ready:Promise.resolve()).then(start);
+})();
+"""
+
 FIT = """
-// 글이 칸을 넘치면 글자를 줄인다 — 원본 슬라이드처럼 한 쪽에 다 들어가게
-document.querySelectorAll('.body').forEach(b=>{let s=parseFloat(b.dataset.max||16);b.style.fontSize=s+'pt';
-  while(b.scrollHeight>b.clientHeight+1&&s>6){s-=.25;b.style.fontSize=s+'pt'}});
+// 글이 칸을 넘치면 글자를 줄인다 — 웹글꼴이 늦게 오면 한 번 더
+function wsFit(){document.querySelectorAll('.pages .body').forEach(b=>{let s=parseFloat(b.dataset.max||16);b.style.fontSize=s+'pt';
+  while(b.scrollHeight>b.clientHeight+1&&s>6){s-=.25;b.style.fontSize=s+'pt'}})}
+wsFit(); if(document.fonts) document.fonts.ready.then(wsFit);
 """
 
 
@@ -228,8 +311,8 @@ def build(date: str) -> Path:
 <title>{html.escape(d["title"])}</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
 <style>{CSS}</style></head><body>
-<div class="bar"><b>🎹 {html.escape(d["title"])} · {len(d["pages"])}쪽</b><button onclick="print()">PDF로 저장</button></div>
-<main class="pages">{pages}</main><script>{FIT}</script></body></html>"""
+<div class="bar"><b>🎹 {html.escape(d["title"])} · {len(d["pages"])}쪽</b><button data-mode="doc" class="on" onclick="wsMode('doc')">문서 보기</button><button data-mode="sv" onclick="wsMode('sv')">🖼 슬라이드 보기</button><button data-mode="pr" onclick="wsMode('pr')">▶ 발표</button><button onclick="print()">PDF로 저장</button></div>
+<main class="pages">{pages}</main><div id="sv"><aside id="rail"></aside><div id="stage"><span id="hint">← → 방향키로 넘김 · Esc 나가기</span><span id="pn"></span></div></div><script data-share>{FIT}</script><script data-share>{VIEW}</script></body></html>"""
     out = HERE / "out" / f"{date}.html"; out.parent.mkdir(exist_ok=True); out.write_text(doc)
     return out
 
