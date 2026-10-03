@@ -57,16 +57,18 @@ body{margin:0;background:#d9dce1;font-family:'Pretendard Variable',Pretendard,'A
 .rt th b{display:block;font-size:15pt;color:#0b1430}
 .rt th i{display:block;font-style:normal;font-size:8pt;color:#fff;background:#dc2626;border-radius:999px;width:max-content;margin:.6mm auto 0;padding:.2mm 2.4mm}
 .rt th.now{background:#0b1430;border-radius:3mm 3mm 0 0}.rt th.now b{color:#fff}
-.rt td{text-align:center;padding:1.6mm .8mm;height:12.5mm;border-bottom:1px solid #e5e7eb;vertical-align:middle}
+.rt td{text-align:center;padding:1mm .8mm;border-bottom:1px solid #e5e7eb;vertical-align:middle}
 .rt tr.gs td{border-top:2px solid #cbd5e1}
 .rt td.grp{color:#fff;font-weight:800;font-size:10pt;letter-spacing:.05em;border-radius:2mm;border-bottom:0;border-right:2mm solid #fff;line-height:1.3}
 .rt td.role{font-weight:800;font-size:13pt;text-align:left;padding-left:2.5mm}
 .rt td.now{background:#fff7e0}
-.nm{display:inline-block;font-size:13pt;font-weight:600;border:1px solid #e2e8f0;border-radius:1.6mm;padding:.5mm 2mm;margin:.4mm .6mm;white-space:nowrap}
+.nm{display:inline-block;width:16.5mm;text-align:center;font-size:12pt;font-weight:600;border:1px solid #e2e8f0;border-radius:1.6mm;height:7mm;line-height:6.6mm;padding:0;white-space:nowrap;letter-spacing:-.02em}
+.nm.empty{visibility:hidden}
+.q4{display:grid;grid-template-columns:repeat(2,16.5mm);gap:1mm 1.2mm;justify-content:center}
 .none{color:#cbd5e1}
 .sup{margin-top:auto;border:1.5px dashed #94a3b8;border-radius:3mm;padding:2.4mm 4mm;display:flex;gap:5mm;align-items:center}
 .sup-h b{display:block;font-size:15pt;color:#0b1430}.sup-h span{font-size:8.5pt;color:#64748b}
-.sup-n{display:flex;flex-wrap:wrap;gap:1mm}.sup-n .nm{background:#f1f5f9}
+.sup-n{display:flex;flex-wrap:wrap;gap:1mm 1.2mm}.sup-n .nm{background:#f1f5f9}
 /* 글 쪽 */
 .textpage{padding:8mm 10mm;height:100%;display:flex;flex-direction:column}
 .textpage h2{margin:0 0 4mm;font-size:22pt}
@@ -212,8 +214,10 @@ def roster_html(date: str) -> str:
             cells = []
             for k, x in enumerate(days):
                 names = R["weeks"].get(x.isoformat(), {}).get(role, [])
-                inner = "".join(f'<span class="nm" style="background:{soft};border-color:{c}33">{html.escape(v)}</span>' for v in names) or '<span class="none">—</span>'
-                cells.append(f'<td class="{"now" if k == 0 else ""}">{inner}</td>')
+                # 한 칸 = 이름 자리 4개(2×2), 폭은 모두 같게 — 빈 자리는 비워 둔다 (2026-10-03 교장님 지시)
+                slots = (names + [""] * 4)[:max(4, len(names))]
+                inner = "".join(f'<span class="nm" style="background:{soft};border-color:{c}33">{html.escape(v)}</span>' if v else '<span class="nm empty"></span>' for v in slots)
+                cells.append(f'<td class="{"now" if k == 0 else ""}"><div class="q4">{inner}</div></td>')
             rows.append(f'<tr class="{"gs" if n == 0 else ""}">{gc}<td class="role" style="color:{c}">{role}</td>{"".join(cells)}</tr>')
     sup = "".join(f'<span class="nm">{html.escape(v)}</span>' for v in R.get("support", []))
     return (f'<div class="rs"><div class="rs-h"><div><span class="kick">WORSHIP TEAM ROSTER</span><h2>예배팀 섬김표</h2></div>'
