@@ -378,10 +378,10 @@ def song_slides(title: str, si: int, W: int, H: int, out: Path) -> list[dict]:
     from PIL import Image, ImageDraw
     sys.path.insert(0, str(HERE)); sys.path.insert(0, str(HERE.parent))
     try:
-        import songbank, songppt
-        t = songbank.find(title)
-        if not t: return []
-        song = json.loads((songppt.DB / songppt.file_name(t)[:-5] / "song.json").read_text(encoding="utf-8"))
+        import songppt, store
+        t = store.song_find(title)                                # 곡별 PPT 는 예배 DB + 그림 창고에서
+        song = store.song_load(t) if t else None
+        if not song: return []
     except Exception:
         return []
     CW, CH = 1920, 1080; kx, ky = W / CW, H / CH

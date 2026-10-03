@@ -619,12 +619,13 @@ def songs(pptx: Path, date: str) -> list[str]:
     if len(titles) != len(divs):
         return [f"곡 {len(titles)}개와 찬양 자리 {len(divs)}개가 맞지 않음 — 곡 장을 넣지 않음"]
     blank = next((l for l in prs.slide_layouts if l.name.upper() == "BLANK"), prs.slide_layouts[-1])
-    ix = songbank.load_index(); log, shift = [], 0
+    import store
+    log, shift = [], 0
     for di, title in zip(divs, titles):
-        key = songbank.find(title, ix)
-        if not key:
+        key = store.song_find(title)                              # 곡별 PPT 는 예배 DB + 그림 창고에서(로컬 사본 없이)
+        song = store.song_load(key) if key else None
+        if not song:
             log.append(f"「{title}」 곡별 PPT 없음 — 자리만 둠"); continue
-        song = json.loads((SP.DB / SP.file_name(key)[:-5] / "song.json").read_text(encoding="utf-8"))
         at = di + shift
         for j, sl in enumerate(song["slides"], 1):
             new = prs.slides.add_slide(blank)

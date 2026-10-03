@@ -135,6 +135,49 @@ def score_url(title: str, key: str | None = None) -> str | None:
     return rows[0]["url"]
 
 
+# ── 곡별 PPT 읽기(로컬 사본 대신 DB·그림 창고에서) ─────────────────────
+CACHE = Path.home() / "Library/Caches/jegok-assets"         # 내려받은 그림 임시 보관(지워도 다시 받는다)
+
+
+def _fetch(url: str) -> bytes:
+    import hashlib as _h
+    CACHE.mkdir(parents=True, exist_ok=True)
+    f = CACHE / _h.sha1(url.encode()).hexdigest()
+    if f.exists(): return f.read_bytes()
+    with urllib.request.urlopen(url, timeout=120) as r: b = r.read()
+    f.write_bytes(b); return b
+
+
+def song_find(title: str, cut: float = 0.8) -> str | None:
+    """악보집 곡명(「우리는 기대하고」) → DB 곡명. 곡명·별칭·첫 가사·머리글과 견준다(songbank.sim)."""
+    import songbank as _b
+    songs = sql("SELECT id, title, aliases, first_line FROM songs")
+    heads = {}
+    for r in sql("SELECT song_id, header FROM song_uses"):
+        heads.setdefault(r["song_id"], []).append(r["header"] or "")
+    best, bs = None, 0.0
+    for r in songs:
+        names = [r["title"], r["first_line"] or ""] + json.loads(r["aliases"] or "[]")
+        names += [h for x in heads.get(r["id"], [])[:3] for h in _b.header_variants(x)[0]]
+        sc = max((_b.sim(title, n) for n in names if n), default=0)
+        if sc > bs: best, bs = r["title"], sc
+    return best if bs >= cut else None
+
+
+def song_load(title: str) -> dict | None:
+    """DB 곡 → {title, n, slides:[{img(base64), pic, sub, chips}]} — 예배 PPT 만들기·웹 PPT 가 쓴다."""
+    import base64 as _b64, concurrent.futures as cf
+    r = sql("SELECT id, title FROM songs WHERE title=?", title)
+    if not r: return None
+    rows = sql("""SELECT s.n, s.pic, s.sub, s.chips, s.auto_sub, a.url FROM song_slides s JOIN assets a ON a.hash=s.asset
+                  WHERE s.song_id=? ORDER BY s.n""", int(r[0]["id"]))
+    with cf.ThreadPoolExecutor(8) as ex:
+        imgs = list(ex.map(_fetch, [x["url"] for x in rows]))
+    return {"title": r[0]["title"], "id": int(r[0]["id"]), "slides": [
+        {"img": _b64.b64encode(b).decode(), "pic": json.loads(x["pic"]), "sub": json.loads(x["sub"]) if x["sub"] else None,
+         "chips": json.loads(x["chips"] or "[]"), "auto_sub": x["auto_sub"] == "1"} for x, b in zip(rows, imgs)]}
+
+
 if __name__ == "__main__":
     a = sys.argv[1:]
     if a and a[0] == "init": init(); print("표 준비됨")

@@ -65,8 +65,7 @@ def songs(only: list[str] | None = None) -> None:
 
 # ── 예배 PPT(주) → services ─────────────────────────────────────
 def _song_row(title: str) -> dict | None:
-    import songbank
-    key = songbank.find(title)
+    key = S.song_find(title)
     if not key: return None
     r = S.sql("SELECT id, title, n FROM songs WHERE title=?", key)
     return r[0] if r else None
@@ -179,7 +178,11 @@ def scores(limit: int | None = None) -> None:
     print(f"드라이브 악보 {len(files)}개 옮김 시작", flush=True)
 
     def one(f):
-        b = g.req("GET", f"{prep.DRIVE}/files/{f['id']}?alt=media&supportsAllDrives=true", timeout=300)
+        for attempt in range(3):                       # 내려받기가 잠깐 끊기면 다시, 그래도 안 되면 그 장만 건너뛴다
+            try:
+                b = g.req("GET", f"{prep.DRIVE}/files/{f['id']}?alt=media&supportsAllDrives=true", timeout=300); break
+            except Exception as e:
+                if attempt == 2: print(f"  건너뜀 {f['name']}: {type(e).__name__}", flush=True); return []
         title, key, alias = parse_score_name(f["name"])
         kind = "찬송가" if "찬송가" in f["path"] else "CCM"
         base = {"title": title, "key": key, "kind": kind, "source": f["path"], "aliases": alias}
