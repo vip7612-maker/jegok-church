@@ -216,6 +216,17 @@ def notice_html(date: str) -> str:
     return f'<div class="notice"><b>📢 공지사항</b><ul>{items}</ul></div>'
 
 
+CHG_PALETTE = ["#7c3aed", "#0f766e", "#b45309", "#1d4ed8", "#be185d", "#4d7c0f"]   # 빨강 없음
+
+
+def chg_style(R: dict, name: str) -> str:
+    """바뀐 사람 색 — 사람마다 다른 색(roster.json person_colors, 없으면 이름으로 고정 배정). 2026-10-03 교장님 지시."""
+    import hashlib
+    key = re.sub(r"\(.*?\)", "", name).strip()
+    c = R.get("person_colors", {}).get(key) or CHG_PALETTE[int(hashlib.md5(key.encode()).hexdigest(), 16) % len(CHG_PALETTE)]
+    return f"background:{c};border-color:{c}"
+
+
 def roster_html(date: str) -> str:
     """섬김표 — roster.json 하나로 관리(주보마다 따로 두지 않음). 이번 주부터 6주, 지원팀은 날짜와 상관없는 명단."""
     import datetime as _dt
@@ -235,11 +246,11 @@ def roster_html(date: str) -> str:
                 cap = R.get("role_slots", {}).get(role, 4)   # 촬영은 2자리(2×1)
                 slots = (names + [""] * cap)[:max(cap, len(names))]
                 base = R.get("defaults", {}).get(role)   # 평소 사람과 다르면 색을 바꿔 눈에 띄게 (2026-10-03 교장님 지시)
-                chip = lambda v: (f'<span class="nm chg">{html.escape(v)}</span>' if base and v not in base
+                chip = lambda v: (f'<span class="nm chg" style="{chg_style(R, v)}">{html.escape(v)}</span>' if base and v not in base
                                   else f'<span class="nm" style="background:{soft};border-color:{c}33">{html.escape(v)}</span>')
                 if g.get("single"):   # 인도·세션: 한 줄, 두 칸을 합친 긴 칸 하나 (2026-10-03 교장님 지시)
                     v = ", ".join(names)
-                    inner = (f'<span class="nm wide chg">{html.escape(v)}</span>' if v and base and any(n not in base for n in names)
+                    inner = (f'<span class="nm wide chg" style="{chg_style(R, names[0])}">{html.escape(v)}</span>' if v and base and any(n not in base for n in names)
                              else f'<span class="nm wide" style="background:{soft};border-color:{c}33">{html.escape(v)}</span>' if v
                              else '<span class="nm wide empty"></span>')
                     cells.append(f'<td class="{"now" if k == 0 else ""}"><div class="q1">{inner}</div></td>')
