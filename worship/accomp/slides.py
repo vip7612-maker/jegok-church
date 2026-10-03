@@ -172,7 +172,7 @@ function paint(sl){{ if(sl.dataset.p) return; sl.dataset.p=1; const s=D[+sl.data
   s.texts.forEach(t=>{{const e=document.createElement('div');e.className='tx';e.textContent=t.t;
     e.style.cssText='left:'+t.x+'px;top:'+t.y+'px;font-size:'+t.s+'px;color:'+t.c+';font-weight:'+(t.b?800:500);
     inn.appendChild(e); const w=measure(t);
-    if(w>t.w*1.02&&t.w>4) e.style.transform='scaleX('+(t.w/w)+')';
+    if(w>t.w&&t.w>4) e.style.transform='scaleX('+(t.w/w)+')';
     else if(t.a==='c') e.style.left=(t.x+(t.w-w)/2)+'px';}}); }}
 const io=new IntersectionObserver(es=>es.forEach(x=>{{if(x.isIntersecting)paint(x.target)}}),{{rootMargin:'800px'}});
 document.querySelectorAll('.sl').forEach(sl=>io.observe(sl));
