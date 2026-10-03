@@ -11,7 +11,7 @@
 악보 칸: {"side": "L", "title": "곡 제목", "img": "scores/<날짜>/파일.png"} — img 가 비면 빈 구획으로 보인다.
 """
 from __future__ import annotations
-import base64, html, json, subprocess, sys
+import base64, html, json, re, subprocess, sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -79,6 +79,7 @@ body{margin:0;background:#d9dce1;font-family:'Pretendard Variable',Pretendard,'A
 .textpage .body{flex:1;min-height:0;overflow:hidden;line-height:1.45}
 .red{color:#dc2626;font-style:normal}
 .verses{line-height:1.75}
+.focus{font-weight:800;color:#9d174d;background:#fdf2f6;box-shadow:0 0 0 1.2mm #fdf2f6;border-radius:1mm}
 .sm-head{background:#e8edf8;border-left:2mm solid #1e3a8a;border-radius:2mm;padding:2.6mm 4mm;margin-bottom:4mm;flex:0 0 auto}.sm-head b{display:block;font-size:21pt;color:#0b1430}.sm-head span{font-size:14pt;color:#334155;font-weight:600}
 .creed{padding:9mm 14mm}.creed h2{font-size:32pt;margin-bottom:6mm}.creed .body{white-space:nowrap;line-height:1.62;font-weight:600;letter-spacing:-.01em}
 .vn{color:#1e3a8a;margin-right:1.5mm}
@@ -243,6 +244,21 @@ def roster_html(date: str) -> str:
             f'<div class="sup"><div class="sup-h"><b>지원팀</b><span>{len(R.get("support", []))}명</span></div><div class="sup-n">{sup}</div></div></div>')
 
 
+RECITE = HERE / "recite.json"
+
+
+def focus_verse(p: dict, date: str) -> int | None:
+    """암송 쪽에서 이번 주 외울 절 — recite.json 의 시작 주일·절에서 한 주에 한 절씩 넘어간다."""
+    import datetime as _dt
+    if not RECITE.exists(): return None
+    head = re.sub(r"<[^>]+>", "", p.get("heading", ""))
+    for key, v in json.loads(RECITE.read_text()).items():
+        if key.startswith("_") or key not in head: continue
+        weeks = (_dt.date.fromisoformat(date) - _dt.date.fromisoformat(v["from"])).days // 7
+        return v["verse"] + weeks if weeks >= 0 else None
+    return None
+
+
 def cover_html(p: dict) -> str:
     """표지: 짙은 남색 새벽빛 + 오른쪽 위 금빛 번짐 + 아래로 흐르는 금빛 오선과 음표."""
     import datetime as _dt
@@ -278,6 +294,11 @@ def page_html(n: int, p: dict, date: str) -> str:
         inner = cover_html(p)
     elif t == "roster":
         inner = roster_html(date)
+    elif t == "recite" and focus_verse(p, date):
+        n = focus_verse(p, date)
+        lines = p["body"].split("<br>")
+        lines = [f'<span class="focus">{l}</span>' if re.match(rf"\s*(<[^>]+>)*\s*{n}(\s|&nbsp;)", l) else l for l in lines]
+        inner = f'<div class="textpage"><h2>{p["heading"]}</h2><div class="body" data-max="14">{"<br>".join(lines)}</div></div>'
     elif t in ("recite", "creed"):
         mx = 60 if t == "creed" else 14
         inner = f'<div class="textpage{' creed' if t == 'creed' else ''}"><h2>{p["heading"]}</h2><div class="body" data-max="{mx}">{p["body"]}</div></div>'
