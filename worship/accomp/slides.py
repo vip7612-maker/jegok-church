@@ -122,7 +122,7 @@ body{{margin:0;background:#0f172a;color:#fff;font-family:'Pretendard Variable',P
 .wrap{{display:flex}}
 #toc{{position:sticky;top:46px;align-self:flex-start;width:190px;flex:0 0 190px;max-height:calc(100vh - 46px);overflow-y:auto;padding:10px 8px;background:#0b1220;font-size:13px}}
 #toc a{{display:block;color:#cbd5e1;text-decoration:none;padding:5px 8px;border-radius:6px}}#toc a:hover,#toc a.on{{background:#1e293b;color:#f6c76b}}
-#toc a.song{{padding-left:18px;color:#93c5fd}}#toc a:focus{{outline:none}}#toc a.on{{background:rgba(246,199,107,.16);color:#f6c76b;box-shadow:inset 4px 0 #f6c76b;font-weight:700}}
+#toc a.song{{padding-left:18px;color:#93c5fd}}#toc a:focus,#toc a:focus-visible{{outline:none!important}}#toc a.on{{background:rgba(246,199,107,.16);color:#f6c76b;box-shadow:inset 4px 0 #f6c76b;font-weight:700}}
 main{{flex:1;min-width:0;padding:14px;display:flex;flex-direction:column;align-items:center;gap:14px}}
 .sl{{position:relative;width:min(100%,1100px);aspect-ratio:16/9;overflow:hidden;background:#000;box-shadow:0 4px 18px rgba(0,0,0,.4);border-radius:6px}}
 .sl .in{{position:absolute;left:0;top:0;width:1440px;height:810px;transform-origin:0 0;background-size:100% 100%}}
@@ -263,7 +263,8 @@ function thumbs(){ const [s,e]=songRange(cur), box=document.getElementById('pvth
     thR=[s,e]; }
   box.querySelectorAll('.th').forEach(t=>t.classList.toggle('on',+t.dataset.k===cur)); fit();
   const on=box.querySelector('.th.on'); if(on) on.scrollIntoView({block:'nearest'}); }
-function go(i,quiet){ cur=Math.max(0,Math.min(all.length-1,i)); mount('pvcur',cur); mount('pvnext',cur+1); thumbs(); fit();
+function go(i,quiet){ const fe=document.activeElement; if(fe&&fe.closest&&fe.closest('#toc')) fe.blur();   // 목차 초점 테두리가 지난 항목에 남지 않게
+  cur=Math.max(0,Math.min(all.length-1,i)); mount('pvcur',cur); mount('pvnext',cur+1); thumbs(); fit();
   document.getElementById('pvn').textContent=(cur+1)+' / '+all.length;
   let on=null;
   document.querySelectorAll('#toc a').forEach(a=>{ const k=all.indexOf(document.getElementById(a.getAttribute('href').slice(1))); if(k<=cur)on=a; a.classList.remove('on'); });
