@@ -125,7 +125,12 @@ def pages(pdf: bytes) -> tuple[list[dict], dict[str, str]]:
     return out, fonts
 
 
-def line_html(l: dict, fonts: dict) -> str:
+def _o(text: str) -> str:
+    import hashlib
+    return hashlib.sha1(re.sub(r"\s+", "", text).encode()).hexdigest()[:10]
+
+
+def line_html(l: dict, fonts: dict, k: str = "") -> str:
     runs = "".join(
         f'<span style="font-family:\'{E(r["font"])}\',\'Noto Sans KR\',sans-serif;font-size:{r["size"]:.2f}pt;color:{r["color"]}'
         f'{";font-weight:700" if r["bold"] else ""}">{E(r["t"])}</span>' for r in l["runs"])
@@ -133,7 +138,8 @@ def line_html(l: dict, fonts: dict) -> str:
     size = max(r["size"] for r in l["runs"]) * 0.3528        # pt → mm
     style = (f"left:{l['x']:.2f}mm;top:{l['base'] - size * 0.88:.2f}mm;width:{l['w']:.2f}mm;line-height:{size:.2f}mm"
              + (";writing-mode:vertical-rl" if vertical else ""))
-    return (f'<div class="ln" contenteditable="true" spellcheck="false" data-w="{l["w"]:.2f}" data-x="{l["x"]:.2f}" '
+    t = "".join(r["t"] for r in l["runs"])
+    return (f'<div class="ln" contenteditable="true" spellcheck="false" data-k="{k}" data-o="{_o(t)}" data-w="{l["w"]:.2f}" data-x="{l["x"]:.2f}" '
             f'data-y="{l["y"]:.2f}" data-h="{l["h"]:.2f}" style="{style}">{runs}</div>')
 
 
@@ -202,7 +208,7 @@ def make_cells(lines: list[dict], grids: list[dict]) -> tuple[list[dict], list[d
     return rest, out
 
 
-def cell_html(c: dict) -> str:
+def cell_html(c: dict, k: str = "") -> str:
     def runs(rs):
         return "".join(f'<span style="font-family:\'{E(r["font"])}\',\'Noto Sans KR\',sans-serif;font-size:{r["size"]:.2f}pt;color:{r["color"]}'
                        f'{";font-weight:700" if r["bold"] else ""}">{E(r["t"])}</span>' for r in rs)
@@ -210,7 +216,8 @@ def cell_html(c: dict) -> str:
         f'<div class="cr" style="line-height:{c["pitch"]:.2f}mm;'
         + (f'text-align:justify;text-align-last:justify;padding:0 {max(0, r["r"]):.2f}mm 0 {max(0, r["l"]):.2f}mm' if r["spread"] else "text-align:center")
         + f'">{runs(r["runs"])}</div>' for r in c["rows"])
-    return (f'<div class="cell" contenteditable="true" spellcheck="false" style="left:{c["x"]:.2f}mm;top:{c["y"]:.2f}mm;'
+    t = "".join(r["t"] for row in c["rows"] for r in row["runs"])
+    return (f'<div class="cell" contenteditable="true" spellcheck="false" data-k="{k}" data-o="{_o(t)}" style="left:{c["x"]:.2f}mm;top:{c["y"]:.2f}mm;'
             f'width:{c["w"]:.2f}mm;height:{c["h"]:.2f}mm">{rows}</div>')
 
 
@@ -280,13 +287,14 @@ def make_blocks(lines: list[dict]) -> tuple[list[dict], list[dict]]:
     return [l for k, l in enumerate(lines) if k not in used], blocks
 
 
-def block_html(b: dict) -> str:
+def block_html(b: dict, k: str = "") -> str:
     def runs(rs):
         return "".join(f'<span style="font-family:\'{E(r["font"])}\',\'Noto Sans KR\',sans-serif;color:{r["color"]}'
                        f'{";font-weight:700" if r["bold"] else ""}">{E(r["t"])}</span>' for r in rs)
     paras = "".join(f'<div class="pa" style="padding-left:{p["pad"]:.2f}mm;text-indent:{p["indent"]:.2f}mm;margin-top:{max(0, p["gap"]):.2f}mm">{runs(p["runs"])}</div>'
                     for p in b["paras"])
-    return (f'<div class="blk" contenteditable="true" spellcheck="false" data-x="{b["x"]:.2f}" data-y="{b["y"]:.2f}" data-h="{b["h"]:.2f}" '
+    t = "".join(r["t"] for pa in b["paras"] for r in pa["runs"])
+    return (f'<div class="blk" contenteditable="true" spellcheck="false" data-k="{k}" data-o="{_o(t)}" data-x="{b["x"]:.2f}" data-y="{b["y"]:.2f}" data-h="{b["h"]:.2f}" '
             f'data-refw="{b["refw"]:.2f}" data-ref="{E(b["ref"])}" style="left:{b["x"]:.2f}mm;top:{b["y"]:.2f}mm;width:{b["w"] + 0.3:.2f}mm;'
             f'{"text-align:center;" if b.get("center") else ""}'
             f'font-size:{b["size"]:.2f}pt;line-height:{b["pitch"]:.2f}mm;font-family:\'{E(b["font"])}\',\'Noto Sans KR\',sans-serif;color:{b["color"]}">'
@@ -304,7 +312,9 @@ def render(date: str, pg: list[dict], fonts: dict[str, str], back: str) -> str:
         body += (f'<div class="page p{i}" style="background-image:url({bg})"><img class="trace" src="{tr}" alt="">'
                  + "".join(f'<img class="fix" src="{f["src"]}" alt="" style="left:{f["x"]:.2f}mm;top:{f["y"]:.2f}mm;width:{f["w"]:.2f}mm;height:{f["h"]:.2f}mm">'
                            for f in p.get("fixes", []))
-                 + "".join(line_html(l, fonts) for l in p["lines"]) + "".join(block_html(b) for b in p.get("blocks", [])) + "".join(cell_html(c) for c in p.get("cells", [])) + "</div>")
+                 + "".join(line_html(l, fonts, f"p{i}l{n}") for n, l in enumerate(p["lines"]))
+                 + "".join(block_html(b, f"p{i}b{n}") for n, b in enumerate(p.get("blocks", [])))
+                 + "".join(cell_html(c, f"p{i}c{n}") for n, c in enumerate(p.get("cells", []))) + "</div>")
     sb = JF.SAVEBAR.read_text() if JF.SAVEBAR.exists() else ""
     return PAGE.format(title=E(title), ff=ff, body=body, back=back, savebar=sb)
 
@@ -342,6 +352,7 @@ body.showtrace .trace{{display:block}}
 </style></head>
 <body>
 <div class="savebar" role="toolbar" aria-label="저장">
+  <button class="main" id="b-save" type="button" style="background:#16a34a;color:#fff">💾 저장하기</button>
   <button class="main" id="b-hwpx" type="button">HWPX로 저장</button>
   <button class="main" id="b-pdf" type="button">PDF로 저장</button>
   <button class="main" id="b-gdoc" type="button">구글문서로 저장</button>
@@ -351,7 +362,8 @@ body.showtrace .trace{{display:block}}
 <div id="linkbox" role="dialog" aria-modal="true"><div class="in"><b>링크</b>
   <input id="linkin" readonly><button type="button" id="b-copy">링크 복사</button> <button type="button" id="b-close">닫기</button></div></div>
 <nav class="jnav"><a href="{back}">◀ 악보집으로</a><a class="editlink" href="edit.html">✏️ 고치기</a></nav>
-<p class="tip">글자를 누르면 바로 고칠 수 있습니다 · 다 고친 뒤 「링크 복사」를 누르면 이 주보 링크에 반영됩니다(맥미니·테일스케일 연결 기기) · 「원본 겹쳐 보기」로 원본과 비교</p>
+<p class="tip">글자를 누르면 바로 고칠 수 있습니다 · 다 고친 뒤 <b>💾 저장하기</b>를 누르면 이 주보 링크에 바로 반영됩니다 · 「원본 겹쳐 보기」로 원본과 비교</p>
+<meta name="jubo-key" content="">
 {body}
 <script data-share>
 /* 줄 폭을 원본 줄 폭에 맞춘다 — 글자 간격을 조금씩. 고친 줄은 자연 간격으로 둔다 */
@@ -379,6 +391,25 @@ body.showtrace .trace{{display:block}}
   document.addEventListener('input',function(e){{ var el=e.target.closest&&e.target.closest('.ln'); if(el){{ el.dataset.edited=1; el.style.letterSpacing='0'; }} }});
   if(document.fonts&&document.fonts.ready) document.fonts.ready.then(fitBlocks); addEventListener('load',fitBlocks);
   if(document.fonts&&document.fonts.ready) document.fonts.ready.then(fit); addEventListener('load',fit); fit();
+  /* 고친 칸 — DB(/api/jubo)에서 불러와 덮어 보이고, 편집본에서는 💾 저장하기로 고친 칸만 저장 (2026-10-03 교장님) */
+  var m=location.pathname.match(/\/d\/([\w-]+)\//), SID=m?m[1]:'', ORIG={{}}, dirty=false;
+  var ED=[].slice.call(document.querySelectorAll('[data-k]'));
+  ED.forEach(function(el){{ ORIG[el.dataset.k]=el.innerHTML; }});
+  if(SID) fetch('/api/jubo?sid='+SID,{{cache:'no-store'}}).then(function(r){{return r.json()}}).then(function(j){{
+    var E=j.edits||{{}}; ED.forEach(function(el){{ var e=E[el.dataset.k]; if(e&&e.o===el.dataset.o){{ el.innerHTML=e.h; el.dataset.edited=1; el.style.letterSpacing='0'; }} }});
+    if(j.updated){{ var t=document.getElementById('msg'); if(t&&!t.textContent) t.textContent='마지막 저장 '+j.updated.replace('T',' ').slice(0,16)+' (UTC)'; }}
+  }}).catch(function(){{}});
+  document.addEventListener('input',function(e){{ if(e.target.closest&&e.target.closest('[data-k]')) dirty=true; }});
+  addEventListener('beforeunload',function(e){{ if(dirty){{ e.preventDefault(); e.returnValue='저장하지 않은 고친 내용이 있습니다'; }} }});
+  var sb=document.getElementById('b-save'), KEY=(document.querySelector('meta[name=jubo-key]')||{{}}).content||'';
+  if(sb){{ if(!KEY||!SID) sb.style.display='none';
+    sb.onclick=function(){{ var edits={{}}; ED.forEach(function(el){{ if(el.innerHTML!==ORIG[el.dataset.k]) edits[el.dataset.k]={{h:el.innerHTML,o:el.dataset.o}}; }});
+      var msg=document.getElementById('msg'); sb.disabled=true; sb.textContent='저장 중…';
+      fetch('/api/jubo',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{sid:SID,key:KEY,edits:edits}})}})
+        .then(function(r){{return r.json()}}).then(function(j){{ sb.disabled=false; sb.textContent='💾 저장하기';
+          if(j.ok){{ dirty=false; if(msg) msg.textContent='✅ 저장했습니다 · 고친 칸 '+j.n+'개 · 주보 링크에 바로 보입니다'; }}
+          else if(msg) msg.textContent='저장 실패: '+(j.error||''); }})
+        .catch(function(e){{ sb.disabled=false; sb.textContent='💾 저장하기'; if(msg) msg.textContent='저장 실패: '+e; }}); }}; }}
 }})();
 </script>
 <script>{savebar}</script>
@@ -397,7 +428,11 @@ def make(date: str, do_share: bool = True) -> tuple[Path, str]:
         import re as _re, subprocess
         sid = _re.search(r"/d/([^/]+)/", url).group(1)
         site = Path.home() / "dev/daily-briefing/report-site"
-        (site / "d" / sid / "edit.html").write_text(out.replace('<title>', '<meta name="robots" content="noindex"><title>✏️ ', 1))
+        import hmac, hashlib
+        sec = next((ln.split("=", 1)[1].strip() for ln in (Path.home() / "dev/daily-briefing/.env").read_text().splitlines() if ln.startswith("JUBO_SECRET=")), "")
+        key = hmac.new(sec.encode(), sid.encode(), hashlib.sha256).hexdigest()[:32] if sec else ""
+        (site / "d" / sid / "edit.html").write_text(out.replace('<meta name="jubo-key" content="">', f'<meta name="jubo-key" content="{key}">')
+                                                     .replace('<title>', '<meta name="robots" content="noindex"><title>✏️ ', 1))
         subprocess.run([str(Path.home() / ".local/node/bin/vercel"), "deploy", "--prod", "--yes"], cwd=site, capture_output=True, timeout=600)
     return f, url
 
