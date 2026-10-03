@@ -72,36 +72,128 @@ def summary(date: str) -> dict:
             "main": t(songs.get("main", [])), "apply": t(songs.get("apply", [])), "leader": leader, "url": url(date)}
 
 
+def past_services() -> list[dict]:
+    """곡 스캔(songppt/scan)으로 찾은 지난 예배(2021~ 주일·수요·금요…) — 날짜·종류·곡·원본 PPT."""
+    out = []
+    for f in sorted((HERE / "songppt" / "scan").glob("*.json")):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            continue
+        src = d["src"]
+        if not src.get("date") or "0000" in src["name"] or "템플릿" in src.get("path", ""): continue   # 예배준비 템플릿은 예배가 아니다
+        link = (f"https://docs.google.com/presentation/d/{src['id']}/edit" if src["mimeType"].endswith("google-apps.presentation")
+                else f"https://drive.google.com/file/d/{src['id']}/view")
+        out.append({"date": src["date"], "kind": src["kind"], "songs": [g["title"] for g in d["groups"]], "src": link})
+    return out
+
+
 def index_page() -> None:
-    dates = sorted(json.loads(PUBLISHED.read_text()) if PUBLISHED.exists() else [], reverse=True)
-    cards = []
-    for x in dates:
-        s = summary(x); d = dt.date.fromisoformat(x)
-        songs = "".join(f"<li><b>{lab}</b>{html.escape(n)}</li>" for lab, n in
-                        [("도입", n) for n in s["intro"]] + [(str(i + 1), n) for i, n in enumerate(s["main"])] + [("적용", n) for n in s["apply"]])
-        cards.append(f'''<a class="c" href="{s["url"]}"><div class="d"><b>{d.month}.{d.day}</b><span>{d.year}</span></div>
-<div class="m"><h3>{html.escape(s["title"] or "주일예배")}</h3><p>{html.escape(s["ref"])}{" · 인도 " + html.escape(", ".join(s["leader"])) if s["leader"] else ""}</p>
-<ol>{songs}</ol></div><span class="go">악보집 열기 →</span></a>''')
-    doc = f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex"><title>제곡교회 예배팀 · 주일예배 악보집</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
-<style>
-*{{box-sizing:border-box}}body{{margin:0;font-family:'Pretendard Variable',Pretendard,sans-serif;background:#f3f4f8;color:#0b1430}}
-header{{background:linear-gradient(160deg,#0b1430,#172a5e 55%,#2b2f6e);color:#fff;padding:34px 22px 28px}}
-header .k{{font-size:11px;letter-spacing:.35em;color:#f6c76b;font-weight:800}}header h1{{margin:8px 0 4px;font-size:28px}}header p{{margin:0;color:#c7d2fe;font-size:14px}}
-main{{max-width:860px;margin:-14px auto 40px;padding:0 14px;display:flex;flex-direction:column;gap:12px}}
-.c{{display:flex;gap:16px;align-items:flex-start;background:#fff;border-radius:16px;padding:16px 18px;text-decoration:none;color:inherit;box-shadow:0 2px 10px rgba(11,20,48,.08);position:relative}}
-.c:first-child{{outline:2px solid #f6c76b}}
-.d{{flex:0 0 64px;text-align:center;background:#0b1430;color:#fff;border-radius:12px;padding:10px 0}}.d b{{display:block;font-size:22px}}.d span{{font-size:11px;color:#c7d2fe}}
-.m{{flex:1;min-width:0}}.m h3{{margin:2px 0 4px;font-size:18px}}.m p{{margin:0 0 8px;color:#64748b;font-size:13px}}
-ol{{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}}li{{font-size:12.5px;background:#f1f5f9;border-radius:8px;padding:3px 9px}}li b{{color:#1e3a8a;margin-right:5px}}
-.go{{position:absolute;right:16px;top:16px;font-size:12px;font-weight:700;color:#b8860b}}
-@media(max-width:560px){{.go{{display:none}}}}
-</style></head><body>
-<header><span class="k">JEGOK CHURCH · WORSHIP TEAM</span><h1>주일예배 악보집</h1><p>예배자 악보 · {len(dates)}주 · 최신 주가 맨 위</p></header>
-<main>{"".join(cards) or "<p>아직 없음</p>"}</main></body></html>"""
+    """모음 쪽 = 랜딩 (2026-10-03 교장님 지시).
+    위 가운데: 주일 0시~24시(한국 시간)는 「오늘」 — 그 주 예배 PPT 첫 장을 크게, 누르면 PPT.
+               그 밖의 날은 다가오는 주일을 「준비 중」 표지로(함께 준비하는 예배팀에게 한마디).
+    아래: 지난 예배 목록 10개씩 쪽 넘김 — 악보집이 있는 주 + 곡 스캔으로 찾은 예전 예배.
+    날짜 판단은 페이지가 열릴 때 브라우저가 하므로 주일이 되어도 다시 올릴 필요가 없다."""
+    pub = sorted(json.loads(PUBLISHED.read_text()) if PUBLISHED.exists() else [])
+    items = []
+    for x in pub:
+        sm = summary(x)
+        cover = (SITE / "d" / sid_for(x) / "cover.jpg").exists()
+        items.append({"date": x, "kind": "주일", "title": sm["title"], "ref": sm["ref"], "leader": sm["leader"],
+                      "songs": sm["intro"] + sm["main"] + sm["apply"], "book": sm["url"] + "/",
+                      "ppt": sm["url"] + "/ppt.html", "cover": (sm["url"] + "/cover.jpg") if cover else ""})
+    have = {(i["date"], i["kind"]) for i in items}
+    items += [o for o in past_services() if (o["date"], o["kind"]) not in have]
+    data = json.dumps(sorted(items, key=lambda i: i["date"], reverse=True), ensure_ascii=False).replace("</", "<\\/")
+    doc = LANDING.replace("@@DATA@@", data)
     (SITE / INDEX).mkdir(exist_ok=True)
     (SITE / INDEX / "index.html").write_text(doc)
+
+
+LANDING = r"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>제곡교회 예배 플랫폼</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+<style>
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:'Pretendard Variable',Pretendard,sans-serif;background:#f3f4f8;color:#0b1430;word-break:keep-all}
+header{background:linear-gradient(160deg,#0b1430,#172a5e 55%,#2b2f6e);color:#fff;padding:30px 20px 90px;text-align:center}
+header .k{font-size:11px;letter-spacing:.35em;color:#f6c76b;font-weight:800}header h1{margin:8px 0 0;font-size:26px}
+main{max-width:860px;margin:-70px auto 40px;padding:0 14px}
+.hero{max-width:720px;margin:0 auto;background:#fff;border-radius:20px;padding:16px;box-shadow:0 10px 30px rgba(11,20,48,.18)}
+.hero .tag{display:inline-block;font-size:12px;font-weight:800;border-radius:999px;padding:4px 12px;background:#fdf3dc;color:#8a5a00}
+.hero .tag.live{background:#dc2626;color:#fff}
+.hero .row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
+.hero .who{font-size:12.5px;color:#64748b}
+.shot{display:block;position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#0b1430 center/cover no-repeat}
+.shot .play{position:absolute;right:12px;bottom:12px;background:rgba(11,20,48,.72);color:#fff;font-weight:800;border-radius:999px;padding:12px 22px;font-size:16px}
+.ready{aspect-ratio:16/9;border-radius:12px;background:linear-gradient(160deg,#172a5e,#2b2f6e);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px}
+.ready .big{font-size:clamp(26px,6vw,40px);font-weight:800;letter-spacing:.04em}
+.ready .when{margin-top:6px;color:#f6c76b;font-weight:700;font-size:15px}
+.ready .msg{margin-top:16px;max-width:460px;color:#dbe3ff;font-size:14.5px;line-height:1.7}
+.hero h2{margin:12px 2px 2px;font-size:19px}.hero .ref{margin:0 2px;color:#64748b;font-size:13px}
+.btns{display:flex;gap:8px;margin-top:12px}.btns a{flex:1;text-align:center;text-decoration:none;font-weight:800;font-size:14px;border-radius:12px;padding:12px 8px;background:#f1f5f9;color:#0b1430}
+.btns a.p{background:#f6c76b;color:#0b1430}
+.chips{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}.chips li{font-size:12.5px;background:#f1f5f9;border-radius:8px;padding:3px 9px}
+h3.sec{margin:28px 4px 10px;font-size:15px;color:#334155;display:flex;justify-content:space-between;align-items:baseline}h3.sec span{font-size:12px;color:#94a3b8;font-weight:500}
+.list{background:#fff;border-radius:16px;box-shadow:0 2px 10px rgba(11,20,48,.06);overflow:hidden}
+.it{display:flex;gap:14px;align-items:flex-start;padding:13px 16px;border-top:1px solid #eef1f6;text-decoration:none;color:inherit}.it:first-child{border-top:0}
+.it:hover{background:#f8fafc}
+.d{flex:0 0 58px;text-align:center}.d b{display:block;font-size:19px}.d span{font-size:11px;color:#94a3b8}
+.m{flex:1;min-width:0}.m .t{font-weight:700;font-size:15px}.m .s{color:#64748b;font-size:12.5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kind{font-size:11px;font-weight:800;border-radius:6px;padding:1px 6px;margin-left:6px;background:#eef2ff;color:#3730a3}
+.go{flex:0 0 auto;font-size:12px;font-weight:700;color:#b8860b;padding-top:4px}
+.pg{display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin:14px 0}
+.pg button{font:700 13px inherit;border:0;border-radius:10px;padding:8px 12px;background:#fff;color:#0b1430;cursor:pointer;box-shadow:0 1px 4px rgba(11,20,48,.08)}
+.pg button.on{background:#0b1430;color:#fff}.pg button:disabled{opacity:.4;cursor:default}
+@media(max-width:560px){.ready{aspect-ratio:auto;min-height:220px}.ready .msg br{display:none}header{padding:24px 16px 80px}.go{display:none}.hero{padding:12px}.d{flex-basis:48px}}
+</style></head><body>
+<header><span class="k">JEGOK CHURCH · WORSHIP TEAM</span><h1>제곡교회 예배 플랫폼</h1></header>
+<main><section class="hero" id="hero"></section>
+<h3 class="sec">지난 예배 <span id="cnt"></span></h3><div class="list" id="list"></div><div class="pg" id="pg"></div></main>
+<script id="data" type="application/json">@@DATA@@</script>
+<script>
+const ALL=JSON.parse(document.getElementById('data').textContent);
+const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const kst=new Date(Date.now()+9*3600e3), TODAY=(new URLSearchParams(location.search).get('today'))||kst.toISOString().slice(0,10);   // ?today= 은 미리 보기용
+const W='일월화수목금토';
+const md=d=>{const x=new Date(d+'T00:00:00Z');return (x.getUTCMonth()+1)+'월 '+x.getUTCDate()+'일('+W[x.getUTCDay()]+')';};
+function nextSunday(){const x=new Date(TODAY+'T00:00:00Z');x.setUTCDate(x.getUTCDate()+((7-x.getUTCDay())%7||7));return x.toISOString().slice(0,10);}
+const sundays=ALL.filter(i=>i.ppt);
+const today=sundays.find(i=>i.date===TODAY);
+function hero(){const h=document.getElementById('hero');
+  if(today){const i=today;
+    h.innerHTML='<div class="row"><span class="tag live">● 오늘 · '+md(i.date)+'</span><span class="who">'+(i.leader.length?'인도 '+esc(i.leader.join(', ')):'')+'</span></div>'
+      +'<a class="shot" href="'+i.ppt+'" style="background-image:url(\''+i.cover+'\')"><span class="play">▶ 예배 PPT 열기</span></a>'
+      +'<h2>'+esc(i.title||'주일예배')+'</h2><p class="ref">'+esc(i.ref)+'</p>'
+      +'<div class="btns"><a class="p" href="'+i.ppt+'">▶ 예배용 PPT</a><a href="'+i.book+'">예배자 악보</a></div>';
+    return;}
+  const up=sundays.filter(i=>i.date>TODAY).sort((a,b)=>a.date<b.date?-1:1)[0];
+  const day=up?up.date:nextSunday();
+  const left=Math.round((new Date(day)-new Date(TODAY))/864e5);
+  h.innerHTML='<div class="row"><span class="tag">준비 중 · '+md(day)+'</span><span class="who">'+(up&&up.leader.length?'인도 '+esc(up.leader.join(', ')):'')+'</span></div>'
+    +'<div class="ready"><div class="big">예배 준비 중</div><div class="when">'+md(day)+' 주일예배'+(left>0?' · '+left+'일 남음':'')+'</div>'
+    +'<div class="msg">함께 예배를 준비하는 동역자 여러분, 고맙습니다.<br> 이번 한 주도 말씀과 찬양으로 마음을 준비해 주세요.<br> 주일 아침, 기쁨으로 만나요.</div></div>'
+    +(up?'<h2>'+esc(up.title||'주일예배')+'</h2><p class="ref">'+esc(up.ref)+'</p>'
+      +(up.songs.length?'<ul class="chips">'+up.songs.map(s=>'<li>'+esc(s)+'</li>').join('')+'</ul>':'')
+      +'<div class="btns"><a href="'+up.book+'">예배자 악보 미리 보기</a><a href="'+up.ppt+'">예배 PPT 미리 보기</a></div>':'');}
+const PAST=ALL.filter(i=>i!==today&&i.date<=TODAY), PER=10;
+function list(p){const n=Math.max(1,Math.ceil(PAST.length/PER)); p=Math.min(Math.max(1,p),n);
+  document.getElementById('cnt').textContent=PAST.length+'개 · '+p+'/'+n+'쪽';
+  document.getElementById('list').innerHTML=PAST.slice((p-1)*PER,p*PER).map(i=>{const x=new Date(i.date+'T00:00:00Z');
+    const href=i.ppt||i.src, t=i.ppt?(i.title||'주일예배'):(i.kind+'예배');
+    const sub=(i.ref?i.ref+' · ':'')+(i.songs.length?i.songs.join(' · '):'곡 정보 없음');
+    return '<a class="it" href="'+href+'"'+(i.ppt?'':' target="_blank" rel="noopener"')+'><div class="d"><b>'+(x.getUTCMonth()+1)+'.'+x.getUTCDate()+'</b><span>'+x.getUTCFullYear()+'</span></div>'
+      +'<div class="m"><div class="t">'+esc(t)+(i.kind!=='주일'?'<span class="kind">'+esc(i.kind)+'</span>':'')+'</div><div class="s">'+esc(sub)+'</div></div>'
+      +'<span class="go">'+(i.ppt?'PPT · 악보 →':'원본 PPT ↗')+'</span></a>';}).join('')||'<div class="it">아직 없음</div>';
+  const pg=document.getElementById('pg'); let b='<button '+(p<=1?'disabled':'')+' data-p="'+(p-1)+'">◀ 이전</button>';
+  const a=Math.max(1,Math.min(p-2,n-4)), z=Math.min(n,a+4);
+  for(let k=a;k<=z;k++) b+='<button class="'+(k===p?'on':'')+'" data-p="'+k+'">'+k+'</button>';
+  b+='<button '+(p>=n?'disabled':'')+' data-p="'+(p+1)+'">다음 ▶</button>'; pg.innerHTML=b;
+  pg.querySelectorAll('button').forEach(x=>x.onclick=()=>{location.hash='p='+x.dataset.p;});}
+function route(){list(+((location.hash.match(/p=(\d+)/)||[])[1]||1));}
+addEventListener('hashchange',()=>{route();document.getElementById('cnt').scrollIntoView({behavior:'smooth'});});
+hero(); route();
+</script></body></html>"""
 
 
 # ── 노션 ──────────────────────────────────────────────

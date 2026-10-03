@@ -329,7 +329,7 @@ def kind_of(name: str) -> str:
 
 def is_service_ppt(name: str) -> bool:
     n = nfc(name)
-    if n.startswith("._") or re.search(r"반주자|싱어|_?wide|와이드|사본|자동 저장|목회자 세미나|기도제목|청춘사진관", n, re.I):
+    if n.startswith("._") or "0000" in n or re.search(r"반주자|싱어|_?wide|와이드|사본|자동 저장|목회자 세미나|기도제목|청춘사진관", n, re.I):
         return False
     return bool(re.search(r"예배|PPT", re.sub(r"\.pptx?$", "", n, flags=re.I), re.I))
 

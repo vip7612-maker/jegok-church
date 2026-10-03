@@ -390,6 +390,8 @@ def song_titles(date: str) -> list[str]:
 def make(pdf: Path, date: str, sid: str, pptx: Path | None = None) -> Path:
     folder = SITE / "d" / sid; folder.mkdir(parents=True, exist_ok=True)
     slides = parse(pdf, folder / "slides")
+    import fitz                                   # 모음 쪽(jegok_worship) 「오늘」 칸에 쓸 첫 장 그림(글자까지 그대로)
+    fitz.open(pdf)[0].get_pixmap(dpi=110).save(str(folder / "cover.jpg"))
     slides = add_song_frames(slides, date, folder / "slides")
     shutil.copy(pdf, folder / "worship.pdf")
     dl = '<a href="worship.pdf" download="{0} 주일예배 PPT.pdf">⬇ PDF</a>'.format(date)
