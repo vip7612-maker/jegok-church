@@ -345,7 +345,8 @@ body.showtrace .trace{{display:block}}
 .savebar .msg{{color:#e7eaec;font-size:12.5px}}
 .jnav{{display:flex;justify-content:center;gap:8px;padding:8px 0 0}}.jnav a{{background:#fff;border:1px solid #cbd5e1}}
 .tip{{text-align:center;font-size:12.5px;color:#334155;margin:6px 0 0}}
-.savebar~.jnav .editlink{{display:none}}   /* 편집본에서는 「고치기」 링크를 숨기고, 공유본(저장 단추가 빠짐)에서만 보인다 */
+.savebar~.jnav .editlink{{display:none}}
+.tip{{display:none}}.savebar~.tip{{display:block}}   /* 고치는 법 안내는 편집본에서만 */   /* 편집본에서는 「고치기」 링크를 숨기고, 공유본(저장 단추가 빠짐)에서만 보인다 */
 #linkbox{{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:30;align-items:center;justify-content:center}}
 #linkbox.on{{display:flex}}#linkbox .in{{background:#fff;padding:16px;border-radius:10px}}#linkin{{width:300px}}
 @media print{{body{{background:#fff}}.page{{margin:0;box-shadow:none;break-after:page}}.savebar,.jnav,.tip,#linkbox,.trace{{display:none!important}}
