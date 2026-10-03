@@ -112,9 +112,10 @@ def pages(pdf: bytes) -> tuple[list[dict], dict[str, str]]:
             if bw < 20 or bh < 20 or bw > W * 0.5: continue
             want = info["width"] / info["height"]
             if abs((bw / bh) / want - 1) < 0.08: continue
-            k = im.width / W
-            ImageDraw.Draw(im).rectangle([x0 * k, y0 * k, x1 * k, y1 * k], fill="white")
-            sw = min(bw, bh * want); sh = sw / want
+            k = im.width / W; ins = 0.6 / MM                       # 0.6mm 안쪽만 지운다 — 그림 자리에 겹친 테두리 선은 남긴다
+            ImageDraw.Draw(im).rectangle([(x0 + ins) * k, (y0 + ins) * k, (x1 - ins) * k, (y1 - ins) * k], fill="white")
+            pad = 1.5 / MM                                         # 테두리 안쪽으로 1.5mm 띄워 넣는다(교장님: 네모 상자 안으로)
+            sw = min(bw - 2 * pad, (bh - 2 * pad) * want); sh = sw / want
             data = doc.extract_image(info["xref"])
             fixes.append({"x": (x0 + (bw - sw) / 2) * MM, "y": (y0 + (bh - sh) / 2) * MM, "w": sw * MM, "h": sh * MM,
                           "src": f"data:image/{data['ext']};base64," + base64.b64encode(data["image"]).decode()})
