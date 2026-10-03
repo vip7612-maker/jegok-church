@@ -89,11 +89,11 @@ body{margin:0;background:#d9dce1;font-family:'Pretendard Variable',Pretendard,'A
 .col{position:absolute;top:0;bottom:0;width:50%;padding:7mm 9mm}
 .col .body{height:100%;overflow:hidden;line-height:1.5}
 /* 악보 칸 */
-.slot{position:absolute;inset:2mm;display:flex;flex-direction:column}
+.slot{position:absolute;inset:1mm;display:flex;flex-direction:column}
 .slot img{width:100%;flex:1;min-height:0;object-fit:contain;object-position:top center}
 .slot.empty{border:2px dashed #93c5fd;border-radius:3mm;align-items:center;justify-content:center;color:#3b82f6;background:#f8fbff}
 .slot.empty b{font-size:16pt}.slot.empty span{font-size:10pt;margin-top:2mm;color:#64748b}
-.shead{display:flex;align-items:center;gap:2.5mm;flex:0 0 auto;margin-bottom:1.5mm}.shead .stt{font-size:11pt;font-weight:700;color:#1e3a8a}
+.shead{position:absolute;left:0;top:0;z-index:3;display:flex;align-items:center;gap:2.5mm;background:rgba(255,255,255,.92);border-radius:0 0 2.5mm 0;padding:0 3mm .8mm 0}.shead .stt{font-size:11pt;font-weight:700;color:#1e3a8a}
 .slot .badge{position:static;align-self:flex-start;flex:0 0 auto;min-width:11mm;text-align:center;font-size:13pt;font-weight:900;color:#fff;background:#1e3a8a;border-radius:2mm;padding:.8mm 3.5mm}
 .slot.empty .badge{position:absolute;left:0;top:0}
 .slot .st{position:absolute;left:0;bottom:0;font-size:8pt;color:#fff;background:rgba(37,99,235,.85);padding:.5mm 2mm;border-radius:0 2mm 0 0}
