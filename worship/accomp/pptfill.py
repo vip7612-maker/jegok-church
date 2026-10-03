@@ -191,6 +191,29 @@ def creed_slides(prs) -> list:
     return out
 
 
+KO_ENDS = ("와", "과", "며", "고", "서", "님", "들", "아", "어", "에", "가", ",")
+
+
+# 사도신경은 글이 바뀌지 않는다 — 줄 나눔을 표로 정해 둔다(교장님이 정한 자리). 표에 없으면 아래 규칙으로.
+CREED_KO = {
+    "거기로부터 살아 있는 자와 죽은 자를 심판하러 오십니다.": ["거기로부터 살아 있는 자와 죽은 자를", "심판하러 오십니다."],   # 2026-10-03 교장님
+}
+
+
+def ko_lines(text: str, width_chars: float = 21) -> list[str]:
+    """사도신경 한 마디(한국어) → 한 줄 또는 두 줄. 한 줄에 들어가면 그대로, 아니면 두 줄 길이가 비슷하고
+    말이 끝나는 자리(…와·…아·…서·…님 …)에서 나눈다 (2026-10-03 교장님: 「거기로부터 살아 있는 자와 / 죽은 자를 심판하러 오십니다.」)."""
+    t = re.sub(r"\s+", " ", text).strip()
+    if t in CREED_KO: return list(CREED_KO[t])
+    if len(t) <= width_chars: return [t]
+    w = t.split(" "); best = None
+    for i in range(1, len(w)):
+        a, b = " ".join(w[:i]), " ".join(w[i:])
+        score = max(len(a), len(b)) + (0 if w[i - 1].endswith(KO_ENDS) else 6)
+        if best is None or score < best[0]: best = (score, [a, b])
+    return best[1]
+
+
 def _clean(t: str) -> str:
     t = re.sub(r"\s+", " ", t.replace("\xa0", " ")).strip()
     for a, b in CREED_FIX: t = t.replace(a, b)
@@ -259,7 +282,7 @@ def creed(pptx: Path) -> list[str]:
         for x in list(bp): bp.remove(x)                       # 자동 줄임 끄기(글자 크기는 위에서 정한 대로)
         first = True
         for i, sec in enumerate(secs):
-            for j, k in enumerate(sec["ko"]):
+            for j, k in enumerate(ko_lines(" ".join(sec["ko"]))):
                 _para(tf, k, "ko", first, before=34 if (i and j == 0) else 0); first = False
             for j, t in enumerate(sec["ru"]): _para(tf, t, "ru", before=8 if j == 0 else 0)
             for j, t in enumerate(sec["en"]): _para(tf, t, "en", before=2 if j == 0 else 0)
