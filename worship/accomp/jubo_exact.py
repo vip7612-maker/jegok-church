@@ -139,6 +139,7 @@ body.showtrace .trace{{display:block}}
 .savebar .msg{{color:#e7eaec;font-size:12.5px}}
 .jnav{{display:flex;justify-content:center;gap:8px;padding:8px 0 0}}.jnav a{{background:#fff;border:1px solid #cbd5e1}}
 .tip{{text-align:center;font-size:12.5px;color:#334155;margin:6px 0 0}}
+.savebar~.jnav .editlink{{display:none}}   /* 편집본에서는 「고치기」 링크를 숨기고, 공유본(저장 단추가 빠짐)에서만 보인다 */
 #linkbox{{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:30;align-items:center;justify-content:center}}
 #linkbox.on{{display:flex}}#linkbox .in{{background:#fff;padding:16px;border-radius:10px}}#linkin{{width:300px}}
 @media print{{body{{background:#fff}}.page{{margin:0;box-shadow:none;break-after:page}}.savebar,.jnav,.tip,#linkbox,.trace{{display:none!important}}
@@ -154,8 +155,8 @@ body.showtrace .trace{{display:block}}
 </div>
 <div id="linkbox" role="dialog" aria-modal="true"><div class="in"><b>링크</b>
   <input id="linkin" readonly><button type="button" id="b-copy">링크 복사</button> <button type="button" id="b-close">닫기</button></div></div>
-<nav class="jnav"><a href="{back}">◀ 악보집으로</a></nav>
-<p class="tip">글자를 누르면 바로 고칠 수 있습니다 · 「원본 겹쳐 보기」로 원본과 비교</p>
+<nav class="jnav"><a href="{back}">◀ 악보집으로</a><a class="editlink" href="edit.html">✏️ 고치기</a></nav>
+<p class="tip">글자를 누르면 바로 고칠 수 있습니다 · 다 고친 뒤 「링크 복사」를 누르면 이 주보 링크에 반영됩니다(맥미니·테일스케일 연결 기기) · 「원본 겹쳐 보기」로 원본과 비교</p>
 {body}
 <script data-share>
 /* 줄 폭을 원본 줄 폭에 맞춘다 — 글자 간격을 조금씩. 고친 줄은 자연 간격으로 둔다 */
@@ -185,6 +186,12 @@ def make(date: str, do_share: bool = True) -> tuple[Path, str]:
     JF.DOCS.mkdir(parents=True, exist_ok=True)
     f = JF.DOCS / f"{date.replace('-', '')}_제곡교회_주보.html"; f.write_text(out)
     url = JF.share(date, out, f"{date.replace('-', '')} 제곡교회 주보") if do_share else ""
+    if url:                                           # 공유본 옆에 편집본(edit.html) — 「✏️ 고치기」로 열고, 고친 뒤 「링크 복사」로 공유본에 반영
+        import re as _re, subprocess
+        sid = _re.search(r"/d/([^/]+)/", url).group(1)
+        site = Path.home() / "dev/daily-briefing/report-site"
+        (site / "d" / sid / "edit.html").write_text(out.replace('<title>', '<meta name="robots" content="noindex"><title>✏️ ', 1))
+        subprocess.run([str(Path.home() / ".local/node/bin/vercel"), "deploy", "--prod", "--yes"], cwd=site, capture_output=True, timeout=600)
     return f, url
 
 
