@@ -103,7 +103,10 @@ def main():
         else:
             head = min(shapes, key=lambda x: x[0][1]); body = max(shapes, key=lambda x: x[0][3])
             kind = "creed" if "사도신경" in plain(head[1]) else "recite"
-            pages.append({"type": kind, "heading": rich(head[1]), "body": rich(body[1])})
+            text = rich(body[1])
+            if kind == "creed" and (HERE / "creed.txt").exists():   # 교장님이 정해 주신 줄바꿈 그대로 (2026-10-03)
+                text = "<br>".join(html.escape(l) for l in (HERE / "creed.txt").read_text().strip().splitlines())
+            pages.append({"type": kind, "heading": rich(head[1]), "body": text})
     data = {"date": date, "title": p["title"], "source": f"https://docs.google.com/presentation/d/{a.sid}/edit", "pages": pages}
     out = HERE / "data" / f"{date}.json"; out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(data, ensure_ascii=False, indent=1))
