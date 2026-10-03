@@ -133,12 +133,15 @@ body.one:not(.pr) main .sl{{display:none;width:min(100%,calc((100vh - 120px)*16/
 #vbar{{display:none;align-items:center;gap:10px;font-weight:700}}body.one #vbar{{display:flex}}body.pr #vbar{{display:none}}
 #vbar button{{font:700 14px inherit;border:0;border-radius:999px;padding:8px 18px;background:#fff;color:#111;cursor:pointer}}
 /* 발표자 보기(메인 모니터) — 청중 화면은 두 번째 모니터 창 (2026-10-03 교장님 지시) */
-#pv{{display:none;position:fixed;left:190px;top:46px;right:0;bottom:0;z-index:15;background:#0b1220;padding:14px;gap:16px}}body.pv #pv{{display:flex}}
-.pvl{{flex:2.3;min-width:0;display:flex;flex-direction:column}}.pvr{{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}}
-.pvlab{{font-size:12px;color:#94a3b8;margin:0 0 5px}}.pvbox .sl{{width:100%;max-width:calc((100vh - 330px)*16/9)}}
+#pv{{display:none;position:fixed;left:190px;top:46px;right:0;bottom:0;z-index:15;background:#0b1220;padding:14px;gap:12px 16px;
+  grid-template-columns:minmax(0,2.3fr) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}}body.pv #pv{{display:grid}}
+.pvl{{min-width:0;display:flex;flex-direction:column}}.pvr{{min-width:0;display:flex;flex-direction:column;gap:12px}}
+/* 썸네일 줄은 아래 전체 폭 — 오른쪽 「발표 끝내기」 아래 빈 곳까지 쓴다 (2026-10-03 교장님 지시) */
+.pvt{{grid-column:1/-1;min-height:0;display:flex;flex-direction:column}}
+.pvlab{{font-size:12px;color:#94a3b8;margin:0 0 5px}}.pvl .pvbox .sl{{width:100%;max-width:calc((100vh - 380px)*16/9)}}.pvr .pvbox .sl{{width:100%}}
 /* 발표자 보기 아래 썸네일 — 지금 노래(목차 한 구간)의 장 전부, 누르면 앞 화면으로 (2026-10-03 교장님 지시) */
 #pvthumbs{{flex:1;min-height:0;overflow-y:auto;display:flex;flex-wrap:wrap;align-content:flex-start;gap:8px;padding:2px}}
-#pvthumbs .th{{width:170px;cursor:pointer;border:3px solid transparent;border-radius:8px;padding:1px}}#pvthumbs .th:hover{{border-color:#475569}}
+#pvthumbs .th{{width:190px;cursor:pointer;border:3px solid transparent;border-radius:8px;padding:1px}}#pvthumbs .th:hover{{border-color:#475569}}
 #pvthumbs .th.on{{border-color:#f6c76b}}#pvthumbs .sl{{width:100%;box-shadow:none;border-radius:4px}}
 .pvbox .last{{aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:#111827;border-radius:6px;color:#94a3b8}}
 .pvinfo{{display:flex;justify-content:space-between;align-items:baseline;font-weight:800;font-size:26px}}#pvclock{{color:#f6c76b}}
@@ -149,13 +152,13 @@ body.one:not(.pr) main .sl{{display:none;width:min(100%,calc((100vh - 120px)*16/
 </style></head><body class="one">
 <div class="top"><b>📽️ {title} · {n}장</b><button class="pr" onclick="present()">▶ 예배용</button><button id="lbtn" onclick="toggleList()">☰ 목록으로 보기</button>{dl}<a href="./">◀ 악보집으로</a></div>
 <div class="wrap"><nav id="toc">{toc}</nav><main id="deck">{slides}<div id="vbar"><button onclick="view(cur-1)">◀ 이전</button><span id="vn"></span><button onclick="view(cur+1)">다음 ▶</button></div></main></div>
-<div id="pv"><div class="pvl"><div class="pvlab">지금 앞 화면</div><div id="pvcur" class="pvbox"></div>
-<div class="pvlab" style="margin-top:10px">이 노래·순서의 모든 장 — 누르면 앞 화면에 바로 나갑니다</div><div id="pvthumbs"></div></div>
+<div id="pv"><div class="pvl"><div class="pvlab">지금 앞 화면</div><div id="pvcur" class="pvbox"></div></div>
 <div class="pvr"><div class="pvlab">다음 장</div><div id="pvnext" class="pvbox"></div>
 <div class="pvinfo"><span id="pvn"></span><span id="pvclock">00:00</span></div>
 <div class="pvbtn"><button onclick="go(cur-1)">◀ 이전</button><button onclick="go(cur+1)">다음 ▶</button></div>
 <div class="pvnote">← → 방향키·스페이스로 넘김 · 왼쪽 목차를 누르면 그 장으로 · Esc 끝내기</div>
-<button class="pvstop" onclick="endPV()">■ 발표 끝내기</button></div></div>
+<button class="pvstop" onclick="endPV()">■ 발표 끝내기</button></div>
+<div class="pvt"><div class="pvlab">이 노래·순서의 모든 장 — 누르면 앞 화면에 바로 나갑니다</div><div id="pvthumbs"></div></div></div>
 <script>
 const D={data};
 const deck=document.getElementById('deck');
@@ -274,6 +277,46 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
                        data=json.dumps(data, ensure_ascii=False, separators=(",", ":")), pvjs=PVJS)
 
 
+def add_song_frames(slides: list[dict], date: str, out: Path) -> list[dict]:
+    """예배 PPT 에 가사 슬라이드가 아직 없을 때 — 찬양과경배·찬양과결단 표지 바로 뒤에 곡마다 틀 한 장(곡 제목 + 악보)을 끼운다
+    (2026-10-03 교장님 지시: 9/27 예배 PPT 처럼 곡마다 자리가 있게). 표지 뒤에 이미 가사 장이 있으면 손대지 않는다."""
+    from PIL import Image
+    try:
+        d = json.loads((HERE / "data" / f"{date}.json").read_text()).get("songs", {})
+    except Exception:
+        return slides
+    songs = [(lab, x) for g, name in (("intro", "도입곡"), ("main", ""), ("apply", "적용송"))
+             for i, x in enumerate(d.get(g, [])) for lab in [name or str(i + 1)]]
+    flat = lambda s: re.sub(r"\s", "", s["plain"])[:40]
+    is_div = lambda s: ("찬양과경배" in flat(s) or "찬양과결단" in flat(s)) and len(re.sub(r"\s", "", s["plain"])) < 160
+    is_sec = lambda s: any(x in flat(s) for x in SECTIONS)   # 다음 장이 곧바로 다른 순서 표지 = 가사 장 없음
+    divs = [k for k, s in enumerate(slides) if is_div(s)]
+    empty = [k for k in divs if k + 1 >= len(slides) or is_sec(slides[k + 1])]
+    if not songs or len(empty) < len(divs):   # 가사 장이 이미 들어 있는 PPT
+        return slides
+    W, H = int(slides[0]["w"]), int(slides[0]["h"])
+    res, si = [], 0
+    for k, s in enumerate(slides):
+        res.append(s)
+        if k in divs and si < len(songs):
+            lab, x = songs[si]; si += 1
+            name = f"frame_{si:02d}.jpg"
+            cv = Image.new("RGB", (W, H), "white")
+            if x.get("img") and (HERE / x["img"]).exists():
+                im = Image.open(HERE / x["img"]).convert("RGB")
+                bw, bh = W - 80, H - 130
+                r = min(bw / im.width, bh / im.height); im = im.resize((max(1, int(im.width * r)), max(1, int(im.height * r))))
+                cv.paste(im, ((W - im.width) // 2, 110 + (bh - im.height) // 2))
+            cv.save(out / name, "JPEG", quality=85)
+            title = ("♬ " + (lab + ". " if lab.isdigit() else lab + " · ") + (x.get("title") or "곡 미정"))
+            texts = [{"x": 40, "y": 30, "w": W - 80, "h": 60, "s": 48, "c": "#6b5444", "b": True, "t": title, "a": "c"}]
+            if not x.get("img"):
+                texts.append({"x": 40, "y": H // 2, "w": W - 80, "h": 40, "s": 32, "c": "#9ca3af", "b": False, "t": "악보·가사 준비 중", "a": "c"})
+            res.append({"n": 0, "w": W, "h": H, "img": name, "texts": texts, "plain": x.get("title", ""), "hidden": x.get("title", "")})
+    for n, s in enumerate(res, 1): s["n"] = n
+    return res
+
+
 def song_titles(date: str) -> list[str]:
     """그 주 악보집 곡 순서(도입곡 → 1~N → 적용송). 없으면 악보 보관함의 「쓴 날」 기록에서."""
     try:
@@ -297,6 +340,7 @@ def song_titles(date: str) -> list[str]:
 def make(pdf: Path, date: str, sid: str, pptx: Path | None = None) -> Path:
     folder = SITE / "d" / sid; folder.mkdir(parents=True, exist_ok=True)
     slides = parse(pdf, folder / "slides")
+    slides = add_song_frames(slides, date, folder / "slides")
     shutil.copy(pdf, folder / "worship.pdf")
     dl = '<a href="worship.pdf" download="{0} 주일예배 PPT.pdf">⬇ PDF</a>'.format(date)
     if pptx:
