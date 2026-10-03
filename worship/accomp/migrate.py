@@ -3,6 +3,7 @@
 
   python3 accomp/migrate.py songs [곡명 …]     곡별 PPT(songppt/db) → songs·song_slides·song_uses (다시 돌려도 같은 결과)
   python3 accomp/migrate.py deck 2026-10-04    그 주 예배 PPT → services(배경 그림 지문·글자·곡 참조·목차·내려받기 뼈대)
+  python3 accomp/migrate.py scores [N]         드라이브 「찬양 악보 모음」 + 노션 보관함 → scores(그림은 Blob 에 한 번만)
 """
 from __future__ import annotations
 
@@ -10,7 +11,7 @@ import base64, json, re, sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE)); sys.path.insert(0, str(HERE.parent))
 import store as S  # noqa: E402
 
 DB = HERE / "songppt" / "db"
@@ -137,10 +138,86 @@ def deck(date: str, pdf: Path | None = None, pptx: Path | None = None) -> dict:
           json.dumps(deckj, ensure_ascii=False, separators=(",", ":")), json.dumps(sk))
     return {"slides": len(out), "base": len(base), "toc": len(toc), "skeleton_kb": sk["size"] // 1024, "media": len(sk["media"])}
 
+# ── 악보 → scores (2026-10-03 교장님: 악보도 DB 에서 가져다 쓰기) ─────────────────
+SCORE_FOLDER = "1GHYOq02R7nfpuEXl-uxMGyqi0K90dOV5"            # 드라이브 「찬양 악보 모음」(찬송가 악보·CCM 악보)
+KEY = re.compile(r"(?:^|[\s(_])([A-G](?:b|#|♭|♯)?m?)(?=$|[\s)_\-])")
+NOTES = ("기타", "피아", "피아노", "피아버전", "4:4", "3:4", "원키")
+
+
+def parse_score_name(name: str) -> tuple[str, str | None, list[str]]:
+    """「주와 같이 길 가는 것 E.png」 → (주와 같이 길 가는 것, E, 별칭들). 끝 번호(-1)·확장자·코드·괄호를 뗀다."""
+    import songbank
+    stem = re.sub(r"\.(png|jpe?g|pdf)$", "", name, flags=re.I)
+    stem = re.sub(r"\s*-\s*\d+$", "", stem)
+    keys = KEY.findall(stem)
+    title, alias = songbank.clean_title(stem.replace("_", " "))
+    title = re.sub(r"\s*\((?:[A-G](?:b|#)?m?)\)\s*", " ", title).strip()
+    return title, (keys[-1] if keys else None), [a for a in alias if a not in NOTES]
+
+
+def _save_scores(rows: list[dict]) -> None:
+    urls = S.put_assets([(r["bytes"], r["ext"]) for r in rows])
+    stmts = []
+    for r in rows:
+        h = S.digest(r["bytes"])
+        stmts.append(("""INSERT INTO scores(title, key, kind, source, ref, asset, page, notion_page, used, aliases) VALUES(?,?,?,?,?,?,?,?,?,?)
+                         ON CONFLICT(ref) DO UPDATE SET title=excluded.title, key=excluded.key, kind=excluded.kind, source=excluded.source,
+                           asset=excluded.asset, page=excluded.page, notion_page=excluded.notion_page, used=excluded.used, aliases=excluded.aliases""",
+                      [r["title"], r["key"], r["kind"], r["source"], r["ref"], h, r.get("page", 1), r.get("notion"),
+                       json.dumps(r.get("used", []), ensure_ascii=False), json.dumps(r.get("aliases", []), ensure_ascii=False)]))
+    for i in range(0, len(stmts), 100): S.sql_many(stmts[i:i + 100])
+
+
+def scores(limit: int | None = None) -> None:
+    """드라이브 악보 모음 + 노션 보관함(score_bank.json·bank/) → scores. 다시 돌리면 같은 자리(ref)를 고쳐 쓴다."""
+    import concurrent.futures as cf, prep, songbank
+    g = prep.G(prep.access_token())
+    files = [f for f in songbank.list_tree(g, SCORE_FOLDER, "악보")
+             if f["name"].lower().rsplit(".", 1)[-1] in ("png", "jpg", "jpeg", "pdf") and not f["name"].startswith("._")]
+    done = {r["ref"] for r in S.sql("SELECT ref FROM scores WHERE ref LIKE 'drive:%'")}
+    files = [f for f in files if f"drive:{f['id']}:1" not in done][:limit]
+    print(f"드라이브 악보 {len(files)}개 옮김 시작", flush=True)
+
+    def one(f):
+        b = g.req("GET", f"{prep.DRIVE}/files/{f['id']}?alt=media&supportsAllDrives=true", timeout=300)
+        title, key, alias = parse_score_name(f["name"])
+        kind = "찬송가" if "찬송가" in f["path"] else "CCM"
+        base = {"title": title, "key": key, "kind": kind, "source": f["path"], "aliases": alias}
+        if f["name"].lower().endswith(".pdf"):
+            import fitz
+            doc = fitz.open(stream=b, filetype="pdf")
+            return [dict(base, ref=f"drive:{f['id']}:{i}", page=i, bytes=pg.get_pixmap(dpi=150).tobytes("png"), ext="png")
+                    for i, pg in enumerate(doc, 1)]
+        ext = "png" if b[:8] == b"\x89PNG\r\n\x1a\n" else "jpg"
+        return [dict(base, ref=f"drive:{f['id']}:1", bytes=b, ext=ext)]
+
+    batch, n = [], 0
+    with cf.ThreadPoolExecutor(6) as ex:
+        for rows in ex.map(one, files):
+            batch += rows
+            if len(batch) >= 60:
+                _save_scores(batch); n += len(batch); batch = []; print(f"  {n}장 …", flush=True)
+    if batch: _save_scores(batch); n += len(batch)
+    # 노션 보관함
+    bank = json.loads((HERE / "score_bank.json").read_text()).get("songs", {})
+    rows = []
+    for title, rec in bank.items():
+        for key, sc in rec.get("scores", {}).items():
+            f = HERE / sc["file"]
+            if f.exists():
+                b = f.read_bytes()
+                rows.append({"title": title, "key": key, "kind": "보관함", "source": f"노션 보관함 {sc.get('no', '')} · {sc.get('source', '')}",
+                             "ref": f"bank:{sc['file']}", "bytes": b, "ext": f.suffix.lstrip(".").lower().replace("jpeg", "jpg"),
+                             "notion": rec.get("page"), "used": sc.get("used", [])})
+    if rows: _save_scores(rows)
+    print(f"악보 {n}장 + 보관함 {len(rows)}장 옮김 ·", json.dumps(S.stats(), ensure_ascii=False),
+          "· 악보 표", S.sql("SELECT COUNT(*) n FROM scores")[0]["n"], flush=True)
+
 
 if __name__ == "__main__":
     a = sys.argv[1:]
     if a and a[0] == "songs": songs(a[1:] or None)
+    elif a and a[0] == "scores": scores(int(a[1]) if len(a) > 1 else None)
     elif a and a[0] == "deck":
         for d in a[1:]: print(d, deck(d))
     else: print(__doc__)

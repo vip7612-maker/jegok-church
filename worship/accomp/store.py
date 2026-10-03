@@ -121,6 +121,20 @@ def stats() -> dict:
             "예배": int(sql("SELECT COUNT(*) n FROM services")[0]["n"])}
 
 
+def score_url(title: str, key: str | None = None) -> str | None:
+    """악보 주소 — 예배 DB 의 scores 에서(보관함 먼저, 같은 코드 먼저). 악보집이 주마다 그림을 복사하지 않고 이 주소를 쓴다."""
+    import re as _re
+    t = _re.sub(r"\s", "", title)
+    rows = sql("""SELECT s.key, s.kind, a.url FROM scores s JOIN assets a ON a.hash=s.asset
+                  WHERE replace(s.title,' ','')=? OR replace(s.title,' ','') LIKE ? OR replace(s.aliases,' ','') LIKE ?
+                  ORDER BY (s.kind='보관함') DESC, s.page""", t, t + "%", f"%{t}%")
+    if not rows: return None
+    if key:
+        for r in rows:
+            if r["key"] == key: return r["url"]
+    return rows[0]["url"]
+
+
 if __name__ == "__main__":
     a = sys.argv[1:]
     if a and a[0] == "init": init(); print("표 준비됨")
