@@ -273,7 +273,7 @@ def page_html(n: int, p: dict, date: str) -> str:
         inner = f'<div class="textpage{' creed' if t == 'creed' else ''}"><h2>{p["heading"]}</h2><div class="body" data-max="{mx}">{p["body"]}</div></div>'
     elif t == "sermon_text":
         inner = (f'<div class="textpage"><div class="sermon-head"><h2>설교본문:</h2><span class="ref">{p["ref"]}</span>'
-                 f'<span class="tt">{p["title"]}</span></div><div class="body verses" data-max="26">{p["body"]}</div></div>')
+                 f'<span class="tt">{p["title"]}</span></div><div class="body verses" data-max="18">{p["body"]}</div></div>')
     elif t == "sermon_summary":
         inner = (f'<div class="col" style="left:0"><div class="body" data-max="20">{p["left"]}</div></div><div class="divider"></div>'
                  f'<div class="col" style="left:50%"><div class="body" data-max="20">{p["right"]}</div></div>')
