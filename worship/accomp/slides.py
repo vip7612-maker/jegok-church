@@ -393,20 +393,13 @@ def song_slides(title: str, si: int, W: int, H: int, out: Path) -> list[dict]:
         im = im.resize((max(1, w), max(1, h)))
         cv.paste(im, (x, y), im)
         texts = []
-        sub = sl.get("sub")
-        if sub and sub.get("lines"):
-            lines = [{"t": part.strip(), "c": ln.get("c")} for ln in sub["lines"]
-                     for part in re.split(r"[\n\v\x0b]+", ln["t"]) if part.strip()]   # 한 줄 안의 줄바꿈은 따로 줄로
-            sub = dict(sub, lines=lines)
-            bx, by, bw, bh = sub["box"]
-            ImageDraw.Draw(cv).rectangle([bx, by, bx + bw, by + bh], fill=sub.get("fill") or "#000000")
-            n = len(sub["lines"]); size = sub["size"]
-            size = min(size, bh / (n * 1.15))                          # 줄이 많으면 칸에 맞게 줄인다
-            top = by + (bh - n * size * 1.15) / 2
-            lx0, lx1 = max(bx, 0) + CW * .02, min(bx + bw, CW) - CW * .02            # 양옆 여백 2% — 긴 줄은 그 안으로 줄인다
-            for i, ln in enumerate(sub["lines"]):
-                texts.append({"x": round(lx0 * kx), "y": round((top + i * size * 1.15) * ky), "w": round((lx1 - lx0) * kx), "h": round(size * ky),
-                              "s": round(size * ky, 1), "c": ln.get("c") or "#ffffff", "b": True, "t": ln["t"], "a": "c"})
+        lay = songppt.sub_layout(sl.get("sub"))           # 자막 통일: 아래 띠 20% — 위 절반 러시아어(노랑)·아래 절반 영어(흰색)
+        if lay:
+            bx, by, bw, bh = lay["box"]
+            ImageDraw.Draw(cv).rectangle([bx, by, bx + bw, by + bh], fill=lay["fill"])
+            for ln in lay["lines"]:
+                texts.append({"x": round(ln["x"] * kx), "y": round(ln["y"] * ky), "w": round(ln["w"] * kx), "h": round(ln["size"] * ky),
+                              "s": round(ln["size"] * ky, 1), "c": ln["c"], "b": True, "t": ln["t"], "a": "c"})
         name = f"song_{si:02d}_{j:02d}.jpg"
         cv.save(out / name, "JPEG", quality=85)
         res.append({"n": 0, "w": W, "h": H, "img": name, "texts": texts, "plain": t, "hidden": t, "song": t})

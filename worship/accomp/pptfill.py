@@ -633,20 +633,21 @@ def songs(pptx: Path, date: str) -> list[str]:
             x, y, w, h = sl["pic"]
             pic = new.shapes.add_picture(io.BytesIO(base64.b64decode(sl["img"])), int(x * kx), int(y * ky), int(w * kx), int(h * ky))
             pic.name = f"{SONG_TAG}{key}|{j}"
-            sub = sl.get("sub")
-            if sub and sub.get("lines"):
-                bx, by, bw, bh = sub["box"]; bx, bw = max(bx, 0), min(bw, 1920 - max(bx, 0))
-                tb = new.shapes.add_textbox(int(bx * kx), int(by * ky), int(bw * kx), int(min(bh, 1080 - by) * ky))
-                tb.name = f"{SONG_TAG}{key}|{j}|sub"
-                tb.fill.solid(); tb.fill.fore_color.rgb = RGBColor.from_string((sub.get("fill") or "#000000").lstrip("#").upper())
-                tf = tb.text_frame; tf.word_wrap = True; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-                lines = [{"t": part.strip(), "c": ln.get("c")} for ln in sub["lines"] for part in re.split(r"[\n\v]+", ln["t"]) if part.strip()]
-                size = min(sub["size"] * 0.75, bh * 0.75 / (len(lines) * 1.25))           # 1920 화면 px → pt, 줄이 많으면 줄임
-                for k, ln in enumerate(lines):
-                    pa = tf.paragraphs[0] if k == 0 else tf.add_paragraph(); pa.alignment = PP_ALIGN.CENTER
-                    r = pa.add_run(); r.text = ln["t"]; r.font.bold = True; r.font.name = "Arial"; r.font.size = Pt(size)
-                    r.font.color.rgb = RGBColor.from_string((ln.get("c") or "#ffffff").lstrip("#").upper())
-                while size > 14 and not fits(tb, size): size -= 1; set_size(tb, size)
+            lay = SP.sub_layout(sl.get("sub"))              # 자막 통일: 아래 띠 20% — 위 절반 러시아어(노랑)·아래 절반 영어(흰색)
+            if lay:
+                from pptx.enum.shapes import MSO_SHAPE
+                bx, by, bw, bh = lay["box"]
+                band = new.shapes.add_shape(MSO_SHAPE.RECTANGLE, int(bx * kx), int(by * ky), int(bw * kx), int(bh * ky))
+                band.name = f"{SONG_TAG}{key}|{j}|band"; band.fill.solid(); band.fill.fore_color.rgb = RGBColor(0, 0, 0); band.line.fill.background()
+                for k, ln in enumerate(lay["lines"]):
+                    tb = new.shapes.add_textbox(int(ln["x"] * kx), int(ln["y"] * ky), int(ln["w"] * kx), int(ln["size"] * 1.12 * ky))
+                    tb.name = f"{SONG_TAG}{key}|{j}|sub{k}"
+                    tf = tb.text_frame; tf.word_wrap = False
+                    bp = tf._txBody.find(A + "bodyPr")
+                    for ins in ("lIns", "rIns", "tIns", "bIns"): bp.set(ins, "0")
+                    pa = tf.paragraphs[0]; pa.alignment = PP_ALIGN.CENTER
+                    r = pa.add_run(); r.text = ln["t"]; r.font.bold = True; r.font.name = "Arial"
+                    r.font.size = Pt(ln["size"] * 0.75 * 0.96); r.font.color.rgb = RGBColor.from_string(ln["c"].lstrip("#"))
             lst = prs.slides._sldIdLst; last = list(lst)[-1]; lst.remove(last); list(lst)[at].addnext(last); at += 1
         shift += len(song["slides"])
         log.append(f"「{title}」 → {key} {len(song['slides'])}장")

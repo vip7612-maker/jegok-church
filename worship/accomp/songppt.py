@@ -73,6 +73,51 @@ def _hex(font_or_fill) -> str | None:
         return None
 
 
+# ── 자막 모양 통일 (2026-10-03 교장님) ───────────────────────────
+# 아래 검은 띠 높이를 정해 두고, 그 위쪽 절반은 러시아어(노랑), 아래쪽 절반은 영어(흰색).
+BAND, RU_COLOR, EN_COLOR, SUB_MAX = 0.20, "#FFFF00", "#FFFFFF", 60
+
+
+def _cw(ch: str) -> float:
+    if re.match(r"[가-힣]", ch): return 1.0
+    if ch == " ": return 0.3
+    if ch in "ШЩЖМЮшщжмюWMwm": return 0.85
+    return 0.6
+
+
+def sub_layout(sub: dict | None, W: float = 1920, H: float = 1080) -> dict | None:
+    """자막(줄 목록) → {box:[x,y,w,h], fill, lines:[{t,c,x,y,w,size}]} — 1920×1080 기준 좌표."""
+    if not sub or not sub.get("lines"): return None
+    parts = [p.strip() for ln in sub["lines"] for p in re.split(r"[\n\v\x0b]+", ln["t"]) if p.strip()]
+    ru = [t for t in parts if re.search(r"[А-Яа-яЁё]", t)]
+    en = [t for t in parts if t not in ru]
+    h = H * BAND; y0 = H - h; half = h / 2; mx = W * 0.02; tw = W - 2 * mx
+    out = []
+    def fit(lines):
+        size = min(SUB_MAX, half * 0.9 / (len(lines) * 1.12))
+        return min([size] + [tw / max(1e-6, sum(_cw(c) for c in t)) for t in lines])     # 가장 긴 줄도 한 줄에
+
+    def reflow(lines):
+        """짧은 줄이 여럿이면 원래 줄을 통째로 이어 붙여(구절은 쪼개지 않음) 글자가 가장 커지는 묶음을 고른다."""
+        from itertools import combinations
+        best = (fit(lines), lines); n = len(lines)
+        for k in range(1, n):
+            for cuts in combinations(range(1, n), k - 1):
+                idx = (0,) + cuts + (n,)
+                out = [" ".join(lines[idx[i]:idx[i + 1]]) for i in range(k)]
+                if fit(out) > best[0] + 0.5: best = (fit(out), out)
+        return best[1]
+
+    for group, top, color in ((ru, y0, RU_COLOR), (en, y0 + half, EN_COLOR)):
+        if not group: continue
+        group = reflow(group); n = len(group)
+        size = fit(group)
+        y = top + (half - n * size * 1.12) / 2
+        for i, t in enumerate(group):
+            out.append({"t": t, "c": color, "x": mx, "y": y + i * size * 1.12, "w": tw, "size": round(size, 1)})
+    return {"box": [0, y0, W, h], "fill": "#000000", "lines": out}
+
+
 def parse(pptx: Path) -> list[dict]:
     from pptx import Presentation
     from pptx.enum.shapes import MSO_SHAPE_TYPE
@@ -88,7 +133,11 @@ def parse(pptx: Path) -> list[dict]:
         pics = [sh for sh in s.shapes if sh.shape_type == MSO_SHAPE_TYPE.PICTURE and sh.width > W * .9 and sh.top < H * .05 and sh.height > H * .6]
         rec = {"n": n, "song": bool(pics), "creed": bool(re.search(r"사도신경|Символ веры|Creed", text)), "title_sig": ""}
         if pics:
-            pic = pics[0]; blob = pic.image.blob
+            try:
+                pic = pics[0]; blob = pic.image.blob
+            except Exception:                         # 파일 밖에 연결된 그림(내용이 PPT 에 없음) — 곡 장으로 보지 않는다
+                pics = []; rec["song"] = False
+        if pics:
             im = Image.open(io.BytesIO(blob)).convert("L"); w, h = im.size
             t = im.crop((0, 0, int(w * .5), int(h * .13))).resize((32, 8)); v = list(t.get_flattened_data()) if hasattr(t, 'get_flattened_data') else list(t.getdata()); avg = sum(v) / len(v)
             rec["title_sig"] = "".join("1" if x > avg else "0" for x in v)

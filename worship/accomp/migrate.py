@@ -106,6 +106,9 @@ def deck(date: str, pdf: Path | None = None, pptx: Path | None = None) -> dict:
     flat = lambda s: re.sub(r"\s", "", s["plain"])[:40]
     is_div = lambda s: ("찬양과경배" in flat(s) or "찬양과결단" in flat(s)) and len(re.sub(r"\s", "", s["plain"])) < 160
     divs = [k for k, s in enumerate(base) if is_div(s)]
+    is_sec = lambda s: any(x in flat(s) for x in SL.SECTIONS)
+    if any(k + 1 < len(base) and not is_sec(base[k + 1]) for k in divs):
+        divs = []                                    # 가사 장이 이미 든 PPT(예: 9/27) — 곡 장을 또 넣지 않는다
     out, conti, si = [], [], 0
     for k, s in enumerate(base):
         out.append({"img": S.digest(imgs[s["img"]]), "texts": s["texts"], "plain": s["plain"], "hidden": s["hidden"]})
@@ -114,7 +117,7 @@ def deck(date: str, pdf: Path | None = None, pptx: Path | None = None) -> dict:
             row = _song_row(title) if title else None
             conti.append({"label": lab, "title": title, "song": int(row["id"]) if row else None, "db": row["title"] if row else None})
             if row:
-                out += [{"song": int(row["id"]), "n": j, "plain": row["title"], "hidden": row["title"]} for j in range(1, int(row["n"]) + 1)]
+                out += [{"song": int(row["id"]), "sn": j, "plain": row["title"], "hidden": row["title"]} for j in range(1, int(row["n"]) + 1)]
     for n, x in enumerate(out, 1): x["n"] = n
     toc = SL.outline(out, [t for _, t in songs])
     for x in out: x.pop("plain", None); x.pop("hidden", None); x.pop("n", None)

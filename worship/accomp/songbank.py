@@ -329,7 +329,7 @@ def kind_of(name: str) -> str:
 
 def is_service_ppt(name: str) -> bool:
     n = nfc(name)
-    if n.startswith("._") or "0000" in n or re.search(r"반주자|싱어|_?wide|와이드|사본|자동 저장|목회자 세미나|기도제목|청춘사진관", n, re.I):
+    if n.startswith(("._", "~$")) or "0000" in n or re.search(r"반주자|싱어|_?wide|와이드|사본|자동 저장|목회자 세미나|기도제목|청춘사진관", n, re.I):
         return False
     return bool(re.search(r"예배|PPT", re.sub(r"\.pptx?$", "", n, flags=re.I), re.I))
 
@@ -436,7 +436,7 @@ def scan_one(g, src: dict, D: Dictionary, ix: dict, do_upload: bool = False, kee
     return done
 
 
-def scan(only: list[str] | None = None, limit: int | None = None, do_upload: bool = False, keep: bool = False) -> None:
+def scan(only: list[str] | None = None, limit: int | None = None, do_upload: bool = False, keep: bool = False, redo: bool = False) -> None:
     import prep
     g = prep.G(prep.access_token())
     if not SOURCES.exists():
@@ -446,7 +446,7 @@ def scan(only: list[str] | None = None, limit: int | None = None, do_upload: boo
     D, weeks = build_dictionary(g, tree)
     ix = load_index()
     todo = [s for s in srcs if (not only or s["date"] in only or s["id"] in only)
-            and (only or not (SCAN / f"{s['id']}.json").exists())]
+            and (only or redo or not (SCAN / f"{s['id']}.json").exists())]
     for i, s in enumerate(todo[:limit] if limit else todo, 1):
         try:
             got = scan_one(g, s, D, ix, do_upload, keep, weeks)
@@ -483,6 +483,6 @@ if __name__ == "__main__":
     elif a[0] == "scan":
         only = a[a.index("--only") + 1].split(",") if "--only" in a else None
         lim = int(a[a.index("--limit") + 1]) if "--limit" in a else None
-        scan(only, lim, "--upload" in a, "--keep" in a)
+        scan(only, lim, "--upload" in a, "--keep" in a, "--redo" in a)
     elif a[0] == "find":
         print(find(" ".join(a[1:])))
