@@ -3,6 +3,7 @@
 
 쪽 번호를 몰라도 곡 번호로 부른다. 넣고 빼면 번호와 쪽이 저절로 다시 매겨진다.
   python3 accomp/score.py list   2026-10-04
+  python3 accomp/score.py trim   2026-10-04                               # 이미 넣은 악보 여백 다시 자르기
   python3 accomp/score.py add    2026-10-04 3 악보.png --title "곡 제목"   # 3번 자리에 끼워 넣기(뒤 번호는 하나씩 밀림)
   python3 accomp/score.py add    2026-10-04 끝 악보.png --title "…"      # 본곡 맨 뒤에
   python3 accomp/score.py set    2026-10-04 3 악보.png [--title "…"]    # 3번 악보 바꾸기
@@ -31,7 +32,21 @@ def copy_img(date: str, src: str) -> str:
     d = HERE / "scores" / date; d.mkdir(parents=True, exist_ok=True)
     dst = d / f"s{int(time.time() * 1000)}{Path(src).suffix.lower() or '.png'}"
     shutil.copy(src, dst)
+    trim(dst)
     return str(dst.relative_to(HERE))
+
+
+def trim(path: Path, pad: int = 6, thresh: int = 235) -> None:
+    """악보 둘레의 흰 여백을 잘라 낸다 — 거의 흰색(thresh 이상)인 가장자리만, 둘레에 pad 픽셀만 남김 (2026-10-03 교장님 지시)."""
+    from PIL import Image, ImageOps
+    im = Image.open(path); im = ImageOps.exif_transpose(im)
+    g = im.convert("L").point(lambda v: 255 if v < thresh else 0)
+    box = g.getbbox()
+    if not box: return
+    l, t, r, b = box
+    box = (max(0, l - pad), max(0, t - pad), min(im.width, r + pad), min(im.height, b + pad))
+    if box != (0, 0, im.width, im.height):
+        im.crop(box).save(path)
 
 
 def show(data: dict) -> None:
@@ -49,7 +64,11 @@ def main() -> int:
     cmd, date = a[0], a[1]
     f = HERE / "data" / f"{date}.json"; data = json.loads(f.read_text())
     S = data.setdefault("songs", {"intro": [], "main": [], "apply": []})
-    if cmd != "list":
+    if cmd == "trim":
+        for L in S.values():
+            for x in L:
+                if x.get("img"): trim(HERE / x["img"])
+    elif cmd != "list":
         g, i = where(a[2]); L = S.setdefault(g, [])
         if cmd == "add":
             item = {"title": title or "", "img": copy_img(date, a[3])}
