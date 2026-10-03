@@ -8,6 +8,8 @@
   python3 accomp/roster.py copy 11.1 11.8              # 한 주 편성을 다른 주로 그대로
   python3 accomp/roster.py support add 홍길동 | support rm 홍길동   # 지원팀(날짜 없는 명단)
   python3 accomp/roster.py role add 미디어 자막         # 역할 줄 추가 (role rm 자막)
+  python3 accomp/roster.py fill 10.4 [11.29]            # 기본값·규칙 채우기 (인도자 이경진·드럼 정상진, 매월 넷째 주 드럼 정영화)
+기본값(defaults)과 다른 이름은 악보집에서 색을 달리해 보인다 — "바뀐 사람"을 한눈에 (2026-10-03 교장님 지시).
 뒤에 --share 를 붙이면 이 날짜가 들어가는 악보집을 다시 만들어 링크에 올린다.
 """
 from __future__ import annotations
@@ -33,6 +35,31 @@ def role(R: dict, r: str) -> str:
     if r not in [x for g in R["groups"] for x in g["roles"]]:
         sys.exit(f"[확인] '{r}' 역할이 없습니다 — 있는 역할: " + ", ".join(x for g in R["groups"] for x in g["roles"]))
     return r
+
+
+def nth_sunday(x: str) -> int:
+    return (int(x[8:]) - 1) // 7 + 1
+
+
+def expected(R: dict, x: str, role: str) -> list[str]:
+    """그 주 그 역할의 '평소' 편성 — 규칙(매월 n째 주) 우선, 없으면 기본값."""
+    for r in R.get("rules", []):
+        if r["role"] == role and nth_sunday(x) == r["nth"]: return r["names"]
+    return R.get("defaults", {}).get(role, [])
+
+
+def fill(R: dict, a: str, b: str | None) -> list[str]:
+    """기본값이 있는 역할만 채운다. 이미 기본값과 다른 사람(교장님이 정하신 교체)은 그대로 둔다."""
+    d0 = dt.date.fromisoformat(day(a)); d1 = dt.date.fromisoformat(day(b)) if b else d0 + dt.timedelta(weeks=8)
+    out = []
+    while d0 <= d1:
+        x = d0.isoformat(); w = R["weeks"].setdefault(x, {})
+        for role, base in R.get("defaults", {}).items():
+            cur = w.get(role, [])
+            if not cur or cur == base or any(cur == r["names"] for r in R.get("rules", []) if r["role"] == role):
+                w[role] = expected(R, x, role)
+        out.append(x); d0 += dt.timedelta(weeks=1)
+    return out
 
 
 def show(R: dict, start: str | None) -> None:
@@ -72,6 +99,10 @@ def main() -> int:
         else:
             for x in R["groups"]: x["roles"] = [r for r in x["roles"] if r != a[2]]
         changed = list(R["weeks"])
+    elif cmd == "fill":
+        changed = fill(R, a[1], a[2] if len(a) > 2 else None)
+        for x in changed:
+            w = R["weeks"][x]; print(f"{int(x[5:7])}.{int(x[8:])} " + " · ".join(f"{r} {', '.join(w.get(r, []))}" for r in R.get("defaults", {})))
     elif cmd == "copy":
         R["weeks"][day(a[2])] = json.loads(json.dumps(R["weeks"].get(day(a[1]), {})))
         changed = [day(a[2])]

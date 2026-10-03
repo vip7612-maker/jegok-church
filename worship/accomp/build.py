@@ -64,6 +64,8 @@ body{margin:0;background:#d9dce1;font-family:'Pretendard Variable',Pretendard,'A
 .rt td.now{background:#fff7e0}
 .nm{display:inline-block;width:16.5mm;text-align:center;font-size:12pt;font-weight:600;border:1px solid #e2e8f0;border-radius:1.6mm;height:7mm;line-height:6.6mm;padding:0;white-space:nowrap;letter-spacing:-.02em}
 .nm.empty{visibility:hidden}
+.nm.chg{background:#dc2626;border-color:#dc2626;color:#fff;font-weight:800}
+.rr{display:flex;align-items:center;gap:4mm}.lg{font-size:9pt;color:#64748b;display:flex;align-items:center;gap:1.5mm}.lg .nm{width:auto;padding:0 2mm;height:5.5mm;line-height:5.2mm;font-size:9pt}
 .q4{display:grid;grid-template-columns:repeat(2,16.5mm);gap:1mm 1.2mm;justify-content:center}
 .none{color:#cbd5e1}
 .sup{margin-top:auto;border:1.5px dashed #94a3b8;border-radius:3mm;padding:2.4mm 4mm;display:flex;gap:5mm;align-items:center}
@@ -217,12 +219,15 @@ def roster_html(date: str) -> str:
                 names = R["weeks"].get(x.isoformat(), {}).get(role, [])
                 # 한 칸 = 이름 자리 4개(2×2), 폭은 모두 같게 — 빈 자리는 비워 둔다 (2026-10-03 교장님 지시)
                 slots = (names + [""] * 4)[:max(4, len(names))]
-                inner = "".join(f'<span class="nm" style="background:{soft};border-color:{c}33">{html.escape(v)}</span>' if v else '<span class="nm empty"></span>' for v in slots)
+                base = R.get("defaults", {}).get(role)   # 평소 사람과 다르면 색을 바꿔 눈에 띄게 (2026-10-03 교장님 지시)
+                chip = lambda v: (f'<span class="nm chg">{html.escape(v)}</span>' if base and v not in base
+                                  else f'<span class="nm" style="background:{soft};border-color:{c}33">{html.escape(v)}</span>')
+                inner = "".join(chip(v) if v else '<span class="nm empty"></span>' for v in slots)
                 cells.append(f'<td class="{"now" if k == 0 else ""}"><div class="q4">{inner}</div></td>')
             rows.append(f'<tr class="{"gs" if n == 0 else ""}">{gc}<td class="role" style="color:{c}">{role}</td>{"".join(cells)}</tr>')
     sup = "".join(f'<span class="nm">{html.escape(v)}</span>' for v in R.get("support", []))
     return (f'<div class="rs"><div class="rs-h"><div><span class="kick">WORSHIP TEAM ROSTER</span><h2>예배팀 섬김표</h2></div>'
-            f'<span class="range">{days[0].month}.{days[0].day} ~ {days[-1].month}.{days[-1].day} · {WEEKS_SHOWN}주</span></div>'
+            f'<div class="rr"><span class="lg"><span class="nm chg">이름</span> 평소와 바뀐 사람</span><span class="range">{days[0].month}.{days[0].day} ~ {days[-1].month}.{days[-1].day} · {WEEKS_SHOWN}주</span></div></div>'
             f'<table class="rt"><colgroup><col style="width:19mm"><col style="width:27mm">{"<col>" * WEEKS_SHOWN}</colgroup>'
             f'<tr><th></th><th></th>{head}</tr>{"".join(rows)}</table>'
             f'<div class="sup"><div class="sup-h"><b>지원팀</b><span>날짜와 상관없이 필요할 때 투입 · {len(R.get("support", []))}명</span></div><div class="sup-n">{sup}</div></div></div>')
