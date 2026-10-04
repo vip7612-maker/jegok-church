@@ -439,7 +439,12 @@ wsFit(); if(document.fonts) document.fonts.ready.then(wsFit);
 def img_src(rel: str) -> str:
     if str(rel).startswith(("http://", "https://")): return rel     # 그림 창고(Blob) 주소 — 복사하지 않고 그대로 (2026-10-03)
     p = HERE / rel
-    return f"data:image/{p.suffix[1:].replace('jpg', 'jpeg')};base64," + base64.b64encode(p.read_bytes()).decode()
+    try:                                                         # 악보 바깥 흰 여백은 늘 타이트하게 잘라 붙인다 (2026-10-04 교장님 원칙, accomp/trim.py)
+        import trim
+        b = trim.trim_bytes(p.read_bytes()); mime = "png" if b[:8] == b"\x89PNG\r\n\x1a\n" else "jpeg"
+    except Exception:
+        b = p.read_bytes(); mime = p.suffix[1:].replace("jpg", "jpeg")
+    return f"data:image/{mime};base64," + base64.b64encode(b).decode()
 
 
 

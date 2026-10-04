@@ -156,6 +156,8 @@ def do_score(row: dict, data: bytes) -> dict:
         if im.mode in ("RGBA", "LA", "P"):
             bg = Image.new("RGB", im.size, "white"); im = im.convert("RGBA"); bg.paste(im, mask=im.split()[-1]); im = bg
         pages = [im.convert("RGB")]
+    import trim
+    pages = [trim.trim_image(p) for p in pages]          # 악보 바깥 흰 여백은 타이트하게 (2026-10-04 교장님 원칙)
     ocrs = ocr_images(pages)
     head_txt, groups = [], []                  # groups: (쪽, 위, 아래, 가사 줄들)
     for pi, (im, ls) in enumerate(zip(pages, ocrs)):

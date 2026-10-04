@@ -49,7 +49,8 @@ def seed(date: str) -> str:
 
 def _local(url: str, date: str) -> str:
     """편집판 그림(Blob 주소) → scores/<날짜>/ 아래 파일(악보집·PPT 만들기는 로컬 파일을 읽는다)."""
-    b = S._fetch(url)
+    import trim                                          # 악보 바깥 흰 여백은 늘 타이트하게 잘라 붙인다 (2026-10-04 교장님 원칙)
+    b = trim.trim_bytes(S._fetch(url))
     h = hashlib.sha256(b).hexdigest()
     for f in (HERE / "scores" / date).glob("*"):        # 이미 있는 같은 그림이면 그 파일을 그대로
         if f.is_file() and f.stat().st_size == len(b) and hashlib.sha256(f.read_bytes()).hexdigest() == h:
