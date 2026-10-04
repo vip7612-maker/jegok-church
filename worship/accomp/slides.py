@@ -304,6 +304,9 @@ const NEWS=(()=>{ const T=i=>D[i].texts.map(t=>t.t).join(' '); let s=-1,e=-1;
 const ROLE=D.map((s,i)=>i).filter(i=>{ const t=D[i].texts.map(x=>x.t).join(' ');
   return D[i].texts.length<=8 && /^(Prayer|Offering|Scripture\s*Reading|Special\s*Praise|Sermon|Mission\s*Report|Benediction|대표\s*기도|봉\s*헌|성경\s*봉독|특\s*송|설\s*교|선교\s*보고)/.test(t.trim()); });
 const EDIT=[...new Set([...NEWS,...ROLE])];
+// 대표기도·봉헌·특송은 맡은 분 이름 칸만 고친다(제목·안내 문구는 그대로) — 2026-10-04 교장님
+const NAMEONLY=i=>/^(Prayer|Offering|Special\s*Praise|대표\s*기도|봉\s*헌|특\s*송)/.test(D[i].texts.map(x=>x.t).join(' ').trim());
+const ISNAME=t=>t.s>=40&&t.s<100;
 const ORIG=D.map(s=>s.texts.map(t=>t.t).join('\n'));
 function repaint(i){ const sl=all[i]; if(!sl) return; sl.querySelectorAll('.in .tx').forEach(x=>x.remove()); delete sl.dataset.p; paint(sl);
   if(document.body.classList.contains('pv')){ thR=null; go(cur,true); } fit(); }
@@ -322,17 +325,17 @@ if(!SCREEN&&EDIT.length){
   const btn=document.createElement('button'); btn.id='nbtn'; btn.textContent='✏️ 교회 소식 수정'; document.body.appendChild(btn);
   const box=document.createElement('div'); box.id='nbox'; box.innerHTML='<div class="p"><h3>✏️ 교회 소식 수정</h3><div class="h"></div><div class="f"></div><div class="b"><span class="m"></span><button class="no">닫기</button><button class="ok">저장 — 앞 화면에 바로 반영</button></div></div>'; document.body.appendChild(box);
   const here=()=>document.body.classList.contains('pv')||ONE()?cur:firstVisible();
-  const sync=()=>{ const h=here(); btn.style.display=EDIT.includes(h)?'block':'none'; btn.textContent=NEWS.includes(h)?'✏️ 교회 소식 수정':'✏️ 이름·내용 수정'; };
+  const sync=()=>{ const h=here(); btn.style.display=EDIT.includes(h)?'block':'none'; btn.textContent=NEWS.includes(h)?'✏️ 교회 소식 수정':NAMEONLY(h)?'✏️ 이름 수정':'✏️ 이름·내용 수정'; };
   const _go=go; go=function(i,q){ _go(i,q); sync(); }; const _view=view; view=function(i){ _view(i); sync(); };
   addEventListener('scroll',()=>{ if(!ONE()) sync(); },{passive:true}); setInterval(sync,800); sync();
   let ei=-1;
   btn.onclick=()=>{ ei=here(); const f=box.querySelector('.f'); f.replaceChildren();
-    box.querySelector('h3').textContent=NEWS.includes(ei)?'✏️ 교회 소식 수정':'✏️ 이름·내용 수정 (오늘만)'; box.querySelector('.h').textContent=(ei+1)+'번째 장 · 줄마다 고친 뒤 저장하세요 (이번 주 PPT 에만 반영, 주보는 그대로)';
-    D[ei].texts.forEach(t=>{ const a=document.createElement('textarea'); a.value=t.t; a.rows=Math.max(1,Math.ceil(t.t.length/48)); f.appendChild(a); });
+    const only=!NEWS.includes(ei)&&NAMEONLY(ei); box.querySelector('h3').textContent=NEWS.includes(ei)?'✏️ 교회 소식 수정':only?'✏️ 맡은 분 이름 수정 (오늘만)':'✏️ 이름·내용 수정 (오늘만)'; box.querySelector('.h').textContent=(ei+1)+'번째 장 · 줄마다 고친 뒤 저장하세요 (이번 주 PPT 에만 반영, 주보는 그대로)';
+    D[ei].texts.forEach((t,j)=>{ if(only&&!ISNAME(t)) return; const a=document.createElement('textarea'); a.dataset.j=j; a.value=t.t; a.rows=Math.max(1,Math.ceil(t.t.length/48)); if(only) a.placeholder='맡은 분 이름 (예: 홍길동 장로)'; f.appendChild(a); });
     box.querySelector('.m').textContent=''; box.style.display='flex'; };
   box.addEventListener('keydown',e=>e.stopPropagation(),true);
   box.querySelector('.no').onclick=()=>{ box.style.display='none'; };
-  box.querySelector('.ok').onclick=()=>{ const texts=[...box.querySelectorAll('textarea')].map(a=>a.value); const m=box.querySelector('.m');
+  box.querySelector('.ok').onclick=()=>{ const texts=D[ei].texts.map(t=>t.t); box.querySelectorAll('textarea').forEach(a=>{ texts[+a.dataset.j]=a.value; }); const m=box.querySelector('.m');
     applyNews(ei,texts); if(bc) bc.postMessage({news:{i:ei,texts}});
     m.textContent='저장 중…';
     fetch('/api/worship',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'news',date:NDATE,key:NKEY,i:ei,orig:ORIG[ei],texts})})
