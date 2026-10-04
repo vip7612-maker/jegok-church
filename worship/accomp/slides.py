@@ -214,7 +214,7 @@ if(SCREEN){
   show(+(location.hash.slice(1)||0),true);
   if(bc){bc.onmessage=e=>{const m=e.data||{}; if(m.end){window.close();return;}
     if(m.bgm){bgmFS(m.bgm);return;} if(m.bgmStop){bgmFS(null);return;}
-    if(typeof m.i==='number'){ bgmFS(null); if(m.i!==cur)show(m.i,true); }}; bc.postMessage({hello:1});}
+    if(typeof m.i==='number'){ if(m.i!==cur)show(m.i,true); }}; bc.postMessage({hello:1});}
   const tip=document.createElement('div'); tip.id='fstip'; tip.textContent='화면을 한 번 누르면 꽉 찬 화면이 됩니다'; document.body.appendChild(tip);
   const fs=()=>{ if(document.fullscreenElement){tip.remove();return;} document.documentElement.requestFullscreen().then(()=>tip.remove()).catch(()=>{}); };
   fs(); document.addEventListener('fullscreenchange',()=>{ if(document.fullscreenElement)tip.remove(); });
@@ -261,6 +261,7 @@ async function present(){
   if(SCREEN) return;
   let other=null;
   try{ if('getScreenDetails' in window){ const sd=await getScreenDetails(); other=sd.screens.find(s=>s!==sd.currentScreen)||null; } }catch(e){}
+  window.WS_OTHER=other;   // BGM 창도 같은 두 번째 모니터에 띄우려고 기억해 둔다
   if(!other&&window.screen.isExtended===false){ presentHere(); return; }   // 모니터가 하나뿐이면 예전처럼 이 창에서 전체 화면
   const start=firstVisible();
   const f=other?'popup,left='+other.availLeft+',top='+other.availTop+',width='+other.availWidth+',height='+other.availHeight+',fullscreen'
@@ -307,6 +308,24 @@ addEventListener('keydown',e=>{ if(!document.body.classList.contains('pv')) retu
   if(['ArrowRight','ArrowDown','PageDown',' ','Enter'].includes(e.key)){e.preventDefault();go(cur+1)}
   else if(['ArrowLeft','ArrowUp','PageUp','Backspace'].includes(e.key)){e.preventDefault();go(cur-1)}
   else if(e.key==='Home')go(0); else if(e.key==='End')go(all.length-1); else if(e.key==='Escape')endPV(); });
+
+// ── BGM·유튜브는 늘 따로 새 창(jegok_worship/bgm.html) — 슬라이드를 넘겨도 끊기지 않는다 (2026-10-04 교장님) ──
+window.wsBgm={ w:null, id:null,
+  open(id){ if(!id) return null; if(this.w&&!this.w.closed&&this.id===id){ try{this.w.focus();}catch(e){} return this.w; }
+    const o=window.WS_OTHER, f=o?('popup,left='+o.availLeft+',top='+o.availTop+',width='+o.availWidth+',height='+o.availHeight):'popup,width=1280,height=720';
+    const u='/jegok_worship/bgm.html?v='+encodeURIComponent(id);
+    if(this.w&&!this.w.closed){ try{ this.w.location.href=u; this.id=id; this.w.focus(); wsBgmBtn(); return this.w; }catch(e){} }
+    this.w=window.open(u,'wsbgm',f); this.id=this.w?id:null;
+    if(!this.w) alert('BGM 창이 막혔습니다. 주소창 오른쪽에서 팝업을 「허용」한 뒤 다시 눌러 주세요.');
+    wsBgmBtn(); return this.w; },
+  stop(){ try{ if(this.w&&!this.w.closed) this.w.close(); }catch(e){} if('BroadcastChannel' in window) new BroadcastChannel('wsbgm').postMessage({stop:1}); this.w=null; this.id=null; wsBgmBtn(); },
+  on(){ return !!(this.w&&!this.w.closed); } };
+function wsBgmBtn(){ if(SCREEN) return; let b=document.getElementById('bgmstopf');
+  if(!b){ b=document.createElement('button'); b.id='bgmstopf'; b.textContent='■ BGM 멈춤';
+    b.style.cssText="position:fixed;left:18px;bottom:18px;z-index:65;display:none;font:800 15px 'Pretendard Variable',sans-serif;border:0;border-radius:999px;padding:11px 18px;background:#dc2626;color:#fff;box-shadow:0 4px 16px rgba(0,0,0,.4);cursor:pointer";
+    b.onclick=()=>{ wsBgm.stop(); if(typeof bgmStop==='function') try{bgmStop();}catch(e){} }; document.body.appendChild(b); }
+  b.style.display=wsBgm.on()?'block':'none'; }
+if(!SCREEN) setInterval(wsBgmBtn,1000);
 
 // ── 교회 소식 급히 고치기 (2026-10-04 교장님) ─────────────────────────────
 // 「교회 소식」 표지 다음부터 「봉헌」 표지 앞까지가 소식 장. ✏️ 를 누르면 줄마다 고칠 수 있고,
@@ -396,14 +415,22 @@ def bgm_html(items: list[dict]) -> str:
     cards = "".join(f'<button class="bgmc" data-id="{html.escape(v["id"])}"><img src="https://i.ytimg.com/vi/{html.escape(v["id"])}/mqdefault.jpg" alt="" loading="lazy">'
                     f'<span>{html.escape(v["title"])}</span><small>{html.escape(v["ch"])} · {tm(v["sec"])}</small></button>' for v in items)
     return ('<div id="bgmbox"><div class="bgmh"><b>🎵 BGM · 성도의 교제를 위한 찬양</b><span id="bgmnow"></span><button class="bgmx" onclick="bgmClose()">닫기 (음악은 계속)</button></div>'
-            '<div id="bgmmode"></div><div id="bgmplay"></div><div class="bgml">' + cards + '</div><p class="bgmnote">누르면 그 영상이 나옵니다 · 다른 순서로 가도 음악은 계속 · ■ 멈춤은 영상에서</p></div>'
+            '<div id="bgmmode"></div><div id="bgmplay"></div><div class="bgml">' + cards + '</div><p class="bgmnote">누르면 BGM 전용 새 창(두 번째 모니터)에서 나옵니다 · 슬라이드를 넘기거나 다른 순서로 가도 음악은 계속 · 끝낼 때 ■ BGM 멈춤</p></div>'
             """<script>
-function bgmOpen(){ bgmMode(); document.body.classList.add('bgm'); document.querySelectorAll('#toc a').forEach(a=>a.classList.toggle('on',a.classList.contains('bgm'))); }
+// 🎵 BGM 단추·목차 → 슬라이드 화면과 따로, 두 번째 모니터에 BGM 전용 창(목록 + 재생)을 연다 (2026-10-04 교장님)
+function bgmOpen(){ const items=[...document.querySelectorAll('#bgmbox .bgmc')].map(c=>({id:c.dataset.id,title:c.querySelector('span').textContent,ch:(c.querySelector('small').textContent.split(' · ')[0]||'')}));
+  const o=window.WS_OTHER, f=o?('popup,left='+o.availLeft+',top='+o.availTop+',width='+o.availWidth+',height='+o.availHeight):'popup,width=1280,height=720';
+  const w=window.open('/jegok_worship/bgm.html#'+encodeURIComponent(JSON.stringify(items)),'wsbgm',f);
+  if(w){ wsBgm.w=w; wsBgm.id='list'; try{w.focus();}catch(e){} wsBgmBtn(); return; }
+  bgmMode(); document.body.classList.add('bgm'); document.querySelectorAll('#toc a').forEach(a=>a.classList.toggle('on',a.classList.contains('bgm'))); }   // 팝업이 막혔을 때만 예전처럼 화면 안에
 function bgmScreen(){ return typeof scr!=='undefined' && scr && !scr.closed && typeof bc!=='undefined' && bc; }
-function bgmStop(){ if(bgmScreen()) bc.postMessage({bgmStop:1}); document.getElementById('bgmplay').innerHTML=''; document.getElementById('bgmnow').textContent=''; document.querySelectorAll('.bgmc').forEach(x=>x.classList.remove('on')); }
+// BGM 은 따로 새 창(jegok_worship/bgm.html)으로 — 슬라이드를 넘겨도 끊기지 않는다 (2026-10-04 교장님)
+function bgmWin(id){ return wsBgm.open(id); }
+function bgmStop(){ if(wsBgm.on()) wsBgm.stop();
+  if(bgmScreen()) bc.postMessage({bgmStop:1}); document.getElementById('bgmplay').innerHTML=''; document.getElementById('bgmnow').textContent=''; document.querySelectorAll('.bgmc').forEach(x=>x.classList.remove('on')); }
 function bgmMode(){ const m=document.getElementById('bgmmode'); if(!m) return; const on=bgmScreen();
-  m.innerHTML=on?'📺 앞 화면이 열려 있습니다 — 고르면 두 번째 모니터에서 전체 화면으로 나옵니다'
-               :'앞 화면이 열려 있지 않아 이 화면에서 나옵니다 <button class="bgmx" onclick="bgmOpenScreen()">📺 앞 화면 열기</button>'; }
+  m.innerHTML=window.WS_OTHER?'📺 고르면 두 번째 모니터에 BGM 전용 창이 뜹니다 — 슬라이드와 따로 돌아갑니다'
+               :'고르면 BGM 전용 새 창이 뜹니다 — 두 번째 모니터로 끌어 놓고 한 번 누르면 전체 화면 (▶ 예배용을 먼저 켜면 자리를 알아서 잡습니다)'; }
 async function bgmOpenScreen(){ if(typeof present==='function'){ await present(); bgmOpen(); } }
 function bgmClose(){ document.body.classList.remove('bgm'); const b=document.querySelector('#toc a.bgm'); if(b) b.classList.remove('on'); }
 addEventListener('DOMContentLoaded',()=>{
@@ -411,10 +438,10 @@ addEventListener('DOMContentLoaded',()=>{
   document.querySelector('#bgmbox .bgml').onclick=e=>{ const c=e.target.closest('.bgmc'); if(!c) return;
     document.querySelectorAll('.bgmc').forEach(x=>x.classList.toggle('on',x===c));
     const name=c.querySelector('span').textContent.slice(0,40), P=document.getElementById('bgmplay');
-    if(bgmScreen()){ bc.postMessage({bgm:c.dataset.id}); P.innerHTML='<div class="bgmon">📺 앞 화면(두 번째 모니터)에서 전체 화면으로 재생 중 <button class="bgmx" onclick="bgmStop()">■ 앞 화면 멈춤</button></div>';
-      document.getElementById('bgmnow').textContent='앞 화면 재생: '+name; return; }
-    P.innerHTML='<iframe src="https://www.youtube-nocookie.com/embed/'+c.dataset.id+'?autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
-    document.getElementById('bgmnow').textContent='이 화면 재생: '+name; };
+    if(bgmScreen()) bc.postMessage({bgmStop:1});      // 예전 방식(앞 화면 위 덮개)이 떠 있으면 걷는다
+    if(!bgmWin(c.dataset.id)) return;
+    P.innerHTML='<div class="bgmon">🎵 BGM 전용 창에서 재생 중 — 다른 슬라이드로 가도 끊기지 않습니다 · 그 창을 한 번 누르면 전체 화면 <button class="bgmx" onclick="bgmStop()">■ BGM 멈춤</button></div>';
+    document.getElementById('bgmnow').textContent='BGM 창 재생: '+name; };
   bgmMode();
 });
 </script>""")
@@ -506,7 +533,10 @@ XP_CSS = """
 
 XP_JS = r"""
 (function(){
-const SECT={news:/^교회\s*소식$/, sermon:/^설교$/}, NAME={news:'교회 소식',sermon:'설교'};
+const SECT={news:/^교회\s*소식$/, reading:/^성경\s*봉독$/, special:/^특\s*송$/, sermon:/^설교$/}, NAME={news:'교회 소식',reading:'성경 봉독',special:'특송',sermon:'설교'};   // 특송·성경 봉독 추가(2026-10-04)
+// 그 주에만 끼운 순서(선교 보고 등, data ppt_extra)에도 늘 ＋ 장 넣기 (2026-10-04 교장님)
+(window.XSECTS||[]).forEach(t=>{ const k='x:'+t; SECT[k]=new RegExp('^'+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s*')+'$'); NAME[k]=t; });
+const SECTS=Object.keys(SECT);
 let poll=null;
 const anchor=sect=>[...document.querySelectorAll('#toc a')].find(a=>SECT[sect].test(a.textContent.trim()));
 function startOf(sect){ const a=anchor(sect); return a?all.indexOf(document.getElementById(a.getAttribute('href').slice(1))):-1; }
@@ -514,7 +544,17 @@ function bg(){ const n=startOf('news'), nx=n>=0&&all[n+1]&&!all[n+1].classList.c
   const plain=d=>d&&d.img&&!d.html&&!d.pic&&d.texts.some(t=>t.c==='#ffffff'&&t.a==='l');      // 흰 글자 왼쪽 맞춤 = 갈색 내용 장(소식·봉독)
   if(plain(nx)) return nx.img; const any=D.find(plain); return any?any.img:(n>=0?D[+all[n].dataset.i].img:''); }
 const ytId=u=>{ const m=String(u||'').match(/(?:youtu\.be\/|v=|embed\/|shorts\/|live\/)([\w-]{11})/); return m?m[1]:(/^[\w-]{11}$/.test(u)?u:''); };
+// 📖 성경 봉독 장: 구절을 한 장에 9줄(약 24자/줄)·3절까지 묶고, 한 절이 길면 글자를 줄인다 — 기존 「다함께 봉독」 장 모양 그대로 (2026-10-04 교장님)
+function readBg(){ const has=(d,w)=>d&&d.img&&!d.html&&d.texts.some(t=>t.t===w);
+  const a=D.find(d=>has(d,'다함께 봉독'))||D.find(d=>has(d,'회중봉독'))||D.find(d=>has(d,'봉독대표')); return a?a.img:bg(); }
+function bibleD(d){ const img=readBg(), V=(d.verses||[]).map(([v,t])=>v+' '+t), L=x=>Math.max(1,Math.ceil(x.length/24)), out=[]; let g=[], n=0;
+  V.forEach(x=>{ const l=L(x); if(g.length&&(n+l>9||g.length>=3)){ out.push(g); g=[]; n=0; } g.push(x); n+=l; }); if(g.length) out.push(g);
+  return out.map(g=>{ const n=g.reduce((a,x)=>a+L(x),0), s=n>9?Math.max(34,Math.floor(55*Math.sqrt(9/n))):55;
+    return {img, bible:1, texts:[{x:53,y:47,w:160,h:28,s:28,c:'#3b2a06',b:false,t:'다함께 봉독',a:'l'},
+      {x:230,y:44,w:900,h:32,s:30,c:'#f6e7c8',b:true,t:d.ref||'',a:'l'},
+      {x:45,y:92,w:1350,h:0,s,c:'#ffffff',b:true,t:g.join('\n'),a:'l',wrap:1,pre:true,lh:1.17}]}; }); }
 function pageD(p){ const d=p.data||{}, b=bg();
+  if(p.type==='bible') return bibleD(d);
   if(p.type==='text'){ const tl=Math.max(1,Math.ceil((d.title||'').length/22));
     return {img:b, texts:[...(d.title?[{x:80,y:64,w:1280,h:0,s:62,c:'#ffffff',b:true,t:d.title,a:'l',wrap:true,lh:1.25}]:[]),
       {x:80,y:d.title?64+tl*78+36:70,w:1280,h:0,s:48,c:'#ffffff',b:false,t:d.body||'',a:'l',wrap:true,pre:true,lh:1.5}]}; }
@@ -534,23 +574,27 @@ window.xpPaint=(s,inn)=>{
 };
 function applyPages(list){ const curEl=all[cur];
   all.filter(x=>x.classList.contains('xp')).forEach(x=>{ io.unobserve(x); x.remove(); all.splice(all.indexOf(x),1); });
-  for(const sect of ['news','sermon']){ const s0=startOf(sect); if(s0<0) continue; let at=songRange(s0)[1];
-    list.filter(p=>p.sect===sect).forEach(p=>{ const di=D.length; D.push(pageD(p));
+  for(const sect of SECTS){ const s0=startOf(sect); if(s0<0) continue; let at=songRange(s0)[1];
+    list.filter(p=>p.sect===sect).forEach(p=>[].concat(pageD(p)).forEach(dd=>{ const di=D.length; D.push(dd);   // 성경 봉독 한 건 = 여러 장
       const sec=document.createElement('section'); sec.className='sl xp'; sec.dataset.i=di; sec.dataset.xp=p.id; sec.dataset.sect=sect;
       sec.innerHTML='<div class="in"></div><span class="no">+</span>';
-      deck.insertBefore(sec, all[at]||document.getElementById('vbar')); all.splice(at,0,sec); at++; io.observe(sec); }); }
+      deck.insertBefore(sec, all[at]||document.getElementById('vbar')); all.splice(at,0,sec); at++; io.observe(sec); })); }
   window.XP=list; const k=all.indexOf(curEl); if(k>=0) cur=k;
   fit(); thR=null;
   if(document.body.classList.contains('pv')) go(cur,true); else if(SCREEN) show(cur,true); else if(ONE()) view(cur);
   clearTimeout(poll); if(list.some(p=>p.type==='html'&&(p.status==='wait'||p.status==='work'))) poll=setTimeout(loadPages,8000);
 }
-async function loadPages(){ if(!NDATE) return; try{ const r=await fetch('/api/worship?pages='+NDATE,{cache:'no-store'}); if(r.ok) applyPages(await r.json()); }catch(e){} }
+// 맥미니가 🎨 장을 다 만들거나 다시 만들면 앞 화면·발표자 화면이 30초 안에 저절로 새 것을 받는다 — 바뀐 것이 있을 때만 다시 그림 (2026-10-04 교장님)
+let lastPages='';
+async function loadPages(){ if(!NDATE) return; try{ const r=await fetch('/api/worship?pages='+NDATE,{cache:'no-store'}); if(!r.ok) return;
+  const t=await r.text(); if(t===lastPages) return; lastPages=t; applyPages(JSON.parse(t)); }catch(e){} }
+setInterval(loadPages,30000);
 window.xpReload=loadPages;
 async function save(body){ const r=await fetch('/api/worship',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({date:NDATE,key:NKEY},body))});
   const j=await r.json().catch(()=>({})); if(!j.ok) throw new Error(j.error||'저장 실패'); await loadPages(); if(bc) bc.postMessage({pages:1}); return j; }
 // ── 미리 보기 칸: 교회 소식·설교 구간이면 ＋, 끼운 장에는 ✏️ 🗑
 window.xpThumbs=(box,s,e)=>{
-  const sect=['news','sermon'].find(x=>startOf(x)===s); if(!sect||SCREEN) return;
+  const sect=SECTS.find(x=>startOf(x)===s); if(!sect||SCREEN) return;
   box.querySelectorAll('.th').forEach(t=>{ const sl=all[+t.dataset.k]; if(!sl||!sl.classList.contains('xp')) return;
     const id=+sl.dataset.xp, pg=(window.XP||[]).find(p=>p.id===id); const bar=document.createElement('div'); bar.className='xpb';
     const ed=document.createElement('button'); ed.textContent='✏️'; ed.title='고치기'; ed.onclick=ev=>{ ev.stopPropagation(); open(sect,pg); };
@@ -568,17 +612,64 @@ function wire(onOk){ P().querySelector('.no').onclick=()=>box.classList.remove('
   P().querySelector('.ok').onclick=async()=>{ const m=P().querySelector('.m'); m.textContent='저장 중…'; try{ await onOk(); box.classList.remove('on'); }catch(err){ m.textContent=err.message; } }; }
 function open(sect,pg){ if(!box.isConnected) document.body.appendChild(box); box.classList.add('on');
   if(pg) return form(sect,pg.type,pg);
+  if(sect==='reading'&&!open.more) return form(sect,'bible',null);   // 성경 봉독 ＋ = 곧바로 구절 찾기
+  open.more=false;
   P().innerHTML='<h3>＋ '+NAME[sect]+' 뒤에 장 넣기</h3><div class="ch3">'
     +'<button data-t="text">📝 글 페이지<small>제목·내용을 직접 씁니다</small></button>'
     +'<button data-t="html">🎨 AI 디자인 페이지<small>문구를 쓰면 글·도식으로 꾸며 줍니다(배경은 템플릿)</small></button>'
-    +'<button data-t="yt">▶ 유튜브 페이지<small>앞 화면에서 꽉 차게 재생</small></button></div>'+foot('').replace('<button class="ok"></button>','');
+    +'<button data-t="yt">▶ 유튜브 페이지<small>찾아서 고르면 앞 화면에서 꽉 차게 재생</small></button>'
+    +(sect==='reading'?'<button data-t="bible">📖 성경 구절<small>찾으면 다함께 봉독 장으로 바로</small></button>':'')+'</div>'+foot('').replace('<button class="ok"></button>','');
   P().querySelector('.no').onclick=()=>box.classList.remove('on');
   P().querySelectorAll('.ch3 button').forEach(b=>b.onclick=()=>form(sect,b.dataset.t,null)); }
 function form(sect,type,pg){ const d=(pg&&pg.data)||{};
+  if(type==='bible'){   // 📖 구절 찾기 → 미리 보기 → 넣기 (AI 없이 즉시)
+    P().innerHTML='<h3>📖 성경 봉독 — 구절 찾기</h3><label>구절 (예: 역대상 25:1-5 · 대상 25:1~5 · 시편 23편 · 요 3:16)</label>'
+      +'<div class="yts"><input class="q" list="bbooks" autocomplete="off" placeholder="책 장:절-절" value="'+esc(d.ref)+'"><button type="button" class="go">🔎 찾기</button></div><datalist id="bbooks"></datalist>'
+      +'<div class="bpv" style="max-height:340px;overflow-y:auto;margin:8px 0;font-size:14.5px;line-height:1.6;color:#111;background:#f8fafc;border-radius:8px;padding:8px 12px"></div>'
+      +'<div class="hint">찾으면 바로 아래에 본문이 나옵니다. 「넣기」를 누르면 성경 봉독 뒤에 「다함께 봉독」 장으로 곧장 들어갑니다(한 장에 2~3절).</div>'
+      +foot(pg?'고치기':'넣기')+(pg?'':'<div style="text-align:right;margin-top:6px"><a href="#" class="oth" style="font-size:13px;color:#64748b">다른 장(글·AI·유튜브) 넣기 →</a></div>');
+    const q=P().querySelector('.q'), V=P().querySelector('.bpv'); let got=null, tm=null;
+    fetch('/api/worship?bible=books').then(r=>r.json()).then(b=>{ const dl=P().querySelector('#bbooks'); if(dl) dl.innerHTML=b.map(x=>'<option value="'+esc(x[0])+' ">'+esc(x[1])+' · '+x[2]+'장</option>').join(''); }).catch(()=>{});
+    const find=async()=>{ const w=q.value.trim(); if(!/\d/.test(w)){ got=null; V.innerHTML=''; return; } V.textContent='찾는 중…';
+      try{ const r=await fetch('/api/worship?bible='+encodeURIComponent(w)); const j=await r.json(); if(q.value.trim()!==w) return;
+        if(!r.ok){ got=null; V.textContent=j.error||'찾지 못했습니다'; return; } got=j;
+        const k=bibleD(j).length; V.innerHTML='<b>'+esc(j.ref)+'</b> · '+j.verses.length+'절 → '+k+'장<br>'+j.verses.map(([v,t])=>'<sup style="color:#b45309;font-weight:700">'+esc(v)+'</sup> '+esc(t)).join('<br>');
+      }catch(e){ got=null; V.textContent='찾지 못했습니다 — 인터넷 연결을 확인해 주세요'; } };
+    q.addEventListener('input',()=>{ clearTimeout(tm); tm=setTimeout(find,350); });
+    q.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); if(got&&got.ref&&q.value.trim()) P().querySelector('.ok').click(); else find(); } });
+    P().querySelector('.go').onclick=find;
+    const oth=P().querySelector('.oth'); if(oth) oth.onclick=e=>{ e.preventDefault(); open.more=true; open(sect,null); };
+    if(!document.getElementById('bbcss')){ const st=document.createElement('style'); st.id='bbcss'; st.textContent='.yts{display:flex;gap:6px}.yts .q{flex:1}.yts .go{font:700 14px inherit;border:0;border-radius:8px;padding:0 14px;background:#1f2937;color:#fff;cursor:pointer}'; document.head.appendChild(st); }
+    if(d.ref) find(); setTimeout(()=>q.focus(),50);
+    wire(async()=>{ if(!got) await find(); if(!got) throw new Error('구절을 먼저 찾아 주세요 — 예) 역대상 25:1-5');
+      return save({action:'page',id:pg&&pg.id,sect,type:'bible',data:{ref:got.ref,verses:got.verses}}); }); return; }
   if(type==='text'){ P().innerHTML='<h3>📝 글 페이지</h3><label>제목</label><input class="t" value="'+esc(d.title)+'"><label>내용</label><textarea class="c">'+esc(d.body)+'</textarea>'+foot(pg?'고치기':'넣기');
     wire(()=>save({action:'page',id:pg&&pg.id,sect,type:'text',data:{title:P().querySelector('.t').value.trim(),body:P().querySelector('.c').value}})); return; }
-  if(type==='yt'){ P().innerHTML='<h3>▶ 유튜브 페이지</h3><label>유튜브 주소</label><input class="u" placeholder="https://youtu.be/…" value="'+esc(d.id?'https://youtu.be/'+d.id:'')+'"><label>제목(선택)</label><input class="t" value="'+esc(d.title)+'"><div class="hint">이 장이 앞 화면에 나오면 영상이 꽉 찬 화면으로 재생됩니다. 다음 장으로 넘기면 닫힙니다.</div>'+foot(pg?'고치기':'넣기');
-    wire(()=>{ const id=ytId(P().querySelector('.u').value.trim()); if(!id) throw new Error('유튜브 주소를 확인해 주세요'); return save({action:'page',id:pg&&pg.id,sect,type:'yt',data:{id,title:P().querySelector('.t').value.trim()}}); }); return; }
+  if(type==='yt'){   // 찾기 → 결과에서 고르기 → 넣기 (2026-10-04 교장님)
+    P().innerHTML='<h3>▶ 유튜브 페이지</h3><label>유튜브 찾기</label><div class="yts"><input class="q" placeholder="곡명·가수로 찾기 (예: 찬양 연속듣기)"><button type="button" class="go">🔎 찾기</button></div>'
+      +'<div class="ytr"></div><label>고른 영상</label><div class="ysel">'+(d.id?'':'아직 고르지 않았습니다 — 위에서 찾아 누르거나 주소를 붙여 넣으세요')+'</div>'
+      +'<input class="u" placeholder="또는 유튜브 주소 붙여 넣기 https://youtu.be/…" value="'+esc(d.id?'https://youtu.be/'+d.id:'')+'"><label>제목(선택)</label><input class="t" value="'+esc(d.title)+'">'
+      +'<div class="hint">이 장이 앞 화면에 나오면 영상이 꽉 찬 화면으로 재생됩니다. 다른 장으로 넘기면 닫힙니다. (끊기지 않게 계속 틀 음악은 🎵 BGM 단추로)</div>'+foot(pg?'고치기':'넣기');
+    if(!document.getElementById('ytscss')){ const st=document.createElement('style'); st.id='ytscss'; st.textContent=
+      '.yts{display:flex;gap:6px}.yts .q{flex:1}.yts .go{font:700 14px inherit;border:0;border-radius:8px;padding:0 14px;background:#1f2937;color:#fff;cursor:pointer}'
+      +'.ytr{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;max-height:300px;overflow-y:auto;margin:8px 0}'
+      +'.ytr .r{display:flex;flex-direction:column;gap:3px;text-align:left;border:2px solid transparent;border-radius:8px;background:#f1f5f9;padding:4px;cursor:pointer;font:600 12.5px inherit;color:#111}'
+      +'.ytr .r:hover{border-color:#94a3b8}.ytr .r.on{border-color:#dc2626;background:#fee2e2}.ytr .r img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px}.ytr .r small{color:#64748b;font-weight:400}'
+      +'.ysel{display:flex;gap:8px;align-items:center;font-size:13px;color:#475569;margin:2px 0 6px}.ysel img{width:120px;aspect-ratio:16/9;object-fit:cover;border-radius:6px}';
+      document.head.appendChild(st); }
+    const q=P().querySelector('.q'), R=P().querySelector('.ytr'), U=P().querySelector('.u'), T=P().querySelector('.t'), S=P().querySelector('.ysel');
+    const pick=(id,title)=>{ U.value='https://youtu.be/'+id; if(title) T.value=title; S.innerHTML='<img src="https://i.ytimg.com/vi/'+esc(id)+'/mqdefault.jpg" alt=""><b>'+esc(title||id)+'</b>';
+      R.querySelectorAll('.r').forEach(x=>x.classList.toggle('on',x.dataset.id===id)); };
+    if(d.id) pick(d.id,d.title);
+    const find=async()=>{ const w=q.value.trim(); if(!w) return; R.innerHTML='<div class="hint">찾는 중…</div>';
+      try{ const list=await (await fetch('/api/worship?yts='+encodeURIComponent(w))).json();
+        R.innerHTML=(list||[]).map(v=>'<button type="button" class="r" data-id="'+esc(v.id)+'" data-t="'+esc(v.title)+'"><img src="https://i.ytimg.com/vi/'+esc(v.id)+'/mqdefault.jpg" alt="" loading="lazy"><span>'+esc(v.title)+'</span><small>'+esc([v.ch,v.len,v.views&&('조회 '+v.views)].filter(Boolean).join(' · '))+'</small></button>').join('')||'<div class="hint">결과가 없습니다 — 다른 말로 찾아 보세요</div>';
+      }catch(e){ R.innerHTML='<div class="hint">찾지 못했습니다 — 인터넷 연결을 확인하거나 주소를 붙여 넣어 주세요</div>'; } };
+    P().querySelector('.go').onclick=find; q.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); find(); } });
+    R.onclick=e=>{ const b=e.target.closest('.r'); if(b) pick(b.dataset.id,b.dataset.t); };
+    U.addEventListener('change',()=>{ const id=ytId(U.value.trim()); if(id) pick(id,T.value); });
+    setTimeout(()=>q.focus(),50);
+    wire(()=>{ const id=ytId(U.value.trim()); if(!id) throw new Error('영상을 찾아 고르거나 유튜브 주소를 넣어 주세요'); return save({action:'page',id:pg&&pg.id,sect,type:'yt',data:{id,title:T.value.trim()}}); }); return; }
   // html — 처음엔 문구, 다 만들어진 뒤엔 화면에서 글자를 바로 고친다
   if(pg&&d.html&&pg.status==='ready'){ P().innerHTML='<h3>🎨 AI 디자인 페이지 — 글자 고치기</h3><div class="ed" style="background-image:url('+(bg()?'slides/'+bg():'')+')"><iframe></iframe></div><div class="hint">글자를 눌러 바로 고칩니다. 내용을 크게 바꾸려면 「문구 바꿔 다시 만들기」.</div>'
       +'<div class="b"><span class="m"></span><button class="no">닫기</button><button class="re">문구 바꿔 다시 만들기</button><button class="ok">저장</button></div>';
@@ -593,14 +684,22 @@ function htmlForm(sect,pg,d){ P().innerHTML='<h3>🎨 AI 디자인 페이지</h3
     return save({action:'page',id:pg&&pg.id,sect,type:'html',data:{title:t,body:c}}); }); }
 // ── 앞 화면: 유튜브 장이면 꽉 차게 재생, 끼운 장 바뀌면 다시 불러오기
 let ytOn=false;
+// ＋ 로 넣은 유튜브 장은 BGM 창이 아니라 앞 화면 자체에서 꽉 차게 — 다른 장으로 넘기면 닫힌다 (2026-10-04 교장님)
+// 덮개(bgmFS)가 아니라 그 장 안에 영상을 끼운다 — 장을 넘기면 영상도 같이 빠지고 다음 장이 나온다 (2026-10-04 교장님)
+let ytEl=null;
 function ytCheck(){ const sl=all[cur], d=sl&&D[+sl.dataset.i];
-  if(d&&d.yt&&document.body.classList.contains('pr')){ if(typeof bgmFS==='function') bgmFS(d.yt); ytOn=true; }
-  else if(ytOn){ if(typeof bgmFS==='function') bgmFS(null); ytOn=false; } }
+  if(ytEl&&(!d||!d.yt||ytEl.parentNode!==sl.querySelector('.in'))){ ytEl.remove(); ytEl=null; ytOn=false; }
+  if(d&&d.yt&&document.body.classList.contains('pr')&&!ytEl){ const inn=sl.querySelector('.in'); paint(sl);
+    const f=document.createElement('iframe'); f.className='ytin';
+    f.src='https://www.youtube-nocookie.com/embed/'+d.yt+'?autoplay=1&rel=0&modestbranding=1&playsinline=1';
+    f.allow='autoplay; encrypted-media; fullscreen'; f.referrerPolicy='strict-origin-when-cross-origin';
+    f.style.cssText='position:absolute;left:0;top:0;width:1440px;height:810px;border:0;z-index:6;background:#000';
+    inn.appendChild(f); ytEl=f; ytOn=true; } }
 addEventListener('DOMContentLoaded',()=>{
   const _s=show; show=function(i,q){ _s(i,q); ytCheck(); };
   if(bc){ const prev=bc.onmessage; bc.onmessage=e=>{ const m=e.data||{}; if(m.pages){ loadPages(); return; } if(prev) prev(e); }; }
   deck.addEventListener('click',e=>{ const sl=e.target.closest('.sl.xp'); if(!sl||document.body.classList.contains('pr')) return; const d=D[+sl.dataset.i]; if(!d||!d.yt) return;
-    const inn=sl.querySelector('.in'); if(inn.querySelector('iframe')) return; const f=document.createElement('iframe');
+    const inn=sl.querySelector('.in'); if(inn.querySelector('iframe')) return; const f=document.createElement('iframe');   // 이 화면 안에서 재생(다른 장으로 가면 닫힘)
     f.src='https://www.youtube-nocookie.com/embed/'+d.yt+'?autoplay=1&rel=0'; f.allow='autoplay; encrypted-media; fullscreen'; f.allowFullscreen=true;
     f.style.cssText='position:absolute;left:'+d.pic.x+'px;top:'+d.pic.y+'px;width:'+d.pic.w+'px;height:'+d.pic.h+'px;border:0;border-radius:18px;z-index:5'; inn.appendChild(f); });
   loadPages(); });
@@ -613,7 +712,11 @@ def _news_globals(date: str | None) -> str:
     import hmac, hashlib
     sec = next((ln.split("=", 1)[1].strip() for ln in (Path.home() / "dev/daily-briefing/.env").read_text().splitlines() if ln.startswith("JUBO_SECRET=")), "")
     key = hmac.new(sec.encode(), f"news:{date}".encode(), hashlib.sha256).hexdigest()[:32] if sec and date else ""
-    return f"const NDATE='{date or ''}',NKEY='{key}';\n"
+    try:
+        xs = [x.get("title", "") for x in json.loads((HERE / "data" / f"{date}.json").read_text()).get("ppt_extra", []) if x.get("title")]
+    except Exception:
+        xs = []
+    return f"const NDATE='{date or ''}',NKEY='{key}';window.XSECTS={json.dumps(xs, ensure_ascii=False)};\n"
 
 
 def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = None, date: str | None = None) -> str:
