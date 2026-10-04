@@ -377,7 +377,7 @@ def fit_ads(prs) -> list[str]:
 
 
 # ── 성경 봉독 본문 장: 한 장에 두 절씩 (2026-10-03 교장님) ─────────────
-VERSE_LINE = re.compile(r"^\s*(?:(?:봉독대표|회중봉독|다함께 봉독)\s*\n)?\s*(\d+)\s{2,}")   # 앞에 봉독 단추 줄이 붙어 있어도
+VERSE_LINE = re.compile(r"^\s*(?:(?:봉독대표|회중봉독|다함께 봉독)\s*\n)?\s*(\d+)\s+(?=[가-힣])")   # 「1   …」·옛 PPT 「1 …」 모두   # 앞에 봉독 단추 줄이 붙어 있어도
 
 
 # 성경 봉독 — 절마다 위에 작은 단추(누가 읽는지) (2026-10-04 교장님 원칙)
@@ -601,6 +601,62 @@ def layout(pptx: Path, date: str) -> list[str]:
     return log
 
 
+
+def _light_bytes(pptx: Path) -> bytes:
+    """구글 변환용 가벼운 사본 — 그림을 1600px·다시 압축(원본 PPT 는 그대로). 옛 PPT 는 그림이 커서
+    「This file is too large to be exported」 로 막혔다(2026-09-27, 2026-10-04 교장님 소급 작업)."""
+    import zipfile, io as _io
+    from PIL import Image
+    src = zipfile.ZipFile(pptx); out = _io.BytesIO(); dst = zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED)
+    for it in src.infolist():
+        b = src.read(it.filename)
+        if it.filename.startswith("ppt/media/") and it.file_size > 150_000 and it.filename.lower().endswith((".png", ".jpg", ".jpeg")):
+            try:
+                im = Image.open(_io.BytesIO(b)); im.thumbnail((1600, 1600)); o = _io.BytesIO()
+                if it.filename.lower().endswith(".png"): im.save(o, "PNG", optimize=True)
+                else: im.convert("RGB").save(o, "JPEG", quality=82)
+                if o.tell() < len(b): b = o.getvalue()
+            except Exception:
+                pass
+        dst.writestr(it, b)
+    dst.close(); return out.getvalue()
+
+
+def google_pdf(pptx: Path) -> bytes:
+    """pptx → 구글 슬라이드로 잠깐 바꿔 PDF(임시본은 지움). 너무 커서 내보내기가 막히면 장을 나눠 여러 번 내보내 이어 붙인다
+    (쪽 순서는 그대로 — 넘침 검사·웹 PPT 가 쪽 번호로 장을 맞춘다). 2026-10-04 9/27 소급 작업에서."""
+    import uuid, tempfile, fitz
+    from pptx import Presentation
+    sys.path.insert(0, str(HERE.parent)); import prep
+    def one(data: bytes) -> bytes:
+        g = prep.G(prep.access_token()); b = f"b{uuid.uuid4().hex}"
+        meta = json.dumps({"name": "_임시 변환", "mimeType": "application/vnd.google-apps.presentation"}).encode()
+        body = (f"--{b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n".encode() + meta + f"\r\n--{b}\r\nContent-Type: {prep.PPTX_MIME}\r\n\r\n".encode()
+                + data + f"\r\n--{b}--".encode())
+        f = g.req("POST", f"{prep.UPLOAD}/files?uploadType=multipart&fields=id", body, ctype=f"multipart/related; boundary={b}", timeout=600)
+        try: return g.req("GET", f"{prep.DRIVE}/files/{f['id']}/export?mimeType=application/pdf", timeout=600)
+        finally: g.req("DELETE", f"{prep.DRIVE}/files/{f['id']}")
+    try:
+        return one(_light_bytes(pptx))
+    except RuntimeError as ex:
+        if "exportSizeLimitExceeded" not in str(ex) and "too large" not in str(ex): raise
+    n = len(Presentation(str(pptx)).slides)
+    for parts in (2, 3, 4, 6):
+        size = -(-n // parts); out = fitz.open(); ok = True
+        with tempfile.TemporaryDirectory() as tmp:
+            for a in range(0, n, size):
+                prs = Presentation(str(pptx))
+                for i in sorted(set(range(n)) - set(range(a, min(n, a + size))), reverse=True): drop(prs, i)
+                part = Path(tmp) / f"p{a}.pptx"; save(prs, part)
+                try:
+                    out.insert_pdf(fitz.open(stream=one(_light_bytes(part)), filetype="pdf"))
+                except RuntimeError as ex:
+                    if "too large" in str(ex) or "exportSizeLimitExceeded" in str(ex): ok = False; break
+                    raise
+        if ok: return out.tobytes()
+    raise RuntimeError("나눠 보내도 구글 내보내기 크기 한도를 넘습니다")
+
+
 def render_check(pptx: Path, pdf: Path | None = None, fix: bool = True) -> list[str]:
     """구글 슬라이드로 바꿔 PDF 로 그려 보고, 글이 제 칸(또는 화면) 아래로 넘친 장을 비율대로 줄인다(최대 3번)."""
     import fitz, tempfile, uuid
@@ -609,15 +665,7 @@ def render_check(pptx: Path, pdf: Path | None = None, fix: bool = True) -> list[
     sys.path.insert(0, str(HERE.parent)); import prep
     log = []
     for _ in range(3):
-        g = prep.G(prep.access_token()); b = f"b{uuid.uuid4().hex}"
-        meta = json.dumps({"name": "_임시 넘침 검사", "mimeType": "application/vnd.google-apps.presentation"}).encode()
-        body = (f"--{b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n".encode() + meta + f"\r\n--{b}\r\nContent-Type: {prep.PPTX_MIME}\r\n\r\n".encode()
-                + pptx.read_bytes() + f"\r\n--{b}--".encode())
-        f = g.req("POST", f"{prep.UPLOAD}/files?uploadType=multipart&fields=id", body, ctype=f"multipart/related; boundary={b}", timeout=600)
-        try:
-            raw = g.req("GET", f"{prep.DRIVE}/files/{f['id']}/export?mimeType=application/pdf", timeout=600)
-        finally:
-            g.req("DELETE", f"{prep.DRIVE}/files/{f['id']}")
+        raw = google_pdf(pptx)
         if pdf: pdf.write_bytes(raw)
         doc = fitz.open(stream=raw, filetype="pdf"); prs = Presentation(str(pptx))
         kx = doc[0].rect.width / (prs.slide_width / 12700); over = []
@@ -684,7 +732,7 @@ def to_pdf(src: Path, dst: Path) -> Path:
     g = prep.G(prep.access_token()); b = f"b{uuid.uuid4().hex}"
     meta = json.dumps({"name": "_임시 변환", "mimeType": "application/vnd.google-apps.presentation"}).encode()
     body = (f"--{b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n".encode() + meta + f"\r\n--{b}\r\nContent-Type: {prep.PPTX_MIME}\r\n\r\n".encode()
-            + src.read_bytes() + f"\r\n--{b}--".encode())
+            + _light_bytes(src) + f"\r\n--{b}--".encode())
     f = g.req("POST", f"{prep.UPLOAD}/files?uploadType=multipart&fields=id", body, ctype=f"multipart/related; boundary={b}", timeout=600)
     try:
         dst.write_bytes(g.req("GET", f"{prep.DRIVE}/files/{f['id']}/export?mimeType=application/pdf", timeout=600))
