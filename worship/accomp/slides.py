@@ -128,7 +128,7 @@ main{{flex:1;min-width:0;padding:14px;display:flex;flex-direction:column;align-i
 .sl .in{{position:absolute;left:0;top:0;width:1440px;height:810px;transform-origin:0 0;background-size:100% 100%}}
 .sl .tx{{position:absolute;white-space:pre;line-height:1;transform-origin:0 0}}
 .sl .no{{position:absolute;right:8px;bottom:6px;font-size:11px;color:#fff;background:rgba(0,0,0,.45);border-radius:999px;padding:1px 7px;z-index:2}}
-body.pr .top,body.pr .wsnav,body.pv .wsnav,body.pr #toc,body.pr .no{{display:none}}body.pr main{{padding:0;gap:0}}body.pr{{background:#000;overflow:hidden}}
+body.pr .top,body.pr .wsnav,body.pv .wsnav,body.pr #toc,body.pr .no{{display:none}}/* 앞 화면(두 번째 모니터)·전체 화면 발표엔 상단 메뉴 두 줄을 절대 안 보이게 — wsnav 의 display:block!important 를 이긴다 (2026-10-04 교장님) */body.pr .wsnav,body.pr header.wsnav,body.pr [data-wsnav]{{display:none!important}}body.pr #deck,body.pr main{{margin:0!important;padding:0!important}}body.pr main{{padding:0;gap:0}}body.pr{{background:#000;overflow:hidden}}
 body.pr .sl{{display:none;position:fixed;inset:0;margin:auto;width:min(100vw,calc(100vh*16/9));border-radius:0;box-shadow:none}}body.pr .sl.cur{{display:block}}
 /* 한 장 보기(기본) — 목차를 누르면 스크롤 없이 그 장만 바로 (2026-10-03 교장님 지시) */
 body.one:not(.pr) main .sl{{display:none;width:min(100%,calc((100vh - var(--navh,88px) - 80px)*16/9))}}body.one:not(.pr) main .sl.cur{{display:block}}
@@ -143,8 +143,8 @@ body.one:not(.pr) main .sl{{display:none;width:min(100%,calc((100vh - var(--navh
 .pvlab{{font-size:12px;color:#94a3b8;margin:0 0 5px}}.pvl .pvbox .sl{{width:100%;max-width:calc((100vh - 380px)*16/9)}}.pvr .pvbox .sl{{width:100%}}
 /* 발표자 보기 아래 썸네일 — 지금 노래(목차 한 구간)의 장 전부, 누르면 앞 화면으로 (2026-10-03 교장님 지시) */
 #pvthumbs{{flex:1;min-height:0;overflow-y:auto;display:flex;flex-wrap:wrap;align-content:flex-start;gap:8px;padding:2px}}
-#pvthumbs .th{{width:190px;cursor:pointer;border:3px solid transparent;border-radius:8px;padding:1px}}#pvthumbs .th:hover{{border-color:#475569}}
-#pvthumbs .th.on{{border-color:#f6c76b}}#pvthumbs .sl{{width:100%;box-shadow:none;border-radius:4px}}
+#pvthumbs .th{{width:285px;cursor:pointer;border:3px solid transparent;border-radius:8px;padding:1px}}#pvthumbs .th:hover{{border-color:#475569}}
+#pvthumbs .th.on{{border-color:#f6c76b}}#toc a.peek{{outline:2px dashed #93c5fd;outline-offset:-2px;color:#93c5fd}}#pvtlab b{{color:#93c5fd}}.pvback{{margin-left:8px;font:700 12px inherit;border:0;border-radius:999px;padding:4px 10px;background:#fff;color:#111;cursor:pointer}}#pvthumbs .sl{{width:100%;box-shadow:none;border-radius:4px}}
 .pvbox .last{{aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:#111827;border-radius:6px;color:#94a3b8}}
 .pvinfo{{display:flex;justify-content:space-between;align-items:baseline;font-weight:800;font-size:26px}}#pvclock{{color:#f6c76b}}
 .pvbtn{{display:flex;gap:8px}}.pvbtn button,.pvstop{{flex:1;font:700 15px inherit;border:0;border-radius:10px;padding:12px;cursor:pointer;background:#fff;color:#111}}
@@ -160,7 +160,7 @@ body.one:not(.pr) main .sl{{display:none;width:min(100%,calc((100vh - var(--navh
 <div class="pvbtn"><button onclick="go(cur-1)">◀ 이전</button><button onclick="go(cur+1)">다음 ▶</button></div>
 <div class="pvnote">← → 방향키·스페이스로 넘김 · 왼쪽 목차를 누르면 그 장으로 · Esc 끝내기</div>
 <button class="pvstop" onclick="endPV()">■ 발표 끝내기</button></div>
-<div class="pvt"><div class="pvlab">이 노래·순서의 모든 장 — 누르면 앞 화면에 바로 나갑니다</div><div id="pvthumbs"></div></div></div>
+<div class="pvt"><div class="pvlab" id="pvtlab">이 노래·순서의 모든 장 — 누르면 앞 화면에 바로 나갑니다</div><div id="pvthumbs"></div></div></div>
 <script>
 const D={data};
 const deck=document.getElementById('deck');
@@ -197,7 +197,7 @@ document.addEventListener('fullscreenchange',()=>{{ if(!SCREEN&&!document.fullsc
 deck.addEventListener('click',e=>{{ if(!document.body.classList.contains('pr')) return; show(cur+(e.clientX>innerWidth/2?1:-1)); }});
 let x0=null; deck.addEventListener('touchstart',e=>x0=e.touches[0].clientX,{{passive:true}});
 deck.addEventListener('touchend',e=>{{ if(x0===null||!document.body.classList.contains('pr'))return; const dx=e.changedTouches[0].clientX-x0; if(Math.abs(dx)>40)show(cur+(dx<0?1:-1)); x0=null; }});
-document.querySelectorAll('#toc a:not(.bgm)').forEach(a=>a.onclick=ev=>{{ev.preventDefault(); a.blur(); if(window.bgmClose) bgmClose(); const el=document.getElementById(a.getAttribute('href').slice(1)); if(document.body.classList.contains('pv')){{go(all.indexOf(el));return;}} if(ONE()){{view(all.indexOf(el));return;}} el.scrollIntoView({{behavior:'instant',block:'start'}});}});
+document.querySelectorAll('#toc a:not(.bgm)').forEach(a=>a.onclick=ev=>{{ev.preventDefault(); a.blur(); if(window.bgmClose) bgmClose(); const el=document.getElementById(a.getAttribute('href').slice(1)); if(document.body.classList.contains('pv')){{peek(all.indexOf(el),a);return;}} if(ONE()){{view(all.indexOf(el));return;}} el.scrollIntoView({{behavior:'instant',block:'start'}});}});
 {pvjs}
 </script></body></html>"""
 
@@ -264,7 +264,15 @@ function mount(id,i){ const box=document.getElementById(id); box.replaceChildren
 function marks(){ return [...document.querySelectorAll('#toc a')].map(a=>all.indexOf(document.getElementById(a.getAttribute('href').slice(1)))).filter(k=>k>=0).sort((a,b)=>a-b); }
 function songRange(i){ let s=0,e=all.length; for(const k of marks()){ if(k<=i) s=k; else { e=k; break; } } return [s,e]; }   // 목차 표시 사이 = 한 노래(순서)
 let thR=null;
-function thumbs(){ const [s,e]=songRange(cur), box=document.getElementById('pvthumbs');
+// 발표 중 목차를 누르면 그 순서의 장들만 아래에 펼쳐 미리 본다 — 앞 화면은 장(썸네일)을 눌러야 넘어간다 (2026-10-04 교장님: 다음 곡 준비)
+let peekAt=null;
+function peek(k,a){ if(k<0) return; peekAt=k; thumbs(k); document.querySelectorAll('#toc a').forEach(x=>x.classList.toggle('peek',x===a&&!x.classList.contains('on')));
+  const [s]=songRange(k), lab=document.getElementById('pvtlab'); const same=songRange(cur)[0]===s;
+  lab.innerHTML=same?'이 노래·순서의 모든 장 — 누르면 앞 화면에 바로 나갑니다'
+    :'👀 미리 보기: <b>'+(a?a.textContent:'')+'</b> — 앞 화면은 그대로입니다. 장을 눌러야 넘어갑니다 <button class="pvback" onclick="unpeek()">↩ 지금 순서로</button>';
+  document.getElementById('pvthumbs').scrollTop=0; }
+function unpeek(){ peekAt=null; document.querySelectorAll('#toc a.peek').forEach(x=>x.classList.remove('peek')); document.getElementById('pvtlab').textContent='이 노래·순서의 모든 장 — 누르면 앞 화면에 바로 나갑니다'; thumbs(); }
+function thumbs(at){ const [s,e]=songRange(at==null?cur:at), box=document.getElementById('pvthumbs');
   if(!thR||thR[0]!==s||thR[1]!==e){ box.replaceChildren();
     for(let k=s;k<e;k++){ paint(all[k]); const c=all[k].cloneNode(true); c.removeAttribute('id'); c.classList.remove('cur');
       const w=document.createElement('div'); w.className='th'; w.dataset.k=k; w.title=(k+1)+'번째 장 — 누르면 앞 화면으로'; w.appendChild(c); w.onclick=()=>go(k); box.appendChild(w); }
@@ -272,7 +280,7 @@ function thumbs(){ const [s,e]=songRange(cur), box=document.getElementById('pvth
   box.querySelectorAll('.th').forEach(t=>t.classList.toggle('on',+t.dataset.k===cur)); fit();
   const on=box.querySelector('.th.on'); if(on) on.scrollIntoView({block:'nearest'}); }
 function go(i,quiet){ const fe=document.activeElement; if(fe&&fe.closest&&fe.closest('#toc')) fe.blur();   // 목차 초점 테두리가 지난 항목에 남지 않게
-  cur=Math.max(0,Math.min(all.length-1,i)); mount('pvcur',cur); mount('pvnext',cur+1); thumbs(); fit();
+  cur=Math.max(0,Math.min(all.length-1,i)); mount('pvcur',cur); mount('pvnext',cur+1); if(peekAt!==null) unpeek(); else thumbs(); fit();
   document.getElementById('pvn').textContent=(cur+1)+' / '+all.length;
   let on=null;
   document.querySelectorAll('#toc a').forEach(a=>{ const k=all.indexOf(document.getElementById(a.getAttribute('href').slice(1))); if(k>=0&&k<=cur)on=a; a.classList.remove('on'); });
@@ -285,6 +293,52 @@ addEventListener('keydown',e=>{ if(!document.body.classList.contains('pv')) retu
   if(['ArrowRight','ArrowDown','PageDown',' ','Enter'].includes(e.key)){e.preventDefault();go(cur+1)}
   else if(['ArrowLeft','ArrowUp','PageUp','Backspace'].includes(e.key)){e.preventDefault();go(cur-1)}
   else if(e.key==='Home')go(0); else if(e.key==='End')go(all.length-1); else if(e.key==='Escape')endPV(); });
+
+// ── 교회 소식 급히 고치기 (2026-10-04 교장님) ─────────────────────────────
+// 「교회 소식」 표지 다음부터 「봉헌」 표지 앞까지가 소식 장. ✏️ 를 누르면 줄마다 고칠 수 있고,
+// 저장하면 앞 화면(두 번째 모니터)에도 바로 바뀌고 서버에 남아 새로 열어도 유지된다.
+const NEWS=(()=>{ const T=i=>D[i].texts.map(t=>t.t).join(' '); let s=-1,e=-1;
+  for(let i=0;i<D.length;i++){ const t=T(i).replace(/\s/g,''); if(s<0&&/교회소식|Announcements/.test(t)) s=i; else if(s>=0&&/^(Offering|봉헌)|Offering봉헌/.test(t)){ e=i; break; } }
+  const r=[]; if(s>=0) for(let i=s+1;i<(e<0?Math.min(D.length,s+8):e);i++) r.push(i); return r; })();
+// 순서 장(대표기도·봉헌·성경봉독·특송·설교·선교보고…) — 맡은 사람 이름이 현장에서 바뀌면 그 자리에서 고친다 (2026-10-04 교장님)
+const ROLE=D.map((s,i)=>i).filter(i=>{ const t=D[i].texts.map(x=>x.t).join(' ');
+  return D[i].texts.length<=8 && /^(Prayer|Offering|Scripture\s*Reading|Special\s*Praise|Sermon|Mission\s*Report|Benediction|대표\s*기도|봉\s*헌|성경\s*봉독|특\s*송|설\s*교|선교\s*보고)/.test(t.trim()); });
+const EDIT=[...new Set([...NEWS,...ROLE])];
+const ORIG=D.map(s=>s.texts.map(t=>t.t).join('\n'));
+function repaint(i){ const sl=all[i]; if(!sl) return; sl.querySelectorAll('.in .tx').forEach(x=>x.remove()); delete sl.dataset.p; paint(sl);
+  if(document.body.classList.contains('pv')){ thR=null; go(cur,true); } fit(); }
+function applyNews(i,texts){ if(!D[i]) return; texts.forEach((t,j)=>{ if(D[i].texts[j]) D[i].texts[j].t=t; }); repaint(i); }
+if(bc){ const prev=bc.onmessage; bc.onmessage=e=>{ const m=e.data||{}; if(m.news){ applyNews(m.news.i,m.news.texts); return; } if(prev) prev(e); }; }
+fetch('/api/worship?news='+NDATE,{cache:'no-store'}).then(r=>r.json()).then(rows=>{ (rows||[]).forEach(r=>{ if(r.orig===ORIG[r.i]) applyNews(r.i,r.texts); }); }).catch(()=>{});
+if(!SCREEN&&EDIT.length){
+  const st=document.createElement('style'); st.textContent=`#nbtn{position:fixed;right:18px;bottom:18px;z-index:60;display:none;font:800 16px 'Pretendard Variable',sans-serif;border:0;border-radius:999px;padding:12px 20px;background:#f6c76b;color:#3b2a06;box-shadow:0 4px 16px rgba(0,0,0,.4);cursor:pointer}
+#nbox{position:fixed;inset:0;z-index:70;display:none;background:rgba(0,0,0,.6);align-items:center;justify-content:center}
+#nbox .p{background:#fff;color:#111;border-radius:14px;width:min(860px,94vw);max-height:90vh;overflow:auto;padding:18px 20px;font:15px 'Pretendard Variable',sans-serif}
+#nbox h3{margin:0 0 6px}#nbox .h{color:#64748b;font-size:13px;margin-bottom:10px}
+#nbox textarea{width:100%;box-sizing:border-box;font:16px 'Pretendard Variable',sans-serif;border:1px solid #cbd5e1;border-radius:8px;padding:8px;margin:4px 0;resize:vertical}
+#nbox .b{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}#nbox .b button{font:700 15px inherit;border:0;border-radius:999px;padding:10px 18px;cursor:pointer}
+#nbox .ok{background:#1f2937;color:#fff}#nbox .no{background:#e2e8f0}#nbox .m{font-size:13px;color:#b45309;margin-right:auto;align-self:center}`;
+  document.head.appendChild(st);
+  const btn=document.createElement('button'); btn.id='nbtn'; btn.textContent='✏️ 교회 소식 수정'; document.body.appendChild(btn);
+  const box=document.createElement('div'); box.id='nbox'; box.innerHTML='<div class="p"><h3>✏️ 교회 소식 수정</h3><div class="h"></div><div class="f"></div><div class="b"><span class="m"></span><button class="no">닫기</button><button class="ok">저장 — 앞 화면에 바로 반영</button></div></div>'; document.body.appendChild(box);
+  const here=()=>document.body.classList.contains('pv')||ONE()?cur:firstVisible();
+  const sync=()=>{ const h=here(); btn.style.display=EDIT.includes(h)?'block':'none'; btn.textContent=NEWS.includes(h)?'✏️ 교회 소식 수정':'✏️ 이름·내용 수정'; };
+  const _go=go; go=function(i,q){ _go(i,q); sync(); }; const _view=view; view=function(i){ _view(i); sync(); };
+  addEventListener('scroll',()=>{ if(!ONE()) sync(); },{passive:true}); setInterval(sync,800); sync();
+  let ei=-1;
+  btn.onclick=()=>{ ei=here(); const f=box.querySelector('.f'); f.replaceChildren();
+    box.querySelector('h3').textContent=NEWS.includes(ei)?'✏️ 교회 소식 수정':'✏️ 이름·내용 수정 (오늘만)'; box.querySelector('.h').textContent=(ei+1)+'번째 장 · 줄마다 고친 뒤 저장하세요 (이번 주 PPT 에만 반영, 주보는 그대로)';
+    D[ei].texts.forEach(t=>{ const a=document.createElement('textarea'); a.value=t.t; a.rows=Math.max(1,Math.ceil(t.t.length/48)); f.appendChild(a); });
+    box.querySelector('.m').textContent=''; box.style.display='flex'; };
+  box.addEventListener('keydown',e=>e.stopPropagation(),true);
+  box.querySelector('.no').onclick=()=>{ box.style.display='none'; };
+  box.querySelector('.ok').onclick=()=>{ const texts=[...box.querySelectorAll('textarea')].map(a=>a.value); const m=box.querySelector('.m');
+    applyNews(ei,texts); if(bc) bc.postMessage({news:{i:ei,texts}});
+    m.textContent='저장 중…';
+    fetch('/api/worship',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'news',date:NDATE,key:NKEY,i:ei,orig:ORIG[ei],texts})})
+      .then(r=>r.json()).then(j=>{ if(j.ok){ m.textContent='✅ 저장했습니다'; setTimeout(()=>{box.style.display='none';},700); } else m.textContent='화면엔 바꿨지만 저장 실패: '+(j.error||''); })
+      .catch(()=>{ m.textContent='화면엔 바꿨지만 저장 실패 — 인터넷 연결을 확인해 주세요'; }); };
+}
 """
 
 
@@ -366,6 +420,14 @@ body.bgm #bgmbox{display:block}body.pv #bgmbox{z-index:60;left:0}body.pr #bgmbox
 """
 
 
+def _news_globals(date: str | None) -> str:
+    """교회 소식 고치기 저장 열쇠(그 주 날짜로) — api/worship.js 의 news 와 같은 계산."""
+    import hmac, hashlib
+    sec = next((ln.split("=", 1)[1].strip() for ln in (Path.home() / "dev/daily-briefing/.env").read_text().splitlines() if ln.startswith("JUBO_SECRET=")), "")
+    key = hmac.new(sec.encode(), f"news:{date}".encode(), hashlib.sha256).hexdigest()[:32] if sec and date else ""
+    return f"const NDATE='{date or ''}',NKEY='{key}';\n"
+
+
 def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = None, date: str | None = None) -> str:
     data = [{"img": s["img"], "texts": s["texts"]} for s in slides]
     sl = "".join(f'<section class="sl" id="s{s["n"]}" data-i="{k}"><div class="in"></div><span class="no">{s["n"]}</span></section>'
@@ -388,7 +450,7 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
         sub += '<button class="sub" onclick="bgmOpen()">🎵 BGM</button>'
     nav = wsnav.nav("ppt", m.group(0) if m else title, sub, dls) + f"<script>{wsnav.JS}</script>" + bgm_html(items)
     return PAGE.format(title=html.escape(title), n=len(slides), slides=sl, toc=toc, dl=dl, nav=nav, navcss=wsnav.CSS + BGM_CSS,
-                       data=json.dumps(data, ensure_ascii=False, separators=(",", ":")), pvjs=PVJS)
+                       data=json.dumps(data, ensure_ascii=False, separators=(",", ":")), pvjs=_news_globals(date) + PVJS)
 
 
 def rewrap(slides: list[dict], pptx: Path | None) -> list[dict]:
