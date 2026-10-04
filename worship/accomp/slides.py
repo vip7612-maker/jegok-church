@@ -120,7 +120,7 @@ body{{margin:0;background:#0f172a;color:#fff;font-family:'Pretendard Variable',P
 .top a,.top button{{font:700 13px inherit;text-decoration:none;border:0;border-radius:999px;padding:7px 14px;background:#fff;color:#111;cursor:pointer;white-space:nowrap}}
 .top .pr{{background:#f6c76b}}
 .wrap{{display:flex}}
-#toc{{position:sticky;top:var(--navh,88px);align-self:flex-start;width:190px;flex:0 0 190px;max-height:calc(100vh - var(--navh,88px));overflow-y:auto;padding:10px 8px;background:#0b1220;font-size:13px}}
+#toc{{position:sticky;top:var(--navh,88px);align-self:flex-start;width:190px;flex:0 0 190px;max-height:calc(100vh - var(--navh,88px));overflow-y:auto;padding:10px 8px;background:#0b1220;font-size:14.3px}}
 #toc a{{display:block;color:#cbd5e1;text-decoration:none;padding:5px 8px;border-radius:6px}}#toc a:hover,#toc a.on{{background:#1e293b;color:#f6c76b}}
 #toc a.song{{padding-left:18px;color:#93c5fd}}#toc a:focus,#toc a:focus-visible{{outline:none!important}}#toc a.on{{background:rgba(246,199,107,.16);color:#f6c76b;box-shadow:inset 4px 0 #f6c76b;font-weight:700}}
 main{{flex:1;min-width:0;padding:14px;display:flex;flex-direction:column;align-items:center;gap:14px}}
