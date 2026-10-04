@@ -116,3 +116,5 @@ if __name__ == "__main__":
         if "--dry-run" not in a:                       # 악보와 PPT 「➕ 올리기」도 같은 1분 주기로 (uploads.py)
             import uploads
             uploads.run()
+            import ppt_pages                           # 예배 PPT 「＋ 장 넣기」 🎨 AI 디자인 페이지
+            ppt_pages.run()

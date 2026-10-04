@@ -170,18 +170,18 @@ function fit(){{document.querySelectorAll('.sl').forEach(sl=>{{const k=sl.client
 const MZ=document.createElement('div'); MZ.style.cssText='position:absolute;left:-99999px;top:0;visibility:hidden;white-space:pre;line-height:1'; document.body.appendChild(MZ);
 function measure(t){{ MZ.style.fontSize=t.s+'px'; MZ.style.fontWeight=t.b?800:500; MZ.textContent=t.t; return MZ.scrollWidth; }}
 function paint(sl){{ if(sl.dataset.p) return; sl.dataset.p=1; const s=D[+sl.dataset.i]; const inn=sl.querySelector('.in');
-  inn.style.backgroundImage='url(slides/'+s.img+')';
+  inn.style.backgroundImage=s.img?'url('+(/^https?:/.test(s.img)?s.img:'slides/'+s.img)+')':'none';
   let dy=0;   // 이어 붙인 문단이 PDF 보다 줄이 줄면, 그 아래 왼쪽 맞춤 글을 그만큼 올린다(빈 줄이 남지 않게)
   s.texts.forEach(t=>{{const e=document.createElement('div');e.className='tx';e.textContent=t.t;
     e.style.cssText='left:'+t.x+'px;top:'+(t.y-(t.a==='l'?dy:0))+'px;font-size:'+t.s+'px;color:'+t.c+';font-weight:'+(t.b?800:500)
       +(t.bg?';background:'+t.bg+';padding:5px 12px;border-radius:8px;line-height:1.15':'');   // 작은 단추(봉독대표·회중봉독 …)
-    if(t.wrap){{ e.style.width=t.w+'px'; e.style.whiteSpace='normal'; e.style.wordBreak='keep-all'; e.style.lineHeight=(t.lh||1.2); inn.appendChild(e);   // 원본 한 문단 = 칸 폭에서 저절로 줄바꿈
+    if(t.wrap){{ e.style.width=t.w+'px'; e.style.whiteSpace=t.pre?'pre-wrap':'normal'; e.style.wordBreak='keep-all'; e.style.lineHeight=(t.lh||1.2); inn.appendChild(e);   // 원본 한 문단 = 칸 폭에서 저절로 줄바꿈
       MZ.style.cssText+=';width:'+t.w+'px;white-space:normal;word-break:keep-all;line-height:'+(t.lh||1.2); MZ.style.fontSize=t.s+'px'; MZ.style.fontWeight=t.b?800:500; MZ.textContent=t.t;
       const lines=Math.round(MZ.offsetHeight/(t.s*(t.lh||1.2))), was=Math.round(t.h/(t.s*(t.lh||1.2)));
       dy+=Math.max(0,was-lines)*t.s*(t.lh||1.2); MZ.style.cssText='position:absolute;left:-99999px;top:0;visibility:hidden;white-space:pre;line-height:1'; return; }}
     inn.appendChild(e); const w=measure(t);
     if(w>t.w&&t.w>4) e.style.transform='scaleX('+(t.w/w)+')';
-    else if(t.a==='c') e.style.left=(t.x+(t.w-w)/2)+'px';}}); }}
+    else if(t.a==='c') e.style.left=(t.x+(t.w-w)/2)+'px';}}); if(window.xpPaint) xpPaint(s,inn); }}
 const io=new IntersectionObserver(es=>es.forEach(x=>{{if(x.isIntersecting)paint(x.target)}}),{{rootMargin:'800px'}});
 document.querySelectorAll('.sl').forEach(sl=>io.observe(sl));
 addEventListener('resize',fit); (document.fonts?document.fonts.ready:Promise.resolve()).then(fit); fit();
@@ -290,7 +290,7 @@ function thumbs(at){ const [s,e]=songRange(at==null?cur:at), box=document.getEle
   if(!thR||thR[0]!==s||thR[1]!==e){ box.replaceChildren();
     for(let k=s;k<e;k++){ paint(all[k]); const c=all[k].cloneNode(true); c.removeAttribute('id'); c.classList.remove('cur');
       const w=document.createElement('div'); w.className='th'; w.dataset.k=k; w.title=(k+1)+'번째 장 — 누르면 앞 화면으로'; w.appendChild(c); w.onclick=()=>go(k); box.appendChild(w); }
-    thR=[s,e]; }
+    if(window.xpThumbs) xpThumbs(box,s,e); thR=[s,e]; }
   box.querySelectorAll('.th').forEach(t=>t.classList.toggle('on',+t.dataset.k===cur)); fit();
   const on=box.querySelector('.th.on'); if(on) on.scrollIntoView({block:'nearest'}); }
 function go(i,quiet){ const fe=document.activeElement; if(fe&&fe.closest&&fe.closest('#toc')) fe.blur();   // 목차 초점 테두리가 지난 항목에 남지 않게
@@ -322,7 +322,7 @@ const EDIT=[...new Set([...NEWS,...ROLE])];
 const NAMEONLY=i=>/^(Prayer|Offering|Special\s*Praise|대표\s*기도|봉\s*헌|특\s*송)/.test(D[i].texts.map(x=>x.t).join(' ').trim());
 const ISNAME=t=>t.s>=40&&t.s<100;
 const ORIG=D.map(s=>s.texts.map(t=>t.t).join('\n'));
-function repaint(i){ const sl=all[i]; if(!sl) return; sl.querySelectorAll('.in .tx').forEach(x=>x.remove()); delete sl.dataset.p; paint(sl);
+function repaint(i){ const sl=all.find(x=>+x.dataset.i===i); if(!sl) return; sl.querySelectorAll('.in .tx').forEach(x=>x.remove()); delete sl.dataset.p; paint(sl);
   if(document.body.classList.contains('pv')){ thR=null; go(cur,true); } fit(); }
 function applyNews(i,texts){ if(!D[i]) return; texts.forEach((t,j)=>{ if(D[i].texts[j]) D[i].texts[j].t=t; }); repaint(i); }
 if(bc){ const prev=bc.onmessage; bc.onmessage=e=>{ const m=e.data||{}; if(m.news){ applyNews(m.news.i,m.news.texts); return; } if(prev) prev(e); }; }
@@ -338,7 +338,7 @@ if(!SCREEN&&EDIT.length){
   document.head.appendChild(st);
   const btn=document.createElement('button'); btn.id='nbtn'; btn.textContent='✏️ 교회 소식 수정'; document.body.appendChild(btn);
   const box=document.createElement('div'); box.id='nbox'; box.innerHTML='<div class="p"><h3>✏️ 교회 소식 수정</h3><div class="h"></div><div class="f"></div><div class="b"><span class="m"></span><button class="no">닫기</button><button class="ok">저장 — 앞 화면에 바로 반영</button></div></div>'; document.body.appendChild(box);
-  const here=()=>document.body.classList.contains('pv')||ONE()?cur:firstVisible();
+  const here=()=>{ const k=document.body.classList.contains('pv')||ONE()?cur:firstVisible(); return all[k]?+all[k].dataset.i:k; };
   const sync=()=>{ const h=here(); btn.style.display=EDIT.includes(h)?'block':'none'; btn.textContent=NEWS.includes(h)?'✏️ 교회 소식 수정':NAMEONLY(h)?'✏️ 이름 수정':'✏️ 이름·내용 수정'; };
   const _go=go; go=function(i,q){ _go(i,q); sync(); }; const _view=view; view=function(i){ _view(i); sync(); };
   addEventListener('scroll',()=>{ if(!ONE()) sync(); },{passive:true}); setInterval(sync,800); sync();
@@ -483,6 +483,131 @@ CHAT_JS = r"""
 """
 
 
+# ── ＋ 장 끼워 넣기 — 교회 소식·설교 뒤에 (2026-10-04 교장님) ──────────────────────────────
+# 발표자 보기 아래 미리 보기 칸에 ＋ → ① 글 페이지(직접 쓰기) ② AI 디자인 페이지(문구를 쓰면 맥미니가 html 스킬로 글·도식 HTML,
+# 배경은 템플릿 그대로) ③ 유튜브 페이지(앞 화면에서 꽉 차게 재생). 서버(ppt_pages)에 저장 — 앞 화면 창도 같이 바뀐다.
+XP_CSS = """
+#pvthumbs .th.add{display:flex;align-items:center;justify-content:center;aspect-ratio:16/9;border:3px dashed #475569;border-radius:8px;color:#cbd5e1;font:800 22px 'Pretendard Variable',sans-serif;cursor:pointer}
+#pvthumbs .th.add:hover{border-color:#f6c76b;color:#f6c76b}
+#pvthumbs .th .xpb{position:absolute;left:6px;top:6px;display:flex;gap:4px;z-index:3}#pvthumbs .th{position:relative}
+#pvthumbs .th .xpb button{border:0;border-radius:6px;background:rgba(15,23,42,.85);color:#fff;font-size:14px;padding:3px 7px;cursor:pointer}
+#xpbox{position:fixed;inset:0;z-index:90;display:none;background:rgba(0,0,0,.6);align-items:center;justify-content:center}
+#xpbox.on{display:flex}#xpbox .p{background:#fff;color:#111;border-radius:14px;width:min(820px,94vw);max-height:92vh;overflow:auto;padding:18px 20px;font:15px 'Pretendard Variable',sans-serif}
+#xpbox h3{margin:0 0 10px}#xpbox .ch3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+#xpbox .ch3 button{border:2px solid #e2e8f0;border-radius:12px;background:#f8fafc;padding:16px 10px;cursor:pointer;font:700 15px inherit;text-align:center;line-height:1.5}
+#xpbox .ch3 button:hover{border-color:#f6c76b;background:#fffbeb}#xpbox .ch3 small{display:block;font-weight:400;color:#64748b;font-size:12.5px}
+#xpbox label{display:block;font-weight:700;margin:10px 0 4px}#xpbox input,#xpbox textarea{width:100%;box-sizing:border-box;font:16px 'Pretendard Variable',sans-serif;border:1px solid #cbd5e1;border-radius:8px;padding:8px}
+#xpbox textarea{min-height:180px;resize:vertical}#xpbox .hint{color:#64748b;font-size:13px;margin-top:6px}
+#xpbox .b{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}#xpbox .b button{font:700 15px inherit;border:0;border-radius:999px;padding:10px 18px;cursor:pointer}
+#xpbox .ok{background:#1f2937;color:#fff}#xpbox .no{background:#e2e8f0}#xpbox .m{margin-right:auto;align-self:center;color:#b45309;font-size:13px}
+#xpbox .ed{width:100%;aspect-ratio:16/9;border:1px solid #cbd5e1;border-radius:8px;background-size:cover;position:relative;overflow:hidden}
+#xpbox .ed iframe{position:absolute;left:0;top:0;width:1920px;height:1080px;border:0;transform-origin:0 0}
+"""
+
+XP_JS = r"""
+(function(){
+const SECT={news:/^교회\s*소식$/, sermon:/^설교$/}, NAME={news:'교회 소식',sermon:'설교'};
+let poll=null;
+const anchor=sect=>[...document.querySelectorAll('#toc a')].find(a=>SECT[sect].test(a.textContent.trim()));
+function startOf(sect){ const a=anchor(sect); return a?all.indexOf(document.getElementById(a.getAttribute('href').slice(1))):-1; }
+function bg(){ const n=startOf('news'), nx=n>=0&&all[n+1]&&!all[n+1].classList.contains('xp')?D[+all[n+1].dataset.i]:null;
+  const plain=d=>d&&d.img&&!d.html&&!d.pic&&d.texts.some(t=>t.c==='#ffffff'&&t.a==='l');      // 흰 글자 왼쪽 맞춤 = 갈색 내용 장(소식·봉독)
+  if(plain(nx)) return nx.img; const any=D.find(plain); return any?any.img:(n>=0?D[+all[n].dataset.i].img:''); }
+const ytId=u=>{ const m=String(u||'').match(/(?:youtu\.be\/|v=|embed\/|shorts\/|live\/)([\w-]{11})/); return m?m[1]:(/^[\w-]{11}$/.test(u)?u:''); };
+function pageD(p){ const d=p.data||{}, b=bg();
+  if(p.type==='text'){ const tl=Math.max(1,Math.ceil((d.title||'').length/22));
+    return {img:b, texts:[...(d.title?[{x:80,y:64,w:1280,h:0,s:62,c:'#ffffff',b:true,t:d.title,a:'l',wrap:true,lh:1.25}]:[]),
+      {x:80,y:d.title?64+tl*78+36:70,w:1280,h:0,s:48,c:'#ffffff',b:false,t:d.body||'',a:'l',wrap:true,pre:true,lh:1.5}]}; }
+  if(p.type==='yt') return {img:b, yt:d.id, pic:{url:'https://i.ytimg.com/vi/'+d.id+'/hqdefault.jpg',x:220,y:d.title?130:105,w:1000,h:562}, play:true,
+      texts:d.title?[{x:220,y:40,w:1000,h:0,s:44,c:'#ffffff',b:true,t:d.title,a:'l',wrap:true,lh:1.2}]:[]};
+  if(p.type==='html'&&p.status==='ready'&&d.html) return {img:b, html:d.html, texts:[]};
+  return {img:b, texts:[{x:80,y:330,w:1280,h:0,s:50,c:'#f6c76b',b:true,a:'l',wrap:true,lh:1.35,
+      t:p.status==='fail'?'⚠️ 만들지 못했습니다 — ✏️ 로 다시 시도해 주세요':'🛠 AI가 「'+(d.title||'새 페이지')+'」 페이지를 만드는 중… (1~2분)'}]};
+}
+window.xpPaint=(s,inn)=>{
+  if(s.pic){ const im=document.createElement('img'); im.src=s.pic.url; im.alt='';
+    im.style.cssText='position:absolute;left:'+s.pic.x+'px;top:'+s.pic.y+'px;width:'+s.pic.w+'px;height:'+s.pic.h+'px;object-fit:cover;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.4)'; inn.appendChild(im); }
+  if(s.play){ const p=document.createElement('div'); p.className='xplay'; p.textContent='▶';
+    p.style.cssText='position:absolute;left:'+(s.pic.x+s.pic.w/2-70)+'px;top:'+(s.pic.y+s.pic.h/2-70)+'px;width:140px;height:140px;border-radius:50%;background:rgba(220,38,38,.92);color:#fff;font-size:64px;display:flex;align-items:center;justify-content:center;padding-left:10px;box-sizing:border-box'; inn.appendChild(p); }
+  if(s.html){ const f=document.createElement('iframe'); f.srcdoc=s.html;   // 스크립트는 맥미니가 빼고 저장(sandbox 를 걸면 글자가 안 그려졌다)
+    f.style.cssText='position:absolute;left:0;top:0;width:1920px;height:1080px;border:0;transform:scale(.75);transform-origin:0 0;pointer-events:none;background:transparent'; inn.appendChild(f); }
+};
+function applyPages(list){ const curEl=all[cur];
+  all.filter(x=>x.classList.contains('xp')).forEach(x=>{ io.unobserve(x); x.remove(); all.splice(all.indexOf(x),1); });
+  for(const sect of ['news','sermon']){ const s0=startOf(sect); if(s0<0) continue; let at=songRange(s0)[1];
+    list.filter(p=>p.sect===sect).forEach(p=>{ const di=D.length; D.push(pageD(p));
+      const sec=document.createElement('section'); sec.className='sl xp'; sec.dataset.i=di; sec.dataset.xp=p.id; sec.dataset.sect=sect;
+      sec.innerHTML='<div class="in"></div><span class="no">+</span>';
+      deck.insertBefore(sec, all[at]||document.getElementById('vbar')); all.splice(at,0,sec); at++; io.observe(sec); }); }
+  window.XP=list; const k=all.indexOf(curEl); if(k>=0) cur=k;
+  fit(); thR=null;
+  if(document.body.classList.contains('pv')) go(cur,true); else if(SCREEN) show(cur,true); else if(ONE()) view(cur);
+  clearTimeout(poll); if(list.some(p=>p.type==='html'&&(p.status==='wait'||p.status==='work'))) poll=setTimeout(loadPages,8000);
+}
+async function loadPages(){ if(!NDATE) return; try{ const r=await fetch('/api/worship?pages='+NDATE,{cache:'no-store'}); if(r.ok) applyPages(await r.json()); }catch(e){} }
+window.xpReload=loadPages;
+async function save(body){ const r=await fetch('/api/worship',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({date:NDATE,key:NKEY},body))});
+  const j=await r.json().catch(()=>({})); if(!j.ok) throw new Error(j.error||'저장 실패'); await loadPages(); if(bc) bc.postMessage({pages:1}); return j; }
+// ── 미리 보기 칸: 교회 소식·설교 구간이면 ＋, 끼운 장에는 ✏️ 🗑
+window.xpThumbs=(box,s,e)=>{
+  const sect=['news','sermon'].find(x=>startOf(x)===s); if(!sect||SCREEN) return;
+  box.querySelectorAll('.th').forEach(t=>{ const sl=all[+t.dataset.k]; if(!sl||!sl.classList.contains('xp')) return;
+    const id=+sl.dataset.xp, pg=(window.XP||[]).find(p=>p.id===id); const bar=document.createElement('div'); bar.className='xpb';
+    const ed=document.createElement('button'); ed.textContent='✏️'; ed.title='고치기'; ed.onclick=ev=>{ ev.stopPropagation(); open(sect,pg); };
+    const del=document.createElement('button'); del.textContent='🗑'; del.title='빼기'; del.onclick=async ev=>{ ev.stopPropagation(); if(confirm('이 장을 뺄까요?')){ try{ await save({action:'pagedel',id}); }catch(err){ alert(err.message); } } };
+    bar.append(ed,del); t.appendChild(bar); });
+  const add=document.createElement('div'); add.className='th add'; add.textContent='＋ 장 넣기'; add.title=NAME[sect]+' 뒤에 장 넣기'; add.onclick=()=>open(sect,null); box.appendChild(add);
+};
+// ── 넣기·고치기 창
+const box=document.createElement('div'); box.id='xpbox'; box.innerHTML='<div class="p"></div>';
+box.addEventListener('keydown',e=>e.stopPropagation(),true); box.addEventListener('click',e=>{ if(e.target===box) box.classList.remove('on'); });
+const P=()=>box.querySelector('.p');
+const esc=t=>String(t||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function foot(okText){ return '<div class="b"><span class="m"></span><button class="no">닫기</button><button class="ok">'+okText+'</button></div>'; }
+function wire(onOk){ P().querySelector('.no').onclick=()=>box.classList.remove('on');
+  P().querySelector('.ok').onclick=async()=>{ const m=P().querySelector('.m'); m.textContent='저장 중…'; try{ await onOk(); box.classList.remove('on'); }catch(err){ m.textContent=err.message; } }; }
+function open(sect,pg){ if(!box.isConnected) document.body.appendChild(box); box.classList.add('on');
+  if(pg) return form(sect,pg.type,pg);
+  P().innerHTML='<h3>＋ '+NAME[sect]+' 뒤에 장 넣기</h3><div class="ch3">'
+    +'<button data-t="text">📝 글 페이지<small>제목·내용을 직접 씁니다</small></button>'
+    +'<button data-t="html">🎨 AI 디자인 페이지<small>문구를 쓰면 글·도식으로 꾸며 줍니다(배경은 템플릿)</small></button>'
+    +'<button data-t="yt">▶ 유튜브 페이지<small>앞 화면에서 꽉 차게 재생</small></button></div>'+foot('').replace('<button class="ok"></button>','');
+  P().querySelector('.no').onclick=()=>box.classList.remove('on');
+  P().querySelectorAll('.ch3 button').forEach(b=>b.onclick=()=>form(sect,b.dataset.t,null)); }
+function form(sect,type,pg){ const d=(pg&&pg.data)||{};
+  if(type==='text'){ P().innerHTML='<h3>📝 글 페이지</h3><label>제목</label><input class="t" value="'+esc(d.title)+'"><label>내용</label><textarea class="c">'+esc(d.body)+'</textarea>'+foot(pg?'고치기':'넣기');
+    wire(()=>save({action:'page',id:pg&&pg.id,sect,type:'text',data:{title:P().querySelector('.t').value.trim(),body:P().querySelector('.c').value}})); return; }
+  if(type==='yt'){ P().innerHTML='<h3>▶ 유튜브 페이지</h3><label>유튜브 주소</label><input class="u" placeholder="https://youtu.be/…" value="'+esc(d.id?'https://youtu.be/'+d.id:'')+'"><label>제목(선택)</label><input class="t" value="'+esc(d.title)+'"><div class="hint">이 장이 앞 화면에 나오면 영상이 꽉 찬 화면으로 재생됩니다. 다음 장으로 넘기면 닫힙니다.</div>'+foot(pg?'고치기':'넣기');
+    wire(()=>{ const id=ytId(P().querySelector('.u').value.trim()); if(!id) throw new Error('유튜브 주소를 확인해 주세요'); return save({action:'page',id:pg&&pg.id,sect,type:'yt',data:{id,title:P().querySelector('.t').value.trim()}}); }); return; }
+  // html — 처음엔 문구, 다 만들어진 뒤엔 화면에서 글자를 바로 고친다
+  if(pg&&d.html&&pg.status==='ready'){ P().innerHTML='<h3>🎨 AI 디자인 페이지 — 글자 고치기</h3><div class="ed" style="background-image:url('+(bg()?'slides/'+bg():'')+')"><iframe></iframe></div><div class="hint">글자를 눌러 바로 고칩니다. 내용을 크게 바꾸려면 「문구 바꿔 다시 만들기」.</div>'
+      +'<div class="b"><span class="m"></span><button class="no">닫기</button><button class="re">문구 바꿔 다시 만들기</button><button class="ok">저장</button></div>';
+    const ed=P().querySelector('.ed'), f=ed.querySelector('iframe'); f.srcdoc=d.html;
+    const sc=()=>{ f.style.transform='scale('+(ed.clientWidth/1920)+')'; }; sc(); setTimeout(sc,50);
+    f.onload=()=>{ try{ f.contentDocument.designMode='on'; }catch(e){} };
+    P().querySelector('.re').onclick=()=>{ pg=Object.assign({},pg,{status:'wait'}); htmlForm(sect,pg,d); };
+    wire(()=>{ const doc=f.contentDocument; doc.designMode='off'; return save({action:'page',id:pg.id,sect,type:'html',data:Object.assign({},d,{html:'<!doctype html>\n'+doc.documentElement.outerHTML})}); }); return; }
+  htmlForm(sect,pg,d); }
+function htmlForm(sect,pg,d){ P().innerHTML='<h3>🎨 AI 디자인 페이지</h3><label>제목</label><input class="t" value="'+esc(d.title)+'"><label>문구 (이 내용으로 글·도식 페이지를 만듭니다)</label><textarea class="c" placeholder="예) 추수감사절 홈커밍데이 — 10월 18일 주일 10:30, 사랑독채 펜션 별관. 예배 후 점심과 레크리에이션…">'+esc(d.body)+'</textarea><div class="hint">배경은 지금 PPT 템플릿 그대로 두고, 글과 간단한 도식(순서·일정·비교)으로 꾸밉니다. 맥미니가 1~2분 안에 만들어 이 자리에 넣습니다.</div>'+foot(pg?'다시 만들기':'AI로 만들기');
+  wire(()=>{ const t=P().querySelector('.t').value.trim(), c=P().querySelector('.c').value.trim(); if(!c&&!t) throw new Error('문구를 써 주세요');
+    return save({action:'page',id:pg&&pg.id,sect,type:'html',data:{title:t,body:c}}); }); }
+// ── 앞 화면: 유튜브 장이면 꽉 차게 재생, 끼운 장 바뀌면 다시 불러오기
+let ytOn=false;
+function ytCheck(){ const sl=all[cur], d=sl&&D[+sl.dataset.i];
+  if(d&&d.yt&&document.body.classList.contains('pr')){ if(typeof bgmFS==='function') bgmFS(d.yt); ytOn=true; }
+  else if(ytOn){ if(typeof bgmFS==='function') bgmFS(null); ytOn=false; } }
+addEventListener('DOMContentLoaded',()=>{
+  const _s=show; show=function(i,q){ _s(i,q); ytCheck(); };
+  if(bc){ const prev=bc.onmessage; bc.onmessage=e=>{ const m=e.data||{}; if(m.pages){ loadPages(); return; } if(prev) prev(e); }; }
+  deck.addEventListener('click',e=>{ const sl=e.target.closest('.sl.xp'); if(!sl||document.body.classList.contains('pr')) return; const d=D[+sl.dataset.i]; if(!d||!d.yt) return;
+    const inn=sl.querySelector('.in'); if(inn.querySelector('iframe')) return; const f=document.createElement('iframe');
+    f.src='https://www.youtube-nocookie.com/embed/'+d.yt+'?autoplay=1&rel=0'; f.allow='autoplay; encrypted-media; fullscreen'; f.allowFullscreen=true;
+    f.style.cssText='position:absolute;left:'+d.pic.x+'px;top:'+d.pic.y+'px;width:'+d.pic.w+'px;height:'+d.pic.h+'px;border:0;border-radius:18px;z-index:5'; inn.appendChild(f); });
+  loadPages(); });
+})();
+"""
+
+
 def _news_globals(date: str | None) -> str:
     """교회 소식 고치기 저장 열쇠(그 주 날짜로) — api/worship.js 의 news 와 같은 계산."""
     import hmac, hashlib
@@ -512,8 +637,8 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
         toc += '<a href="#bgm" class="bgm">🎵 BGM</a>'
         sub += '<button class="sub" onclick="bgmOpen()">🎵 BGM</button>'
     toc += CHAT_HTML                              # 💬 예배팀 소통(목차 아래) — 2026-10-04 교장님
-    nav = wsnav.nav("ppt", m.group(0) if m else title, sub, dls, day=date) + f"<script>{wsnav.JS}</script>" + bgm_html(items) + f"<script>{CHAT_JS}</script>"
-    return PAGE.format(title=html.escape(title), n=len(slides), slides=sl, toc=toc, dl=dl, nav=nav, navcss=wsnav.CSS + BGM_CSS + CHAT_CSS,
+    nav = wsnav.nav("ppt", m.group(0) if m else title, sub, dls, day=date) + f"<script>{wsnav.JS}</script>" + bgm_html(items) + f"<script>{CHAT_JS}</script><script>{XP_JS}</script>"
+    return PAGE.format(title=html.escape(title), n=len(slides), slides=sl, toc=toc, dl=dl, nav=nav, navcss=wsnav.CSS + BGM_CSS + CHAT_CSS + XP_CSS,
                        data=json.dumps(data, ensure_ascii=False, separators=(",", ":")), pvjs=_news_globals(date) + PVJS)
 
 

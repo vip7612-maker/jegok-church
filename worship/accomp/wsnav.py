@@ -20,8 +20,8 @@ CSS = """
 .wsnav .tick{flex:1;min-width:0;text-align:center;font-weight:900;font-size:15px;color:#fde047;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 10px}
 .wsnav .tick:empty{visibility:hidden}
 .wsnav .tick b{display:inline-block;background:#dc2626;color:#fff;border-radius:6px;padding:2px 8px;margin-right:8px;font-size:12px;vertical-align:1px}
-.wsnav .tick.blink{animation:wstick 0.9s steps(2,jump-none) 4}
-@keyframes wstick{0%{opacity:1}50%{opacity:.12}100%{opacity:1}}
+.wsnav .tick.blink{animation:wstick 1.6s ease-in-out 3}
+@keyframes wstick{0%{opacity:1}50%{opacity:.2}100%{opacity:1}}
 .wsnav .tab{width:auto;font:700 14px inherit;border:0;border-radius:999px;padding:7px 15px;background:none;color:#e2e8f0;text-decoration:none;cursor:pointer;white-space:nowrap}
 .wsnav .tab:hover{background:#334155}
 .wsnav .tab.cur{background:#f6c76b;color:#412402}
@@ -74,7 +74,7 @@ JS = r"""
     async function load(){ const d=day(); if(!d) return; try{ const r=await fetch('/api/worship?chat='+d,{cache:'no-store'}); if(!r.ok) return;
         const j=await r.json(); const was=msgs.map(x=>x.id).join(); msgs=j; if(was!==msgs.map(x=>x.id).join()){ k=Math.max(0,msgs.length-1); show(); }
         window.dispatchEvent(new CustomEvent('wschat',{detail:msgs})); }catch(e){} }
-    window.wsChatReload=load; load(); setInterval(load,5000); setInterval(show,5000);
+    window.wsChatReload=load; load(); setInterval(load,5000); setInterval(show,7000);   // 천천히 깜빡이고 7초마다 다음 메시지 (교장님: 너무 빠르다)
   })();
   window.wsCopyLink=function(btn){ const u=location.href.split('#')[0], m=document.querySelector('.wsnav .msg');
     const ok=()=>{ if(m){ m.textContent='링크가 복사되었습니다'; setTimeout(()=>m.textContent='',2500);} const d=btn.closest('details'); if(d) d.open=false; };
