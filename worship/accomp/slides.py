@@ -136,11 +136,11 @@ body.one:not(.pr) main .sl{{display:none;width:min(100%,calc((100vh - var(--navh
 #vbar button{{font:700 14px inherit;border:0;border-radius:999px;padding:8px 18px;background:#fff;color:#111;cursor:pointer}}
 /* 발표자 보기(메인 모니터) — 청중 화면은 두 번째 모니터 창 (2026-10-03 교장님 지시) */
 #pv{{display:none;position:fixed;left:190px;top:var(--navh,88px);right:0;bottom:0;z-index:15;background:#0b1220;padding:14px;gap:12px 16px;
-  grid-template-columns:minmax(0,2.3fr) minmax(0,1fr);grid-template-rows:var(--pvtop,auto) 14px minmax(0,1fr)}}body.pv #pv{{display:grid}}
+  grid-template-columns:min(70%,calc((var(--pvtop,520px) - 26px)*16/9)) minmax(0,1fr);grid-template-rows:var(--pvtop,520px) 14px minmax(0,1fr)}}body.pv #pv{{display:grid}}
 .pvl{{grid-row:1;min-width:0;min-height:0;display:flex;flex-direction:column}}.pvr{{grid-row:1;min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:12px}}#pvsplit{{grid-row:2;grid-column:1/-1;cursor:row-resize;display:flex;align-items:center;justify-content:center;touch-action:none}}#pvsplit::before{{content:'';width:120px;height:6px;border-radius:99px;background:#475569}}#pvsplit:hover::before,#pvsplit.on::before{{background:#f6c76b}}
 /* 썸네일 줄은 아래 전체 폭 — 오른쪽 「발표 끝내기」 아래 빈 곳까지 쓴다 (2026-10-03 교장님 지시) */
 .pvt{{grid-row:3;grid-column:1/-1;min-height:0;display:flex;flex-direction:column}}
-.pvlab{{font-size:12px;color:#94a3b8;margin:0 0 5px}}.pvl .pvbox .sl{{width:100%;max-width:max(260px,calc((var(--pvtop,calc(100vh - 380px)) - 30px)*16/9))}}.pvr .pvbox .sl{{width:100%}}
+.pvlab{{font-size:12px;color:#94a3b8;margin:0 0 5px}}.pvl .pvbox .sl{{width:100%}}.pvr .pvbox .sl{{width:100%;max-width:max(120px,calc((var(--pvtop,520px) - 225px)*16/9))}}.pvr{{container-type:size}}@container (max-height:430px){{.pvnote{{display:none}}}}
 /* 발표자 보기 아래 썸네일 — 지금 노래(목차 한 구간)의 장 전부, 누르면 앞 화면으로 (2026-10-03 교장님 지시) */
 #pvthumbs{{flex:1;min-height:0;overflow-y:auto;display:flex;flex-wrap:wrap;align-content:flex-start;gap:8px;padding:2px}}
 #pvthumbs .th{{width:285px;cursor:pointer;border:3px solid transparent;border-radius:8px;padding:1px}}#pvthumbs .th:hover{{border-color:#475569}}
@@ -225,12 +225,15 @@ let scr=null,t0=0,tick=null;
 // 발표자 보기 위(지금·다음 장) / 아래(미리 보기) 크기 — 가운데 막대를 끌어 위아래로 조절, 이 기기에 기억 (2026-10-04 교장님)
 (function(){ const pv=document.getElementById('pv'), sp=document.getElementById('pvsplit'); if(!pv||!sp) return;
   const set=h=>{ if(h==null){ pv.style.removeProperty('--pvtop'); } else pv.style.setProperty('--pvtop',h+'px'); if(typeof fit==='function') fit(); };
-  try{ const v=+localStorage.getItem('ws_pvtop'); if(v>0) set(v); }catch(e){}
+  let saved=0; try{ saved=+localStorage.getItem('ws_pvtop')||0; }catch(e){}
+  window.pvSize=()=>{ const nh=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--navh'))||88;
+    const room=innerHeight-nh-28-14; set(Math.max(300,saved>0?Math.min(saved,room-140):Math.round(room*0.6))); };
   let drag=null;
   sp.addEventListener('pointerdown',e=>{ drag={y:e.clientY,h:pv.querySelector('.pvl').getBoundingClientRect().height}; sp.classList.add('on'); sp.setPointerCapture(e.pointerId); e.preventDefault(); });
-  sp.addEventListener('pointermove',e=>{ if(!drag) return; const max=pv.clientHeight-160; set(Math.round(Math.max(140,Math.min(max,drag.h+e.clientY-drag.y)))); });
-  sp.addEventListener('pointerup',()=>{ if(!drag) return; drag=null; sp.classList.remove('on'); try{ localStorage.setItem('ws_pvtop',parseInt(pv.style.getPropertyValue('--pvtop'))||''); }catch(e){} });
-  sp.addEventListener('dblclick',()=>{ set(null); try{ localStorage.removeItem('ws_pvtop'); }catch(e){} });
+  sp.addEventListener('pointermove',e=>{ if(!drag) return; const max=pv.clientHeight-160; set(Math.round(Math.max(300,Math.min(max,drag.h+e.clientY-drag.y)))); });
+  sp.addEventListener('pointerup',()=>{ if(!drag) return; drag=null; sp.classList.remove('on'); saved=parseInt(pv.style.getPropertyValue('--pvtop'))||0; try{ localStorage.setItem('ws_pvtop',saved); }catch(e){} });
+  sp.addEventListener('dblclick',()=>{ saved=0; try{ localStorage.removeItem('ws_pvtop'); }catch(e){} pvSize(); });
+  addEventListener('resize',()=>{ if(document.body.classList.contains('pv')) pvSize(); });
 })();
 // BGM 을 앞 화면(두 번째 모니터)에서 꽉 차게 — 발표자 화면에서 고르면 BroadcastChannel 로 영상 번호가 온다 (2026-10-03 교장님)
 function bgmFS(id){ let o=document.getElementById('bgmfs'); if(!id){ if(o)o.remove(); return; }
@@ -268,7 +271,7 @@ async function present(){
   enterPV(start);
 }
 function clock(){const s=Math.floor((Date.now()-t0)/1000); document.getElementById('pvclock').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
-function enterPV(i){ document.body.classList.add('pv'); t0=Date.now(); clearInterval(tick); tick=setInterval(clock,1000); clock(); go(i); }
+function enterPV(i){ document.body.classList.add('pv'); if(window.pvSize) pvSize(); t0=Date.now(); clearInterval(tick); tick=setInterval(clock,1000); clock(); go(i); }
 function mount(id,i){ const box=document.getElementById(id); box.replaceChildren();
   if(i>=all.length){ box.innerHTML='<div class="last">마지막 장입니다</div>'; return; }
   paint(all[i]); const c=all[i].cloneNode(true); c.removeAttribute('id'); c.classList.remove('cur'); box.appendChild(c); }
