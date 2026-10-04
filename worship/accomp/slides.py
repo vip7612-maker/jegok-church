@@ -436,6 +436,52 @@ body.bgm #bgmbox{display:block}body.pv #bgmbox{z-index:60;left:0}body.pr #bgmbox
 @media (max-width:760px){#bgmbox{left:0}}
 """
 
+# ── 💬 예배팀 소통 — PPT 왼쪽 목차 아래 채팅. 체크 안 한 메시지는 상단 메뉴 전광판에서 깜빡이며 번갈아 (2026-10-04 교장님) ──
+CHAT_HTML = ('<div id="chat"><div class="chh">💬 예배팀 소통</div>'
+             '<div class="chin"><textarea id="chtx" rows="2" placeholder="메시지 쓰기 (Enter 발송 · Shift+Enter 줄바꿈)"></textarea>'
+             '<button type="button" id="chgo">챗발송</button></div><div id="chlist"></div></div>')
+
+CHAT_CSS = """
+#chat{margin-top:10px;border-top:1px solid #1e293b;padding-top:10px}
+#chat .chh{font-weight:800;color:#e2e8f0;padding:0 4px 6px}
+#chat .chin{display:flex;flex-direction:column;gap:6px}
+#chtx{width:100%;box-sizing:border-box;resize:vertical;min-height:52px;font:14px 'Pretendard Variable',sans-serif;border:1px solid #334155;border-radius:8px;background:#0f172a;color:#fff;padding:7px 8px}
+#chgo{font:800 14px 'Pretendard Variable',sans-serif;border:0;border-radius:8px;padding:8px;background:#f6c76b;color:#3b2a06;cursor:pointer}
+#chlist{margin-top:8px;max-height:186px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+#chlist .cm{display:flex;gap:7px;align-items:flex-start;background:#1e293b;border-radius:8px;padding:7px 8px;font-size:13.5px;line-height:1.35;color:#f1f5f9;word-break:keep-all;overflow-wrap:anywhere}
+#chlist .cm input{margin:2px 0 0;width:18px;height:18px;flex:0 0 auto;cursor:pointer;accent-color:#16a34a}
+#chlist .cm small{display:block;color:#94a3b8;font-size:11px;margin-top:2px}
+#chlist .none{color:#64748b;font-size:12.5px;padding:2px 4px}
+body.pr #chat{display:none}
+"""
+
+CHAT_JS = r"""
+(function(){
+  const send=async()=>{ const ta=document.getElementById('chtx'), t=ta.value.trim(); if(!t) return;
+    const b=document.getElementById('chgo'); b.disabled=true; b.textContent='보내는 중…';
+    try{ const r=await fetch('/api/worship',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'chat',date:NDATE,key:NKEY,text:t})});
+      const j=await r.json(); if(j.ok){ ta.value=''; if(window.wsChatReload) wsChatReload(); } else alert('발송 실패: '+(j.error||'')); }
+    catch(e){ alert('발송 실패 — 인터넷 연결을 확인해 주세요'); }
+    b.disabled=false; b.textContent='챗발송'; };
+  const hm=s=>{ try{ return new Date(s).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Seoul'}); }catch(e){ return ''; } };
+  function draw(list){ const box=document.getElementById('chlist'); if(!box) return;
+    const atEnd=box.scrollTop+box.clientHeight>=box.scrollHeight-4;
+    box.replaceChildren();
+    if(!list.length){ const n=document.createElement('div'); n.className='none'; n.textContent='확인할 메시지가 없습니다'; box.appendChild(n); return; }
+    list.forEach(m=>{ const row=document.createElement('label'); row.className='cm';
+      const cb=document.createElement('input'); cb.type='checkbox'; cb.title='확인 — 누르면 사라집니다';
+      cb.onchange=async()=>{ row.style.opacity=.35; try{ await fetch('/api/worship',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'chatdone',date:NDATE,key:NKEY,id:m.id})}); }catch(e){} if(window.wsChatReload) wsChatReload(); };
+      const tx=document.createElement('div'); tx.textContent=m.text; const t=document.createElement('small'); t.textContent=hm(m.at); tx.appendChild(t);
+      row.append(cb,tx); box.appendChild(row); });
+    if(atEnd||box.dataset.n!==String(list.length)) box.scrollTop=box.scrollHeight; box.dataset.n=list.length; }
+  addEventListener('wschat',e=>draw(e.detail||[]));
+  addEventListener('DOMContentLoaded',()=>{ const ta=document.getElementById('chtx'), b=document.getElementById('chgo'); if(!ta) return;
+    b.onclick=send;
+    ta.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){ e.preventDefault(); send(); } });
+    ta.addEventListener('keyup',e=>e.stopPropagation()); });
+})();
+"""
+
 
 def _news_globals(date: str | None) -> str:
     """교회 소식 고치기 저장 열쇠(그 주 날짜로) — api/worship.js 의 news 와 같은 계산."""
@@ -465,8 +511,9 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
     if items:
         toc += '<a href="#bgm" class="bgm">🎵 BGM</a>'
         sub += '<button class="sub" onclick="bgmOpen()">🎵 BGM</button>'
-    nav = wsnav.nav("ppt", m.group(0) if m else title, sub, dls) + f"<script>{wsnav.JS}</script>" + bgm_html(items)
-    return PAGE.format(title=html.escape(title), n=len(slides), slides=sl, toc=toc, dl=dl, nav=nav, navcss=wsnav.CSS + BGM_CSS,
+    toc += CHAT_HTML                              # 💬 예배팀 소통(목차 아래) — 2026-10-04 교장님
+    nav = wsnav.nav("ppt", m.group(0) if m else title, sub, dls, day=date) + f"<script>{wsnav.JS}</script>" + bgm_html(items) + f"<script>{CHAT_JS}</script>"
+    return PAGE.format(title=html.escape(title), n=len(slides), slides=sl, toc=toc, dl=dl, nav=nav, navcss=wsnav.CSS + BGM_CSS + CHAT_CSS,
                        data=json.dumps(data, ensure_ascii=False, separators=(",", ":")), pvjs=_news_globals(date) + PVJS)
 
 
