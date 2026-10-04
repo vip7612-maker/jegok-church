@@ -503,10 +503,60 @@ def creed_cover(prs) -> list[str]:
     return out
 
 
+# 한 줄로 보여야 하는 문구 — 글상자가 좁아 둘로 꺾이던 것 (2026-10-04 교장님)
+ONE_LINE = ["성도 모두가 함께 마음을 모아 기도해 주시기 바랍니다", "하나님 아버지의 사랑과 성령님의 교통하심이"]
+
+
+def keep_one_line(prs, phrases=ONE_LINE) -> list[str]:
+    """그 문구가 든 글상자를 흰 바탕(화면 폭 6~70%) 안에서 가운데를 지킨 채 넓혀 문단마다 한 줄로. 그래도 넘치면 1pt씩(20pt 까지) 줄인다."""
+    from pptx.util import Pt, Emu
+    W = prs.slide_width; out = []
+    keys = [re.sub(r"\s", "", x) for x in phrases]
+    for i, s in enumerate(prs.slides):
+        for sh in s.shapes:
+            if not sh.has_text_frame: continue
+            flat = re.sub(r"\s", "", sh.text_frame.text)
+            if not any(k in flat for k in keys): continue
+            lo, hi = W * 0.06, W * 0.70
+            c = sh.left + sh.width / 2
+            half = min(c - lo, hi - c)
+            if half * 2 > sh.width:
+                sh.left, sh.width = Emu(int(c - half)), Emu(int(half * 2))
+            paras = [pa for pa in sh.text_frame.paragraphs if pa.text.strip()]
+            w = _inner(sh)[0]
+            size = max((r.font.size.pt for pa in paras for r in pa.runs if r.font.size), default=24)
+            new = size
+            while new > 20 and any(_lines_needed(pa.text.replace("\v", " ").strip(), new, w) > 1 for pa in paras): new -= 1
+            if new < size:
+                for pa in paras:
+                    for r in pa.runs: r.font.size = Pt(new)
+            out.append(f"{i + 1}장 한 줄로: 글상자 폭 {sh.width / W:.0%}" + (f", {size:.0f}→{new:.0f}pt" if new < size else ""))
+    return out
+
+
+READER_PT = 36       # 성경봉독 봉독자 이름 — 틀의 24pt 의 1.5배 (2026-10-04 교장님). 다시 돌려도 더 커지지 않게 고정값
+
+
+def reader_size(prs) -> list[str]:
+    """「성경 봉독」 표지 장의 봉독자 이름 글상자(본문 표기 아래 작은 글상자)를 READER_PT 로."""
+    from pptx.util import Pt
+    H = prs.slide_height; out = []
+    for i, s in enumerate(prs.slides):
+        ts = [x for x in s.shapes if x.has_text_frame and x.text_frame.text.strip()]
+        if not any(re.sub(r"\s", "", x.text_frame.text) in ("성경봉독", "ScriptureReading") for x in ts): continue
+        low = [x for x in ts if x.top > H * 0.62 and re.search(r"[가-힣]", x.text_frame.text) and len(x.text_frame.text) < 20]
+        for sh in low:
+            runs = [r for pa in sh.text_frame.paragraphs for r in pa.runs]
+            if runs and all((r.font.size.pt if r.font.size else 0) < READER_PT for r in runs):
+                for r in runs: r.font.size = Pt(READER_PT)
+                out.append(f"{i + 1}장 봉독자 이름 「{sh.text_frame.text.strip()}」 {READER_PT}pt")
+    return out
+
+
 def layout(pptx: Path, date: str) -> list[str]:
     from pptx import Presentation
     prs = Presentation(str(pptx))
-    log = reading(prs, date) + fit_ads(prs) + fit_recite(prs) + one_line(prs, "성경암송") + creed_cover(prs)
+    log = reading(prs, date) + fit_ads(prs) + fit_recite(prs) + one_line(prs, "성경암송") + creed_cover(prs) + keep_one_line(prs) + reader_size(prs)
     save(prs, pptx)
     return log
 
