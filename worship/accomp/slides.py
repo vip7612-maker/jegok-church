@@ -174,13 +174,13 @@ function fit(){{document.querySelectorAll('.sl').forEach(sl=>{{const k=sl.client
 // 글자 폭은 늘 보이는 측정 칸에서 잰다 — 발표 중 숨겨 둔 다음 장을 미리 그릴 때 폭이 0 으로 재어져
 // 가운데 정렬 자막이 칸 가운데에서 시작해 잘리던 문제(2026-10-03 교장님 화면)
 const MZ=document.createElement('div'); MZ.style.cssText='position:absolute;left:-99999px;top:0;visibility:hidden;white-space:pre;line-height:1'; document.body.appendChild(MZ);
-function measure(t){{ MZ.style.fontSize=t.s+'px'; MZ.style.fontWeight=t.b?800:500; MZ.textContent=t.t; return MZ.scrollWidth; }}
+function measure(t){{ MZ.style.cssText='position:absolute;left:-99999px;top:0;visibility:hidden;white-space:pre;line-height:1'+(t.css?';'+t.css:''); MZ.style.fontSize=t.s+'px'; MZ.style.fontWeight=t.b?800:500; MZ.textContent=t.t; return MZ.scrollWidth; }}
 function paint(sl){{ if(sl.dataset.p) return; sl.dataset.p=1; const s=D[+sl.dataset.i]; const inn=sl.querySelector('.in');
   inn.style.backgroundImage=s.img?'url('+(/^https?:/.test(s.img)?s.img:'slides/'+s.img)+')':'none';
   let dy=0;   // 이어 붙인 문단이 PDF 보다 줄이 줄면, 그 아래 왼쪽 맞춤 글을 그만큼 올린다(빈 줄이 남지 않게)
   s.texts.forEach(t=>{{const e=document.createElement('div');e.className='tx';e.textContent=t.t;
     e.style.cssText='left:'+t.x+'px;top:'+(t.y-(t.a==='l'?dy:0))+'px;font-size:'+t.s+'px;color:'+t.c+';font-weight:'+(t.b?800:500)
-      +(t.bg?';background:'+t.bg+';padding:5px 12px;border-radius:8px;line-height:1.15':'');   // 작은 단추(봉독대표·회중봉독 …)
+      +(t.bg?';background:'+t.bg+';padding:5px 12px;border-radius:8px;line-height:1.15':'')+(t.css?';'+t.css:'');   // 작은 단추(봉독대표·회중봉독 …)
     if(t.wrap){{ e.style.width=t.w+'px'; e.style.whiteSpace=t.pre?'pre-wrap':'normal'; e.style.wordBreak='keep-all'; e.style.lineHeight=(t.lh||1.2); inn.appendChild(e);   // 원본 한 문단 = 칸 폭에서 저절로 줄바꿈
       MZ.style.cssText+=';width:'+t.w+'px;white-space:normal;word-break:keep-all;line-height:'+(t.lh||1.2); MZ.style.fontSize=t.s+'px'; MZ.style.fontWeight=t.b?800:500; MZ.textContent=t.t;
       const lines=Math.round(MZ.offsetHeight/(t.s*(t.lh||1.2))), was=Math.round(t.h/(t.s*(t.lh||1.2)));
@@ -757,7 +757,10 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
     sub += tail
     toc += CHAT_HTML                              # 💬 예배팀 소통(목차 아래) — 2026-10-04 교장님
     # 「예배용 PPT 열기」(모음 쪽)는 ppt.html#pv — 바로 발표자 보기로 열고, 📺 프레젠테이션 열기 한 번으로 두 번째 모니터 (창은 눌러야 열린다)
-    nav_pv = "<script>addEventListener('load',()=>{ if(location.hash==='#pv'&&!new URLSearchParams(location.search).has('screen')) enterPV(0); });</script>"
+    nav_pv = ("<script>addEventListener('DOMContentLoaded',()=>{ if(D.some(s=>s.texts.some(t=>t.css&&/Serif|Cormorant/.test(t.css)))){const l=document.createElement('link');l.rel='stylesheet';"
+              "l.href='https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;900&family=Cormorant+Garamond:ital,wght@0,500;1,500&display=swap';document.head.appendChild(l);"
+              "(document.fonts?document.fonts.ready:Promise.resolve()).then(()=>{document.querySelectorAll('.sl').forEach(x=>{delete x.dataset.p;x.querySelectorAll('.tx').forEach(e=>e.remove());});document.querySelectorAll('.sl.cur').forEach(x=>paint(x));});} });</script>")
+    nav_pv += "<script>addEventListener('load',()=>{ if(location.hash==='#pv'&&!new URLSearchParams(location.search).has('screen')) enterPV(0); });</script>"
     # 2단 밑줄(켜짐)은 지금 보기를 따라간다 — 발표자 보기면 ▶ 예배용, 아니면 한 장씩·목록 (2026-10-04 교장님)
     nav_pv += ("<script>addEventListener('DOMContentLoaded',()=>{ const sync=()=>{ const c=document.body.classList, pv=c.contains('pv');"
                "const set=(id,on)=>{ const b=document.getElementById(id); if(b) b.classList.toggle('on',on); };"

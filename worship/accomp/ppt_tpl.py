@@ -142,15 +142,19 @@ def set_main(s: dict, val: str, size_min: float = 40) -> None:
     """표지 장의 맡은 분(가운데 큰 갈색 글자) 바꾸기."""
     for t in s["texts"]:
         if t["s"] >= size_min and t["s"] < 100 and t["c"] != "#efe6dd":
-            cx = t["x"] + t["w"] / 2   # 틀 글자의 가운데를 그대로
-            t["t"] = val; t["w"] = int(text_w(val, t["s"])) + 4; t["x"] = int(cx - t["w"] / 2); return
+            cx = t["x"] + t["w"] / 2   # 틀 글자의 가운데를 그대로(왼쪽 맞춤 틀이면 왼쪽 끝을 그대로)
+            t["t"] = val; t["w"] = int(text_w(val, t["s"])) + 4
+            if t.get("a") != "l": t["x"] = int(cx - t["w"] / 2)
+            return
 
 
 def set_small(s: dict, val: str) -> None:
     for t in s["texts"]:
         if 20 <= t["s"] < 40 and t["y"] > 520:   # 봉독자 이름은 36pt(틀 24pt 의 1.5배, 2026-10-04 교장님)
-            cx = t["x"] + t["w"] / 2   # 틀 글자의 가운데를 그대로
-            t["t"] = val; t["w"] = int(text_w(val, t["s"])) + 4; t["x"] = int(cx - t["w"] / 2); return
+            cx = t["x"] + t["w"] / 2   # 틀 글자의 가운데를 그대로(왼쪽 맞춤 틀이면 왼쪽 끝을 그대로)
+            t["t"] = val; t["w"] = int(text_w(val, t["s"])) + 4
+            if t.get("a") != "l": t["x"] = int(cx - t["w"] / 2)
+            return
 
 
 def make(date: str, sid: str) -> Path:
