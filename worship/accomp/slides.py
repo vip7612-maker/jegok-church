@@ -143,9 +143,9 @@ body.pvfold #pv{{grid-template-columns:minmax(0,1fr) 0 0}}body.pvfold #pvsplit{{
 #pvsplit{{grid-column:2;cursor:col-resize;display:flex;align-items:center;justify-content:center;touch-action:none}}#pvsplit::before{{content:'';width:6px;height:120px;border-radius:99px;background:#475569}}#pvsplit:hover::before,#pvsplit.on::before{{background:#f6c76b}}
 .pvside{{grid-column:3;min-width:0;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px}}
 #pvfold{{flex:0 0 auto;margin-left:auto;font:700 12.5px inherit;border:0;border-radius:999px;padding:5px 12px;background:#1e293b;color:#cbd5e1;cursor:pointer}}#pvfold:hover{{color:#f6c76b}}
-body.pvfold .pvside{{display:none}}.pvth{{display:flex;align-items:center;gap:10px;margin:0 0 5px}}.pvth .pvlab{{margin:0;min-width:0}}body.pvfold #pvfold{{background:#f6c76b;color:#3b2a06}}
+body.pvfold .pvside{{display:none}}.pvth{{display:flex;align-items:center;gap:10px;margin:0 0 5px}}#pvscr{{flex:0 0 auto;margin-left:auto;font:800 12.5px inherit;border:0;border-radius:999px;padding:5px 12px;background:#f6c76b;color:#3b2a06;cursor:pointer}}#pvscr~#pvfold{{margin-left:0}}.pvth .pvlab{{margin:0;min-width:0}}body.pvfold #pvfold{{background:#f6c76b;color:#3b2a06}}
 .pvl,.pvr{{min-width:0;display:flex;flex-direction:column;gap:12px}}
-.pvlab{{font-size:12px;color:#94a3b8;margin:0 0 5px}}.pvpn{{display:flex;justify-content:space-between;align-items:flex-start}}.pvq{{width:calc(50% - 4px);cursor:pointer}}.pvq .pvlab{{margin:0 0 3px}}.pvq .sl{{border-radius:4px}}.pvq:hover .sl{{outline:2px solid #f6c76b}}.pvq .last{{font-size:11px}}.pvl .pvbox .sl{{width:100%}}.pvr .pvbox .sl{{width:100%}}
+.pvlab{{font-size:12px;color:#94a3b8;margin:0 0 5px}}.pvpn{{display:flex;flex-direction:column;gap:10px}}.pvq:last-child{{align-self:flex-end}}.pvq{{width:80%;cursor:pointer}}.pvq .pvlab{{margin:0 0 3px}}.pvq .sl{{border-radius:4px}}.pvq:hover .sl{{outline:2px solid #f6c76b}}.pvq .last{{font-size:11px}}.pvl .pvbox .sl{{width:100%}}.pvr .pvbox .sl{{width:100%}}
 /* 발표자 보기 아래 썸네일 — 지금 노래(목차 한 구간)의 장 전부, 누르면 앞 화면으로 (2026-10-03 교장님 지시) */
 #pvthumbs{{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));align-content:start;gap:8px;padding:2px}}
 #pvthumbs .th{{min-width:0;cursor:pointer;border:3px solid transparent;border-radius:8px;padding:1px}}#pvthumbs .th:hover{{border-color:#475569}}
@@ -159,7 +159,7 @@ body.pvfold .pvside{{display:none}}.pvth{{display:flex;align-items:center;gap:10
 {navcss}</style></head><body class="one">
 {nav}
 <div class="wrap"><nav id="toc">{toc}</nav><main id="deck">{slides}<div id="vbar"><button onclick="view(cur-1)">◀ 이전</button><span id="vn"></span><button onclick="view(cur+1)">다음 ▶</button></div></main></div>
-<div id="pv"><div class="pvt"><div class="pvth"><div class="pvlab" id="pvtlab">이 노래·순서의 모든 장 — 누르면 앞 화면에 바로 나갑니다</div><button id="pvfold" onclick="pvFold()" title="오른쪽 칸 접기·열기">접기 ▶</button></div><div id="pvthumbs"></div></div>
+<div id="pv"><div class="pvt"><div class="pvth"><div class="pvlab" id="pvtlab">이 노래·순서의 모든 장 — 누르면 앞 화면에 바로 나갑니다</div><button id="pvscr" onclick="present().then(()=>{{if(scr&&!scr.closed)this.style.display='none';}})" title="두 번째 모니터에 앞 화면 창 열기">📺 앞 화면 열기</button><button id="pvfold" onclick="pvFold()" title="오른쪽 칸 접기·열기">접기 ▶</button></div><div id="pvthumbs"></div></div>
 <div id="pvsplit" title="끌어서 오른쪽 폭 조절 (두 번 누르면 처음대로)"></div>
 <div class="pvside"><div class="pvl"><div class="pvlab">지금 앞 화면</div><div id="pvcur" class="pvbox"></div><div class="pvpn"><div class="pvq" onclick="go(cur-1)" title="이전 장으로"><div class="pvlab">◀ 이전 장</div><div id="pvprev" class="pvbox"></div></div><div class="pvq" onclick="go(cur+1)" title="다음 장으로"><div class="pvlab" style="text-align:right">다음 장 ▶</div><div id="pvnext" class="pvbox"></div></div></div></div>
 <div class="pvr">
@@ -743,10 +743,10 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
     m = _re.search(r"\d+월 \d+일", title)
     dls = [(("📊 PPT 받기" if h.endswith(".pptx") else "📕 PDF 받기"), h) for h in _re.findall(r'href="([^"]+)"', dl or "")]
     note = "" if dls else _re.sub(r"<[^>]+>", "", dl or "")
-    sub = ('<button class="sub on" id="b-one" onclick="wsView(true)">▣ 한 장씩</button>'
-           '<button class="sub" id="lbtn" onclick="wsView(false)">☰ 목록</button>'
-           '<button class="sub" onclick="present()">▶ 예배용(두 화면)</button>'
-           + (f'<span class="note">{html.escape(note)}</span>' if note.strip() else ""))
+    sub = ('<button class="sub" onclick="present()">▶ 예배용(두 화면)</button>'      # 예배용이 맨 앞 (2026-10-04 교장님)
+           '<button class="sub on" id="b-one" onclick="wsView(true)">▣ 한 장씩</button>'
+           '<button class="sub" id="lbtn" onclick="wsView(false)">☰ 목록</button>')
+    tail = f'<span class="note">{html.escape(note)}</span>' if note.strip() else ""
     if not date and m:                            # 날짜를 안 받았으면 제목(「10월 11일」)에서
         import datetime as dt
         mo, da = map(int, re.findall(r"\d+", m.group(0))); date = f"{dt.date.today().year}-{mo:02d}-{da:02d}"
@@ -754,8 +754,11 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
     if items:
         toc += '<a href="#bgm" class="bgm">🎵 BGM</a>'
         sub += '<button class="sub" onclick="bgmOpen()">🎵 BGM</button>'
+    sub += tail
     toc += CHAT_HTML                              # 💬 예배팀 소통(목차 아래) — 2026-10-04 교장님
-    nav = wsnav.nav("ppt", m.group(0) if m else title, sub, dls, day=date) + f"<script>{wsnav.JS}</script>" + bgm_html(items) + f"<script>{CHAT_JS}</script><script>{XP_JS}</script>"
+    # 「예배용 PPT 열기」(모음 쪽)는 ppt.html#pv — 바로 발표자 보기로 열고, 📺 앞 화면 열기 한 번으로 두 번째 모니터 (창은 눌러야 열린다)
+    nav_pv = "<script>addEventListener('load',()=>{ if(location.hash==='#pv'&&!new URLSearchParams(location.search).has('screen')) enterPV(0); });</script>"
+    nav = nav_pv + wsnav.nav("ppt", m.group(0) if m else title, sub, dls, day=date) + f"<script>{wsnav.JS}</script>" + bgm_html(items) + f"<script>{CHAT_JS}</script><script>{XP_JS}</script>"
     return PAGE.format(title=html.escape(title), n=len(slides), slides=sl, toc=toc, dl=dl, nav=nav, navcss=wsnav.CSS + BGM_CSS + CHAT_CSS + XP_CSS,
                        data=json.dumps(data, ensure_ascii=False, separators=(",", ":")), pvjs=_news_globals(date) + PVJS)
 
