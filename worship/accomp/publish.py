@@ -163,9 +163,9 @@ const today=sundays.find(i=>i.date===TODAY);
 function hero(){const h=document.getElementById('hero');
   if(today){const i=today;
     h.innerHTML='<div class="row"><span class="tag live">● 오늘 · '+md(i.date)+'</span><span class="who">'+(i.leader.length?'인도 '+esc(i.leader.join(', ')):'')+'</span></div>'
-      +'<a class="shot" href="'+i.ppt+'" style="background-image:url(\''+i.cover+'\')"><span class="play">▶ 예배 PPT 열기</span></a>'
+      +'<a class="shot" href="'+i.ppt+'" style="background-image:url(\''+i.cover+'\')"></a>'
       +'<h2>'+esc(i.title||'주일예배')+'</h2><p class="ref">'+esc(i.ref)+'</p>'
-      +'<div class="btns"><a class="p" href="'+i.ppt+'">▶ 예배용 PPT</a><a href="'+i.book+'">예배자 악보</a></div>';
+      +'<div class="btns"><a class="p" href="'+i.ppt+'">▶ 예배용 PPT 열기</a><a href="'+i.book+'">예배자 악보</a></div>';
     return;}
   const up=sundays.filter(i=>i.date>TODAY).sort((a,b)=>a.date<b.date?-1:1)[0];
   const day=up?up.date:nextSunday();

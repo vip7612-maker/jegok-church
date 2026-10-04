@@ -93,7 +93,7 @@ def make(date: str, sid: str) -> Path:
     fname = f"{date} 예배자 악보.pptx"
     pptx(imgs, folder / "doc.pptx")
     rel = [f"ppt/{p.name}" for p in imgs]
-    (folder / "ppt.html").write_text(PAGE.format(
+    (folder / "score-ppt.html").write_text(PAGE.format(   # ppt.html 은 예배 PPT(slides.py) 자리 — 다시 만드는 동안 덮어써 악보집 12쪽이 잠깐 나가던 문제 (2026-10-04)
         title=html.escape(d["title"]), n=len(imgs), fname=html.escape(fname), icon="📽️", unit="장", label="PPT", dl="doc.pptx",
         thumbs="".join(f'<img src="{r}" alt="{i}쪽" loading="lazy">' for i, r in enumerate(rel, 1)),
         imgs=json.dumps(rel)))
@@ -112,6 +112,9 @@ def jubo(date: str, sid: str) -> str:
         r = g.get(f"{prep.DRIVE}/files", q=f"'{fo['id']}' in parents and trashed=false and mimeType='application/pdf'",
                   fields="files(id,name,modifiedTime)", includeItemsFromAllDrives="true")
         pdf = next((f for f in sorted(r.get("files", []), key=lambda f: f["modifiedTime"], reverse=True) if "주보" in f["name"]), None)
+    local = HERE / "jubo" / f"{date}.pdf"   # 2026-10-03부터 드라이브 폴더 없이 — 텔레그램으로 받은 주보(jubo_in.py)
+    local = local if local.exists() else None
+    if local: pdf = {"name": f"{date.replace('-', '')} 주일 주보.pdf"}
     out = folder / "jubo"; out.mkdir(exist_ok=True)
     for old in out.glob("*.jpg"): old.unlink()
     d = json.loads((HERE / "data" / f"{date}.json").read_text())
@@ -123,7 +126,7 @@ def jubo(date: str, sid: str) -> str:
             f'<a href="./" style="background:#fff;color:#111;border-radius:999px;padding:8px 16px;text-decoration:none;font-weight:700">◀ 악보집으로</a></body>')
         (folder / "jubo.pdf").unlink(missing_ok=True)
         return "주보 없음"
-    raw = g.download(pdf["id"]); (folder / "jubo.pdf").write_bytes(raw)
+    raw = local.read_bytes() if local else g.download(pdf["id"]); (folder / "jubo.pdf").write_bytes(raw)
     # HTML 주보 — 한글 파일 + PDF 로 원본 양식 그대로 짠 문서(jubo_form, hwp-to-html 스킬 방식)를 공유하고
     # 주보 단추(jubo.html)는 그 공유본으로 보낸다 (2026-10-03 교장님 지시)
     hwp = None
