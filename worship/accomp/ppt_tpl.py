@@ -84,6 +84,10 @@ def pages(blocks: list[list[tuple[str, bool]]], size: float, step: int, gap: int
         for ln, bold in b:
             if y + step > bottom + step and cur:
                 out.append(cur); cur, y = [], top
+            if ln.startswith("\x00"):                      # 봉독 단추(봉독대표·회중봉독·다함께 봉독) — 금빛 작은 단추, 절 바로 위
+                lab = ln[1:]; ls = round(size * 0.5)
+                cur.append({"x": 45, "y": y, "w": int(len(lab) * ls * 1.05) + 30, "h": ls, "s": ls, "c": "#3b2a06", "bg": "#f6c76b", "b": True, "t": lab, "a": "l"})
+                y += ls + 18; continue
             cur.append({"x": 45, "y": y, "w": 1350, "h": int(size), "s": size, "c": "#ffffff", "b": bold, "t": ln, "a": "l"})
             y += step
         y += gap
@@ -99,7 +103,8 @@ def verse_blocks(ref: str) -> list[list[tuple[str, bool]]]:
         if m:
             ls = wrap(f"{m.group(1)} {m.group(2).strip()}", 60)
             blocks.append([(x, i == 0) for i, x in enumerate(ls)])
-    return blocks
+    import pptfill                                         # 절마다 위에 누가 읽는지 — 원칙은 pptfill.read_label 하나 (2026-10-04 교장님)
+    return [[("\x00" + pptfill.read_label(k, len(blocks)), True)] + b for k, b in enumerate(blocks)]
 
 
 def news_blocks(lines: list[str]) -> list[list[tuple[str, bool]]]:

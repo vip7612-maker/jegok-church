@@ -377,7 +377,40 @@ def fit_ads(prs) -> list[str]:
 
 
 # ── 성경 봉독 본문 장: 한 장에 두 절씩 (2026-10-03 교장님) ─────────────
-VERSE_LINE = re.compile(r"^\s*(\d+)\s{2,}")
+VERSE_LINE = re.compile(r"^\s*(?:(?:봉독대표|회중봉독|다함께 봉독)\s*\n)?\s*(\d+)\s{2,}")   # 앞에 봉독 단추 줄이 붙어 있어도
+
+
+# 성경 봉독 — 절마다 위에 작은 단추(누가 읽는지) (2026-10-04 교장님 원칙)
+#   첫 절 「봉독대표」 → 다음 절 「회중봉독」 → 번갈아. 마지막 절이 홀수 번째(1·3·5…)면 「다함께 봉독」.
+#   전체가 3절 미만이면 모든 절 「다함께 봉독」.
+READ_LABEL_FILL, READ_LABEL_TEXT = "F6C76B", "3B2A06"     # 봉독 장 바탕이 갈색이라 금빛 단추·짙은 글씨
+
+
+def read_label(k: int, n: int) -> str:
+    """k = 본문 안 몇 번째 절(0부터), n = 전체 절 수."""
+    if n < 3: return "다함께 봉독"
+    if k == n - 1 and k % 2 == 0: return "다함께 봉독"
+    return "봉독대표" if k % 2 == 0 else "회중봉독"
+
+
+def _label_para(tpl, label: str):
+    """본문 문단 틀을 본떠 「 봉독대표 」 한 줄 — 금빛 바탕(형광) 짙은 굵은 글씨라 작은 단추처럼 보인다."""
+    from lxml import etree
+    q = copy.deepcopy(tpl)
+    for r in q.findall(A + "r")[1:]: q.remove(r)
+    r = q.find(A + "r"); r.find(A + "t").text = f" {label} "
+    rp = r.find(A + "rPr")
+    if rp is None: rp = etree.SubElement(r, A + "rPr"); r.remove(rp); r.insert(0, rp)
+    rp.set("b", "1")
+    for tag in ("solidFill", "highlight", "gradFill", "noFill"):
+        for x in rp.findall(A + tag): rp.remove(x)
+    fill = etree.Element(A + "solidFill"); etree.SubElement(fill, A + "srgbClr").set("val", READ_LABEL_TEXT)
+    hl = etree.Element(A + "highlight"); etree.SubElement(hl, A + "srgbClr").set("val", READ_LABEL_FILL)
+    ln = rp.find(A + "ln"); rp.insert(list(rp).index(ln) + 1 if ln is not None else 0, fill)
+    after = [x for x in rp if etree.QName(x).localname in ("uLnTx", "uLn", "uFillTx", "uFill", "latin", "ea", "cs", "sym", "hlinkClick", "hlinkMouseOver", "rtl", "extLst")]
+    if after: rp.insert(list(rp).index(after[0]), hl)
+    else: rp.append(hl)
+    return q
 
 
 def reading(prs, date: str) -> list[str]:
@@ -399,19 +432,26 @@ def reading(prs, date: str) -> list[str]:
     for i, g in zip(run, groups):
         sh = body_shape(prs.slides[i]); txBody = sh.text_frame._txBody
         ps = txBody.findall(A + "p")
-        tpl = next(p for p in ps if p.find(A + "r") is not None); blank = next((p for p in ps if p.find(A + "r") is None), None)
+        _pt = lambda p: "".join(t.text or "" for t in p.iter(A + "t"))
+        tpl = next((p for p in ps if p.find(A + "r") is not None and re.match(r"\s*\d", _pt(p))),       # 절 문단(단추 줄 말고)을 틀로
+                   next(p for p in ps if p.find(A + "r") is not None)); blank = next((p for p in ps if p.find(A + "r") is None), None)
         for p in ps: txBody.remove(p)
         for j, v in enumerate(g):
+            txBody.append(_label_para(tpl, read_label(v - a, b - a + 1)))      # 절 위에 누가 읽는지 작은 단추
             q = copy.deepcopy(tpl)
             for r in q.findall(A + "r")[1:]: q.remove(r)
             q.find(A + "r").find(A + "t").text = f"{v}   {text[v]}"
             txBody.append(q)
         from pptx.util import Pt
-        for j, pa in enumerate(sh.text_frame.paragraphs):     # 둘째 절 앞은 한 줄쯤 띄운다(빈 문단 대신)
-            pa.space_before = Pt(36) if j else None
+        for j, pa in enumerate(sh.text_frame.paragraphs):     # 둘째 절(의 단추) 앞은 한 줄쯤 띄우고, 단추와 절 사이는 살짝
+            pa.space_before = Pt(36) if j == 2 else (Pt(4) if j % 2 else None)
     shapes = [body_shape(prs.slides[i]) for i in run]
     sz = best_size(shapes, 60)
-    for x in shapes: set_size(x, sz)
+    for x in shapes:
+        set_size(x, sz)
+        for j, pa in enumerate(x.text_frame.paragraphs):      # 단추 글씨는 본문의 절반쯤
+            if j % 2 == 0:
+                for r in pa.runs: r.font.size = Pt(max(18, round(sz * 0.5)))
     return [f"성경 봉독 {book} {ch}:{a}-{b}: {len(run)}장(두 절씩), 글자 {sz:.0f}pt"]
 
 
