@@ -211,7 +211,7 @@ main{padding:12px;display:flex;flex-direction:column;align-items:center;gap:12px
 .L2{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.18;padding:0 30px;font-family:Calibri,'Pretendard Variable',sans-serif;font-weight:600}
 .L2 div{white-space:nowrap;outline:none}
 body.edit .L2 div{background:rgba(255,255,255,.12);border-radius:6px;outline:2px dashed #f6c76b;margin:2px 0;padding:0 8px;min-width:200px}
-/* 3층 절 바로가기 — 앞 화면 글자를 가리지 않게 슬라이드 아래 줄로 (2026-10-03) */
+/* 3층 절 바로가기 — 프레젠테이션 글자를 가리지 않게 슬라이드 아래 줄로 (2026-10-03) */
 .L3{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:1400px}
 .L3 button{font:600 13px inherit;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:999px;padding:6px 12px;cursor:pointer}
 .L3 button.on{background:#f6c76b;color:#111;border-color:#f6c76b}

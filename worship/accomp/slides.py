@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""주일예배 PPT(앞 화면용) → HTML 슬라이드 (2026-10-03 교장님 지시).
+"""주일예배 PPT(프레젠테이션용) → HTML 슬라이드 (2026-10-03 교장님 지시).
 
 PPT 를 PDF 로 바꾼 파일을 읽어 장마다
   · 배경(사진·색·악보 그림) = 글자를 지운 그림 한 장
@@ -128,7 +128,7 @@ main{{flex:1;min-width:0;padding:14px;display:flex;flex-direction:column;align-i
 .sl .in{{position:absolute;left:0;top:0;width:1440px;height:810px;transform-origin:0 0;background-size:100% 100%}}
 .sl .tx{{position:absolute;white-space:pre;line-height:1;transform-origin:0 0}}
 .sl .no{{position:absolute;right:8px;bottom:6px;font-size:11px;color:#fff;background:rgba(0,0,0,.45);border-radius:999px;padding:1px 7px;z-index:2}}
-body.pr .top,body.pr .wsnav,body.pv .wsnav,body.pr #toc,body.pr .no{{display:none}}/* 앞 화면(두 번째 모니터)·전체 화면 발표엔 상단 메뉴 두 줄을 절대 안 보이게 — wsnav 의 display:block!important 를 이긴다 (2026-10-04 교장님) */body.pr .wsnav,body.pr header.wsnav,body.pr [data-wsnav]{{display:none!important}}body.pr #deck,body.pr main{{margin:0!important;padding:0!important}}body.pr main{{padding:0;gap:0}}body.pr{{background:#000;overflow:hidden}}
+body.pr .top,body.pr .wsnav,body.pv .wsnav,body.pr #toc,body.pr .no{{display:none}}/* 프레젠테이션(두 번째 모니터)·전체 화면 발표엔 상단 메뉴 두 줄을 절대 안 보이게 — wsnav 의 display:block!important 를 이긴다 (2026-10-04 교장님) */body.pr .wsnav,body.pr header.wsnav,body.pr [data-wsnav]{{display:none!important}}body.pr #deck,body.pr main{{margin:0!important;padding:0!important}}body.pr main{{padding:0;gap:0}}body.pr{{background:#000;overflow:hidden}}
 body.pr .sl{{display:none;position:fixed;inset:0;margin:auto;width:min(100vw,calc(100vh*16/9));border-radius:0;box-shadow:none}}body.pr .sl.cur{{display:block}}
 /* 한 장 보기(기본) — 목차를 누르면 스크롤 없이 그 장만 바로 (2026-10-03 교장님 지시) */
 body.one:not(.pr) main .sl{{display:none;width:min(100%,calc((100vh - var(--navh,88px) - 80px)*16/9))}}body.one:not(.pr) main .sl.cur{{display:block}}
@@ -146,7 +146,7 @@ body.pvfold #pv{{grid-template-columns:minmax(0,1fr) 0 0}}body.pvfold #pvsplit{{
 body.pvfold .pvside{{display:none}}.pvth{{display:flex;align-items:center;gap:10px;margin:0 0 5px}}#pvscr{{flex:0 0 auto;margin-left:auto;font:800 12.5px inherit;border:0;border-radius:999px;padding:5px 12px;background:#f6c76b;color:#3b2a06;cursor:pointer}}#pvscr~#pvfold{{margin-left:0}}.pvth .pvlab{{margin:0;min-width:0}}body.pvfold #pvfold{{background:#f6c76b;color:#3b2a06}}
 .pvl,.pvr{{min-width:0;display:flex;flex-direction:column;gap:12px}}
 .pvlab{{font-size:12px;color:#94a3b8;margin:0 0 5px}}.pvpn{{display:flex;justify-content:space-between;align-items:flex-start}}.pvq{{width:calc((50% - 4px) * .8);cursor:pointer}}.pvq .pvlab{{margin:0 0 3px}}.pvq .sl{{border-radius:4px}}.pvq:hover .sl{{outline:2px solid #f6c76b}}.pvq .last{{font-size:11px}}.pvl .pvbox .sl{{width:100%}}.pvr .pvbox .sl{{width:100%}}
-/* 발표자 보기 아래 썸네일 — 지금 노래(목차 한 구간)의 장 전부, 누르면 앞 화면으로 (2026-10-03 교장님 지시) */
+/* 발표자 보기 아래 썸네일 — 지금 노래(목차 한 구간)의 장 전부, 누르면 프레젠테이션으로 (2026-10-03 교장님 지시) */
 #pvthumbs{{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));align-content:start;gap:8px;padding:2px}}
 #pvthumbs .th{{min-width:0;cursor:pointer;border:3px solid transparent;border-radius:8px;padding:1px}}#pvthumbs .th:hover{{border-color:#475569}}
 #pvthumbs .th.on{{border-color:#f6c76b}}#toc a.peek{{outline:2px dashed #93c5fd;outline-offset:-2px;color:#93c5fd}}#pvtlab b{{color:#93c5fd}}.pvback{{margin-left:8px;font:700 12px inherit;border:0;border-radius:999px;padding:4px 10px;background:#fff;color:#111;cursor:pointer}}#pvthumbs .sl{{width:100%;box-shadow:none;border-radius:4px}}
@@ -159,9 +159,9 @@ body.pvfold .pvside{{display:none}}.pvth{{display:flex;align-items:center;gap:10
 {navcss}</style></head><body class="one">
 {nav}
 <div class="wrap"><nav id="toc">{toc}</nav><main id="deck">{slides}<div id="vbar"><button onclick="view(cur-1)">◀ 이전</button><span id="vn"></span><button onclick="view(cur+1)">다음 ▶</button></div></main></div>
-<div id="pv"><div class="pvt"><div class="pvth"><div class="pvlab" id="pvtlab">이 노래·순서의 모든 장 — 누르면 앞 화면에 바로 나갑니다</div><button id="pvscr" onclick="present().then(()=>{{if(scr&&!scr.closed)this.style.display='none';}})" title="두 번째 모니터에 앞 화면 창 열기">📺 앞 화면 열기</button><button id="pvfold" onclick="pvFold()" title="오른쪽 칸 접기·열기">접기 ▶</button></div><div id="pvthumbs"></div></div>
+<div id="pv"><div class="pvt"><div class="pvth"><div class="pvlab" id="pvtlab">이 노래·순서의 모든 장 — 누르면 프레젠테이션에 바로 나갑니다</div><button id="pvscr" onclick="present().then(()=>{{if(scr&&!scr.closed)this.style.display='none';}})" title="두 번째 모니터에 프레젠테이션 창 열기">📺 프레젠테이션 열기</button><button id="pvfold" onclick="pvFold()" title="오른쪽 칸 접기·열기">접기 ▶</button></div><div id="pvthumbs"></div></div>
 <div id="pvsplit" title="끌어서 오른쪽 폭 조절 (두 번 누르면 처음대로)"></div>
-<div class="pvside"><div class="pvl"><div class="pvlab">지금 앞 화면</div><div id="pvcur" class="pvbox"></div><div class="pvpn"><div class="pvq" onclick="go(cur-1)" title="이전 장으로"><div class="pvlab">◀ 이전 장</div><div id="pvprev" class="pvbox"></div></div><div class="pvq" onclick="go(cur+1)" title="다음 장으로"><div class="pvlab" style="text-align:right">다음 장 ▶</div><div id="pvnext" class="pvbox"></div></div></div></div>
+<div class="pvside"><div class="pvl"><div class="pvlab">지금 프레젠테이션</div><div id="pvcur" class="pvbox"></div><div class="pvpn"><div class="pvq" onclick="go(cur-1)" title="이전 장으로"><div class="pvlab">◀ 이전 장</div><div id="pvprev" class="pvbox"></div></div><div class="pvq" onclick="go(cur+1)" title="다음 장으로"><div class="pvlab" style="text-align:right">다음 장 ▶</div><div id="pvnext" class="pvbox"></div></div></div></div>
 <div class="pvr">
 <div class="pvinfo"><span id="pvn"></span><span id="pvclock">00:00</span></div>
 <div class="pvbtn"><button onclick="go(cur-1)">◀ 이전</button><button onclick="go(cur+1)">다음 ▶</button></div>
@@ -209,13 +209,13 @@ document.querySelectorAll('#toc a:not(.bgm)').forEach(a=>a.onclick=ev=>{{ev.prev
 </script></body></html>"""
 
 
-# 두 모니터 발표 — 메인 모니터는 발표자 보기(지금 장·다음 장·시계·목차), 두 번째 모니터는 앞 화면 창 (2026-10-03 교장님 지시)
-# 같은 ppt.html 을 ?screen=1 로 연 창이 앞 화면이고, 두 창은 BroadcastChannel 로 장 번호를 주고받는다.
+# 두 모니터 발표 — 메인 모니터는 발표자 보기(지금 장·다음 장·시계·목차), 두 번째 모니터는 프레젠테이션 창 (2026-10-03 교장님 지시)
+# 같은 ppt.html 을 ?screen=1 로 연 창이 프레젠테이션이고, 두 창은 BroadcastChannel 로 장 번호를 주고받는다.
 PVJS = r"""
 const SCREEN=new URLSearchParams(location.search).has('screen');
 const bc=('BroadcastChannel' in window)?new BroadcastChannel('wsppt'+location.pathname):null;
 if(SCREEN){
-  document.title='앞 화면 · '+document.title; document.body.classList.remove('one'); document.body.classList.add('pr');
+  document.title='프레젠테이션 · '+document.title; document.body.classList.remove('one'); document.body.classList.add('pr');
   const _show=show; show=function(i,quiet){_show(i); if(!quiet&&bc)bc.postMessage({i:cur});};
   show(+(location.hash.slice(1)||0),true);
   if(bc){bc.onmessage=e=>{const m=e.data||{}; if(m.end){window.close();return;}
@@ -243,7 +243,7 @@ let scr=null,t0=0,tick=null;
   sp.addEventListener('dblclick',()=>{ saved=0; try{ localStorage.removeItem('ws_pvw'); }catch(e){} pvSize(); });
   addEventListener('resize',()=>{ if(document.body.classList.contains('pv')) pvSize(); });
 })();
-// BGM 을 앞 화면(두 번째 모니터)에서 꽉 차게 — 발표자 화면에서 고르면 BroadcastChannel 로 영상 번호가 온다 (2026-10-03 교장님)
+// BGM 을 프레젠테이션(두 번째 모니터)에서 꽉 차게 — 발표자 화면에서 고르면 BroadcastChannel 로 영상 번호가 온다 (2026-10-03 교장님)
 function bgmFS(id){ let o=document.getElementById('bgmfs'); if(!id){ if(o)o.remove(); return; }
   if(!o){ o=document.createElement('div'); o.id='bgmfs'; o.style.cssText='position:fixed;inset:0;z-index:9999;background:#000'; document.body.appendChild(o); }
   o.innerHTML='<iframe src="https://www.youtube-nocookie.com/embed/'+id+'?autoplay=1&rel=0&modestbranding=1&playsinline=1" style="width:100%;height:100%;border:0" allow="autoplay; encrypted-media; fullscreen"></iframe>'; }
@@ -275,8 +275,8 @@ async function present(){
   const f=other?'popup,left='+other.availLeft+',top='+other.availTop+',width='+other.availWidth+',height='+other.availHeight+',fullscreen'
                :'popup,width=1280,height=720';
   scr=window.open(location.pathname+'?screen=1#'+start,'wsppt_screen',f);
-  if(!scr){ alert('앞 화면 창이 막혔습니다. 주소창 오른쪽에서 팝업·창 관리를 「허용」한 뒤 ▶ 예배용을 다시 눌러 주세요.'); return; }
-  if(!other) alert('앞 화면 창을 두 번째 모니터로 끌어 놓고, 그 창을 한 번 누르면 꽉 찬 화면이 됩니다.');
+  if(!scr){ alert('프레젠테이션 창이 막혔습니다. 주소창 오른쪽에서 팝업·창 관리를 「허용」한 뒤 ▶ 예배용을 다시 눌러 주세요.'); return; }
+  if(!other) alert('프레젠테이션 창을 두 번째 모니터로 끌어 놓고, 그 창을 한 번 누르면 꽉 찬 화면이 됩니다.');
   enterPV(start);
 }
 function clock(){const s=Math.floor((Date.now()-t0)/1000); document.getElementById('pvclock').textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
@@ -288,18 +288,18 @@ function mount(id,i){ const box=document.getElementById(id); box.replaceChildren
 function marks(){ return [...document.querySelectorAll('#toc a')].map(a=>all.indexOf(document.getElementById(a.getAttribute('href').slice(1)))).filter(k=>k>=0).sort((a,b)=>a-b); }
 function songRange(i){ let s=0,e=all.length; for(const k of marks()){ if(k<=i) s=k; else { e=k; break; } } return [s,e]; }   // 목차 표시 사이 = 한 노래(순서)
 let thR=null;
-// 발표 중 목차를 누르면 그 순서의 장들만 아래에 펼쳐 미리 본다 — 앞 화면은 장(썸네일)을 눌러야 넘어간다 (2026-10-04 교장님: 다음 곡 준비)
+// 발표 중 목차를 누르면 그 순서의 장들만 아래에 펼쳐 미리 본다 — 프레젠테이션은 장(썸네일)을 눌러야 넘어간다 (2026-10-04 교장님: 다음 곡 준비)
 let peekAt=null;
 function peek(k,a){ if(k<0) return; peekAt=k; thumbs(k); document.querySelectorAll('#toc a').forEach(x=>x.classList.toggle('peek',x===a&&!x.classList.contains('on')));
   const [s]=songRange(k), lab=document.getElementById('pvtlab'); const same=songRange(cur)[0]===s;
-  lab.innerHTML=same?'이 노래·순서의 모든 장 — 누르면 앞 화면에 바로 나갑니다'
-    :'👀 미리 보기: <b>'+(a?a.textContent:'')+'</b> — 앞 화면은 그대로입니다. 장을 눌러야 넘어갑니다 <button class="pvback" onclick="unpeek()">↩ 지금 순서로</button>';
+  lab.innerHTML=same?'이 노래·순서의 모든 장 — 누르면 프레젠테이션에 바로 나갑니다'
+    :'👀 미리 보기: <b>'+(a?a.textContent:'')+'</b> — 프레젠테이션은 그대로입니다. 장을 눌러야 넘어갑니다 <button class="pvback" onclick="unpeek()">↩ 지금 순서로</button>';
   document.getElementById('pvthumbs').scrollTop=0; }
-function unpeek(){ peekAt=null; document.querySelectorAll('#toc a.peek').forEach(x=>x.classList.remove('peek')); document.getElementById('pvtlab').textContent='이 노래·순서의 모든 장 — 누르면 앞 화면에 바로 나갑니다'; thumbs(); }
+function unpeek(){ peekAt=null; document.querySelectorAll('#toc a.peek').forEach(x=>x.classList.remove('peek')); document.getElementById('pvtlab').textContent='이 노래·순서의 모든 장 — 누르면 프레젠테이션에 바로 나갑니다'; thumbs(); }
 function thumbs(at){ const [s,e]=songRange(at==null?cur:at), box=document.getElementById('pvthumbs');
   if(!thR||thR[0]!==s||thR[1]!==e){ box.replaceChildren();
     for(let k=s;k<e;k++){ paint(all[k]); const c=all[k].cloneNode(true); c.removeAttribute('id'); c.classList.remove('cur');
-      const w=document.createElement('div'); w.className='th'; w.dataset.k=k; w.title=(k+1)+'번째 장 — 누르면 앞 화면으로'; w.appendChild(c); w.onclick=()=>go(k); box.appendChild(w); }
+      const w=document.createElement('div'); w.className='th'; w.dataset.k=k; w.title=(k+1)+'번째 장 — 누르면 프레젠테이션으로'; w.appendChild(c); w.onclick=()=>go(k); box.appendChild(w); }
     if(window.xpThumbs) xpThumbs(box,s,e); thR=[s,e]; }
   box.querySelectorAll('.th').forEach(t=>t.classList.toggle('on',+t.dataset.k===cur)); fit();
   const on=box.querySelector('.th.on'); if(on) on.scrollIntoView({block:'nearest'}); }
@@ -338,7 +338,7 @@ if(!SCREEN) setInterval(wsBgmBtn,1000);
 
 // ── 교회 소식 급히 고치기 (2026-10-04 교장님) ─────────────────────────────
 // 「교회 소식」 표지 다음부터 「봉헌」 표지 앞까지가 소식 장. ✏️ 를 누르면 줄마다 고칠 수 있고,
-// 저장하면 앞 화면(두 번째 모니터)에도 바로 바뀌고 서버에 남아 새로 열어도 유지된다.
+// 저장하면 프레젠테이션(두 번째 모니터)에도 바로 바뀌고 서버에 남아 새로 열어도 유지된다.
 const NEWS=(()=>{ const T=i=>D[i].texts.map(t=>t.t).join(' '); let s=-1,e=-1;
   for(let i=0;i<D.length;i++){ const t=T(i).replace(/\s/g,''); if(s<0&&/교회소식|Announcements/.test(t)) s=i; else if(s>=0&&/^(Offering|봉헌)|Offering봉헌/.test(t)){ e=i; break; } }
   const r=[]; if(s>=0) for(let i=s+1;i<(e<0?Math.min(D.length,s+8):e);i++) r.push(i); return r; })();
@@ -365,7 +365,7 @@ if(!SCREEN&&EDIT.length){
 #nbox .ok{background:#1f2937;color:#fff}#nbox .no{background:#e2e8f0}#nbox .m{font-size:13px;color:#b45309;margin-right:auto;align-self:center}`;
   document.head.appendChild(st);
   const btn=document.createElement('button'); btn.id='nbtn'; btn.textContent='✏️ 교회 소식 수정'; document.body.appendChild(btn);
-  const box=document.createElement('div'); box.id='nbox'; box.innerHTML='<div class="p"><h3>✏️ 교회 소식 수정</h3><div class="h"></div><div class="f"></div><div class="b"><span class="m"></span><button class="no">닫기</button><button class="ok">저장 — 앞 화면에 바로 반영</button></div></div>'; document.body.appendChild(box);
+  const box=document.createElement('div'); box.id='nbox'; box.innerHTML='<div class="p"><h3>✏️ 교회 소식 수정</h3><div class="h"></div><div class="f"></div><div class="b"><span class="m"></span><button class="no">닫기</button><button class="ok">저장 — 프레젠테이션에 바로 반영</button></div></div>'; document.body.appendChild(box);
   const here=()=>{ const k=document.body.classList.contains('pv')||ONE()?cur:firstVisible(); return all[k]?+all[k].dataset.i:k; };
   const sync=()=>{ const h=here(); btn.style.display=EDIT.includes(h)?'block':'none'; btn.textContent=NEWS.includes(h)?'✏️ 교회 소식 수정':NAMEONLY(h)?'✏️ 이름 수정':'✏️ 이름·내용 수정'; };
   const _go=go; go=function(i,q){ _go(i,q); sync(); }; const _view=view; view=function(i){ _view(i); sync(); };
@@ -447,7 +447,7 @@ addEventListener('DOMContentLoaded',()=>{
   document.querySelector('#bgmbox .bgml').onclick=e=>{ const c=e.target.closest('.bgmc'); if(!c) return;
     document.querySelectorAll('.bgmc').forEach(x=>x.classList.toggle('on',x===c));
     const name=c.querySelector('span').textContent.slice(0,40), P=document.getElementById('bgmplay');
-    if(bgmScreen()) bc.postMessage({bgmStop:1});      // 예전 방식(앞 화면 위 덮개)이 떠 있으면 걷는다
+    if(bgmScreen()) bc.postMessage({bgmStop:1});      // 예전 방식(프레젠테이션 위 덮개)이 떠 있으면 걷는다
     if(!bgmWin(c.dataset.id)) return;
     P.innerHTML='<div class="bgmon">🎵 BGM 전용 창에서 재생 중 — 다른 슬라이드로 가도 끊기지 않습니다 · 그 창을 한 번 누르면 전체 화면 <button class="bgmx" onclick="bgmStop()">■ BGM 멈춤</button></div>';
     document.getElementById('bgmnow').textContent='BGM 창 재생: '+name; };
@@ -521,7 +521,7 @@ CHAT_JS = r"""
 
 # ── ＋ 장 끼워 넣기 — 교회 소식·설교 뒤에 (2026-10-04 교장님) ──────────────────────────────
 # 발표자 보기 아래 미리 보기 칸에 ＋ → ① 글 페이지(직접 쓰기) ② AI 디자인 페이지(문구를 쓰면 맥미니가 html 스킬로 글·도식 HTML,
-# 배경은 템플릿 그대로) ③ 유튜브 페이지(앞 화면에서 꽉 차게 재생). 서버(ppt_pages)에 저장 — 앞 화면 창도 같이 바뀐다.
+# 배경은 템플릿 그대로) ③ 유튜브 페이지(프레젠테이션에서 꽉 차게 재생). 서버(ppt_pages)에 저장 — 프레젠테이션 창도 같이 바뀐다.
 XP_CSS = """
 #pvthumbs .th.add{display:flex;align-items:center;justify-content:center;aspect-ratio:16/9;border:3px dashed #475569;border-radius:8px;color:#cbd5e1;font:800 22px 'Pretendard Variable',sans-serif;cursor:pointer}
 #pvthumbs .th.add:hover{border-color:#f6c76b;color:#f6c76b}
@@ -599,7 +599,7 @@ function applyPages(list){ const curEl=all[cur];
   if(document.body.classList.contains('pv')) go(cur,true); else if(SCREEN) show(cur,true); else if(ONE()) view(cur);
   clearTimeout(poll); if(list.some(p=>p.type==='html'&&(p.status==='wait'||p.status==='work'))) poll=setTimeout(loadPages,8000);
 }
-// 맥미니가 🎨 장을 다 만들거나 다시 만들면 앞 화면·발표자 화면이 30초 안에 저절로 새 것을 받는다 — 바뀐 것이 있을 때만 다시 그림 (2026-10-04 교장님)
+// 맥미니가 🎨 장을 다 만들거나 다시 만들면 프레젠테이션·발표자 화면이 30초 안에 저절로 새 것을 받는다 — 바뀐 것이 있을 때만 다시 그림 (2026-10-04 교장님)
 let lastPages='';
 async function loadPages(){ if(!NDATE) return; try{ const r=await fetch('/api/worship?pages='+NDATE,{cache:'no-store'}); if(!r.ok) return;
   const t=await r.text(); if(t===lastPages) return; lastPages=t; applyPages(JSON.parse(t)); }catch(e){} }
@@ -632,7 +632,7 @@ function open(sect,pg){ if(!box.isConnected) document.body.appendChild(box); box
   P().innerHTML='<h3>＋ '+NAME[sect]+' 뒤에 장 넣기</h3><div class="ch3">'
     +'<button data-t="text">📝 글 페이지<small>제목·내용을 직접 씁니다</small></button>'
     +'<button data-t="html">🎨 AI 디자인 페이지<small>문구를 쓰면 글·도식으로 꾸며 줍니다(배경은 템플릿)</small></button>'
-    +'<button data-t="yt">▶ 유튜브 페이지<small>찾아서 고르면 앞 화면에서 꽉 차게 재생</small></button>'
+    +'<button data-t="yt">▶ 유튜브 페이지<small>찾아서 고르면 프레젠테이션에서 꽉 차게 재생</small></button>'
     +(sect==='reading'?'<button data-t="bible">📖 성경 구절<small>찾으면 다함께 봉독 장으로 바로</small></button>':'')+'</div>'+foot('').replace('<button class="ok"></button>','');
   P().querySelector('.no').onclick=()=>box.classList.remove('on');
   P().querySelectorAll('.ch3 button').forEach(b=>b.onclick=()=>form(sect,b.dataset.t,null)); }
@@ -664,7 +664,7 @@ function form(sect,type,pg){ const d=(pg&&pg.data)||{};
     P().innerHTML='<h3>▶ 유튜브 페이지</h3><label>유튜브 찾기</label><div class="yts"><input class="q" placeholder="곡명·가수로 찾기 (예: 찬양 연속듣기)"><button type="button" class="go">🔎 찾기</button></div>'
       +'<div class="ytr"></div><label>고른 영상</label><div class="ysel">'+(d.id?'':'아직 고르지 않았습니다 — 위에서 찾아 누르거나 주소를 붙여 넣으세요')+'</div>'
       +'<input class="u" placeholder="또는 유튜브 주소 붙여 넣기 https://youtu.be/…" value="'+esc(d.id?'https://youtu.be/'+d.id:'')+'"><label>제목(선택)</label><input class="t" value="'+esc(d.title)+'">'
-      +'<div class="hint">이 장이 앞 화면에 나오면 영상이 꽉 찬 화면으로 재생됩니다. 다른 장으로 넘기면 닫힙니다. (끊기지 않게 계속 틀 음악은 🎵 BGM 단추로)</div>'+foot(pg?'고치기':'넣기');
+      +'<div class="hint">이 장이 프레젠테이션에 나오면 영상이 꽉 찬 화면으로 재생됩니다. 다른 장으로 넘기면 닫힙니다. (끊기지 않게 계속 틀 음악은 🎵 BGM 단추로)</div>'+foot(pg?'고치기':'넣기');
     if(!document.getElementById('ytscss')){ const st=document.createElement('style'); st.id='ytscss'; st.textContent=
       '.yts{display:flex;gap:6px}.yts .q{flex:1}.yts .go{font:700 14px inherit;border:0;border-radius:8px;padding:0 14px;background:#1f2937;color:#fff;cursor:pointer}'
       +'.ytr{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;max-height:300px;overflow-y:auto;margin:8px 0}'
@@ -697,9 +697,9 @@ function form(sect,type,pg){ const d=(pg&&pg.data)||{};
 function htmlForm(sect,pg,d){ P().innerHTML='<h3>🎨 AI 디자인 페이지</h3><label>제목</label><input class="t" value="'+esc(d.title)+'"><label>문구 (이 내용으로 글·도식 페이지를 만듭니다)</label><textarea class="c" placeholder="예) 추수감사절 홈커밍데이 — 10월 18일 주일 10:30, 사랑독채 펜션 별관. 예배 후 점심과 레크리에이션…">'+esc(d.body)+'</textarea><div class="hint">배경은 지금 PPT 템플릿 그대로 두고, 글과 간단한 도식(순서·일정·비교)으로 꾸밉니다. 맥미니가 1~2분 안에 만들어 이 자리에 넣습니다.</div>'+foot(pg?'다시 만들기':'AI로 만들기');
   wire(()=>{ const t=P().querySelector('.t').value.trim(), c=P().querySelector('.c').value.trim(); if(!c&&!t) throw new Error('문구를 써 주세요');
     return save({action:'page',id:pg&&pg.id,sect,type:'html',data:{title:t,body:c}}); }); }
-// ── 앞 화면: 유튜브 장이면 꽉 차게 재생, 끼운 장 바뀌면 다시 불러오기
+// ── 프레젠테이션: 유튜브 장이면 꽉 차게 재생, 끼운 장 바뀌면 다시 불러오기
 let ytOn=false;
-// ＋ 로 넣은 유튜브 장은 BGM 창이 아니라 앞 화면 자체에서 꽉 차게 — 다른 장으로 넘기면 닫힌다 (2026-10-04 교장님)
+// ＋ 로 넣은 유튜브 장은 BGM 창이 아니라 프레젠테이션 자체에서 꽉 차게 — 다른 장으로 넘기면 닫힌다 (2026-10-04 교장님)
 // 덮개(bgmFS)가 아니라 그 장 안에 영상을 끼운다 — 장을 넘기면 영상도 같이 빠지고 다음 장이 나온다 (2026-10-04 교장님)
 let ytEl=null;
 function ytCheck(){ const sl=all[cur], d=sl&&D[+sl.dataset.i];
@@ -743,7 +743,7 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
     m = _re.search(r"\d+월 \d+일", title)
     dls = [(("📊 PPT 받기" if h.endswith(".pptx") else "📕 PDF 받기"), h) for h in _re.findall(r'href="([^"]+)"', dl or "")]
     note = "" if dls else _re.sub(r"<[^>]+>", "", dl or "")
-    sub = ('<button class="sub" onclick="present()">▶ 예배용(두 화면)</button>'      # 예배용이 맨 앞 (2026-10-04 교장님)
+    sub = ('<button class="sub" id="b-pv" onclick="present()">▶ 예배용(두 화면)</button>'      # 예배용이 맨 앞 (2026-10-04 교장님)
            '<button class="sub on" id="b-one" onclick="wsView(true)">▣ 한 장씩</button>'
            '<button class="sub" id="lbtn" onclick="wsView(false)">☰ 목록</button>')
     tail = f'<span class="note">{html.escape(note)}</span>' if note.strip() else ""
@@ -756,8 +756,13 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
         sub += '<button class="sub" onclick="bgmOpen()">🎵 BGM</button>'
     sub += tail
     toc += CHAT_HTML                              # 💬 예배팀 소통(목차 아래) — 2026-10-04 교장님
-    # 「예배용 PPT 열기」(모음 쪽)는 ppt.html#pv — 바로 발표자 보기로 열고, 📺 앞 화면 열기 한 번으로 두 번째 모니터 (창은 눌러야 열린다)
+    # 「예배용 PPT 열기」(모음 쪽)는 ppt.html#pv — 바로 발표자 보기로 열고, 📺 프레젠테이션 열기 한 번으로 두 번째 모니터 (창은 눌러야 열린다)
     nav_pv = "<script>addEventListener('load',()=>{ if(location.hash==='#pv'&&!new URLSearchParams(location.search).has('screen')) enterPV(0); });</script>"
+    # 2단 밑줄(켜짐)은 지금 보기를 따라간다 — 발표자 보기면 ▶ 예배용, 아니면 한 장씩·목록 (2026-10-04 교장님)
+    nav_pv += ("<script>addEventListener('DOMContentLoaded',()=>{ const sync=()=>{ const c=document.body.classList, pv=c.contains('pv');"
+               "const set=(id,on)=>{ const b=document.getElementById(id); if(b) b.classList.toggle('on',on); };"
+               "set('b-pv',pv); set('b-one',!pv&&c.contains('one')); set('lbtn',!pv&&!c.contains('one')); };"
+               "new MutationObserver(sync).observe(document.body,{attributes:true,attributeFilter:['class']}); sync(); });</script>")
     nav = nav_pv + wsnav.nav("ppt", m.group(0) if m else title, sub, dls, day=date) + f"<script>{wsnav.JS}</script>" + bgm_html(items) + f"<script>{CHAT_JS}</script><script>{XP_JS}</script>"
     return PAGE.format(title=html.escape(title), n=len(slides), slides=sl, toc=toc, dl=dl, nav=nav, navcss=wsnav.CSS + BGM_CSS + CHAT_CSS + XP_CSS,
                        data=json.dumps(data, ensure_ascii=False, separators=(",", ":")), pvjs=_news_globals(date) + PVJS)
