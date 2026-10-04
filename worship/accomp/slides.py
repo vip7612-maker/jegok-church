@@ -145,7 +145,7 @@ body.pvfold #pv{{grid-template-columns:minmax(0,1fr) 0 0}}body.pvfold #pvsplit{{
 #pvfold{{flex:0 0 auto;margin-left:auto;font:700 12.5px inherit;border:0;border-radius:999px;padding:5px 12px;background:#1e293b;color:#cbd5e1;cursor:pointer}}#pvfold:hover{{color:#f6c76b}}
 body.pvfold .pvside{{display:none}}.pvth{{display:flex;align-items:center;gap:10px;margin:0 0 5px}}.pvth .pvlab{{margin:0;min-width:0}}body.pvfold #pvfold{{background:#f6c76b;color:#3b2a06}}
 .pvl,.pvr{{min-width:0;display:flex;flex-direction:column;gap:12px}}
-.pvlab{{font-size:12px;color:#94a3b8;margin:0 0 5px}}.pvpn{{display:flex;justify-content:space-between;align-items:flex-start}}.pvq{{width:25%;cursor:pointer}}.pvq .pvlab{{margin:0 0 3px}}.pvq .sl{{border-radius:4px}}.pvq:hover .sl{{outline:2px solid #f6c76b}}.pvq .last{{font-size:11px}}.pvl .pvbox .sl{{width:100%}}.pvr .pvbox .sl{{width:100%}}
+.pvlab{{font-size:12px;color:#94a3b8;margin:0 0 5px}}.pvpn{{display:flex;justify-content:space-between;align-items:flex-start}}.pvq{{width:calc(50% - 4px);cursor:pointer}}.pvq .pvlab{{margin:0 0 3px}}.pvq .sl{{border-radius:4px}}.pvq:hover .sl{{outline:2px solid #f6c76b}}.pvq .last{{font-size:11px}}.pvl .pvbox .sl{{width:100%}}.pvr .pvbox .sl{{width:100%}}
 /* 발표자 보기 아래 썸네일 — 지금 노래(목차 한 구간)의 장 전부, 누르면 앞 화면으로 (2026-10-03 교장님 지시) */
 #pvthumbs{{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));align-content:start;gap:8px;padding:2px}}
 #pvthumbs .th{{min-width:0;cursor:pointer;border:3px solid transparent;border-radius:8px;padding:1px}}#pvthumbs .th:hover{{border-color:#475569}}
