@@ -535,8 +535,8 @@ XP_JS = r"""
 (function(){
 const SECT={news:/^교회\s*소식$/, reading:/^성경\s*봉독$/, special:/^특\s*송$/, sermon:/^설교$/}, NAME={news:'교회 소식',reading:'성경 봉독',special:'특송',sermon:'설교'};   // 특송·성경 봉독 추가(2026-10-04)
 // 그 주에만 끼운 순서(선교 보고 등, data ppt_extra)에도 늘 ＋ 장 넣기 (2026-10-04 교장님)
-(window.XSECTS||[]).forEach(t=>{ const k='x:'+t; SECT[k]=new RegExp('^'+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s*')+'$'); NAME[k]=t; });
-const SECTS=Object.keys(SECT);
+// XSECTS 는 이 스크립트보다 뒤에서 정해지므로 처음 쓸 때 읽는다 — 먼저 읽어 선교 보고에 ＋가 안 나왔던 일(2026-10-04)
+let _S=null; const sects=()=>_S||(window.XSECTS?(window.XSECTS.forEach(t=>{ const k='x:'+t; SECT[k]=new RegExp('^'+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s*')+'$'); NAME[k]=t; }),_S=Object.keys(SECT)):Object.keys(SECT));
 let poll=null;
 const anchor=sect=>[...document.querySelectorAll('#toc a')].find(a=>SECT[sect].test(a.textContent.trim()));
 function startOf(sect){ const a=anchor(sect); return a?all.indexOf(document.getElementById(a.getAttribute('href').slice(1))):-1; }
@@ -574,7 +574,7 @@ window.xpPaint=(s,inn)=>{
 };
 function applyPages(list){ const curEl=all[cur];
   all.filter(x=>x.classList.contains('xp')).forEach(x=>{ io.unobserve(x); x.remove(); all.splice(all.indexOf(x),1); });
-  for(const sect of SECTS){ const s0=startOf(sect); if(s0<0) continue; let at=songRange(s0)[1];
+  for(const sect of sects()){ const s0=startOf(sect); if(s0<0) continue; let at=songRange(s0)[1];
     list.filter(p=>p.sect===sect).forEach(p=>[].concat(pageD(p)).forEach(dd=>{ const di=D.length; D.push(dd);   // 성경 봉독 한 건 = 여러 장
       const sec=document.createElement('section'); sec.className='sl xp'; sec.dataset.i=di; sec.dataset.xp=p.id; sec.dataset.sect=sect;
       sec.innerHTML='<div class="in"></div><span class="no">+</span>';
@@ -594,7 +594,7 @@ async function save(body){ const r=await fetch('/api/worship',{method:'POST',hea
   const j=await r.json().catch(()=>({})); if(!j.ok) throw new Error(j.error||'저장 실패'); await loadPages(); if(bc) bc.postMessage({pages:1}); return j; }
 // ── 미리 보기 칸: 교회 소식·설교 구간이면 ＋, 끼운 장에는 ✏️ 🗑
 window.xpThumbs=(box,s,e)=>{
-  const sect=SECTS.find(x=>startOf(x)===s); if(!sect||SCREEN) return;
+  const sect=sects().find(x=>startOf(x)===s); if(!sect||SCREEN) return;
   box.querySelectorAll('.th').forEach(t=>{ const sl=all[+t.dataset.k]; if(!sl||!sl.classList.contains('xp')) return;
     const id=+sl.dataset.xp, pg=(window.XP||[]).find(p=>p.id===id); const bar=document.createElement('div'); bar.className='xpb';
     const ed=document.createElement('button'); ed.textContent='✏️'; ed.title='고치기'; ed.onclick=ev=>{ ev.stopPropagation(); open(sect,pg); };
