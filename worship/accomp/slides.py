@@ -138,14 +138,14 @@ body.one:not(.pr) main .sl{{display:none;width:min(100%,calc((100vh - var(--navh
 /* 3분면 (2026-10-04 교장님): 왼쪽 목차 · 가운데 이 순서의 모든 장 · 오른쪽 지금/다음 장(접었다 폈다, 가운데 막대로 폭 조절) */
 #pv{{display:none;position:fixed;left:190px;top:var(--navh,88px);right:0;bottom:0;z-index:15;background:#0b1220;padding:14px;gap:0 6px;
   grid-template-columns:minmax(0,1fr) 14px var(--pvw,440px);grid-template-rows:minmax(0,1fr)}}body.pv #pv{{display:grid}}
-body.pvfold #pv{{grid-template-columns:minmax(0,1fr) 0 46px}}body.pvfold #pvsplit{{visibility:hidden}}
+body.pvfold #pv{{grid-template-columns:minmax(0,1fr) 0 0}}body.pvfold #pvsplit{{visibility:hidden}}
 .pvt{{grid-column:1;min-width:0;min-height:0;display:flex;flex-direction:column}}
 #pvsplit{{grid-column:2;cursor:col-resize;display:flex;align-items:center;justify-content:center;touch-action:none}}#pvsplit::before{{content:'';width:6px;height:120px;border-radius:99px;background:#475569}}#pvsplit:hover::before,#pvsplit.on::before{{background:#f6c76b}}
 .pvside{{grid-column:3;min-width:0;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px}}
-#pvfold{{align-self:flex-end;font:700 12.5px inherit;border:0;border-radius:999px;padding:5px 12px;background:#1e293b;color:#cbd5e1;cursor:pointer}}#pvfold:hover{{color:#f6c76b}}
-body.pvfold .pvside>*:not(#pvfold){{display:none}}body.pvfold #pvfold{{writing-mode:vertical-rl;align-self:stretch;padding:14px 0;border-radius:10px;letter-spacing:2px}}
+#pvfold{{flex:0 0 auto;margin-left:auto;font:700 12.5px inherit;border:0;border-radius:999px;padding:5px 12px;background:#1e293b;color:#cbd5e1;cursor:pointer}}#pvfold:hover{{color:#f6c76b}}
+body.pvfold .pvside{{display:none}}.pvth{{display:flex;align-items:center;gap:10px;margin:0 0 5px}}.pvth .pvlab{{margin:0;min-width:0}}body.pvfold #pvfold{{background:#f6c76b;color:#3b2a06}}
 .pvl,.pvr{{min-width:0;display:flex;flex-direction:column;gap:12px}}
-.pvlab{{font-size:12px;color:#94a3b8;margin:0 0 5px}}.pvl .pvbox .sl{{width:100%}}.pvr .pvbox .sl{{width:100%}}
+.pvlab{{font-size:12px;color:#94a3b8;margin:0 0 5px}}.pvpn{{display:flex;justify-content:space-between;align-items:flex-start}}.pvq{{width:25%;cursor:pointer}}.pvq .pvlab{{margin:0 0 3px}}.pvq .sl{{border-radius:4px}}.pvq:hover .sl{{outline:2px solid #f6c76b}}.pvq .last{{font-size:11px}}.pvl .pvbox .sl{{width:100%}}.pvr .pvbox .sl{{width:100%}}
 /* 발표자 보기 아래 썸네일 — 지금 노래(목차 한 구간)의 장 전부, 누르면 앞 화면으로 (2026-10-03 교장님 지시) */
 #pvthumbs{{flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));align-content:start;gap:8px;padding:2px}}
 #pvthumbs .th{{min-width:0;cursor:pointer;border:3px solid transparent;border-radius:8px;padding:1px}}#pvthumbs .th:hover{{border-color:#475569}}
@@ -159,10 +159,10 @@ body.pvfold .pvside>*:not(#pvfold){{display:none}}body.pvfold #pvfold{{writing-m
 {navcss}</style></head><body class="one">
 {nav}
 <div class="wrap"><nav id="toc">{toc}</nav><main id="deck">{slides}<div id="vbar"><button onclick="view(cur-1)">◀ 이전</button><span id="vn"></span><button onclick="view(cur+1)">다음 ▶</button></div></main></div>
-<div id="pv"><div class="pvt"><div class="pvlab" id="pvtlab">이 노래·순서의 모든 장 — 누르면 앞 화면에 바로 나갑니다</div><div id="pvthumbs"></div></div>
+<div id="pv"><div class="pvt"><div class="pvth"><div class="pvlab" id="pvtlab">이 노래·순서의 모든 장 — 누르면 앞 화면에 바로 나갑니다</div><button id="pvfold" onclick="pvFold()" title="오른쪽 칸 접기·열기">접기 ▶</button></div><div id="pvthumbs"></div></div>
 <div id="pvsplit" title="끌어서 오른쪽 폭 조절 (두 번 누르면 처음대로)"></div>
-<div class="pvside"><button id="pvfold" onclick="pvFold()" title="오른쪽 칸 접기·펴기">접기 ▶</button><div class="pvl"><div class="pvlab">지금 앞 화면</div><div id="pvcur" class="pvbox"></div></div>
-<div class="pvr"><div class="pvlab">다음 장</div><div id="pvnext" class="pvbox"></div>
+<div class="pvside"><div class="pvl"><div class="pvlab">지금 앞 화면</div><div id="pvcur" class="pvbox"></div><div class="pvpn"><div class="pvq" onclick="go(cur-1)" title="이전 장으로"><div class="pvlab">◀ 이전 장</div><div id="pvprev" class="pvbox"></div></div><div class="pvq" onclick="go(cur+1)" title="다음 장으로"><div class="pvlab" style="text-align:right">다음 장 ▶</div><div id="pvnext" class="pvbox"></div></div></div></div>
+<div class="pvr">
 <div class="pvinfo"><span id="pvn"></span><span id="pvclock">00:00</span></div>
 <div class="pvbtn"><button onclick="go(cur-1)">◀ 이전</button><button onclick="go(cur+1)">다음 ▶</button></div>
 <div class="pvnote">← → 방향키·스페이스로 넘김 · 왼쪽 목차를 누르면 그 장으로 · Esc 끝내기</div>
@@ -233,7 +233,7 @@ let scr=null,t0=0,tick=null;
 (function(){ const pv=document.getElementById('pv'), sp=document.getElementById('pvsplit'); if(!pv||!sp) return;
   const set=w=>{ pv.style.setProperty('--pvw',w+'px'); if(typeof fit==='function') fit(); };
   let saved=0; try{ saved=+localStorage.getItem('ws_pvw')||0; if(localStorage.getItem('ws_pvfold')==='1') document.body.classList.add('pvfold'); }catch(e){}
-  const fb=()=>{ const b=document.getElementById('pvfold'); if(b) b.textContent=document.body.classList.contains('pvfold')?'◀ 지금·다음 장 펴기':'접기 ▶'; }; fb();
+  const fb=()=>{ const b=document.getElementById('pvfold'); if(b) b.textContent=document.body.classList.contains('pvfold')?'열기 ◀':'접기 ▶'; }; fb();
   window.pvFold=()=>{ const on=document.body.classList.toggle('pvfold'); try{ localStorage.setItem('ws_pvfold',on?'1':'0'); }catch(e){} fb(); requestAnimationFrame(()=>{ if(typeof fit==='function') fit(); }); };
   window.pvSize=()=>{ const room=pv.clientWidth||innerWidth-190; set(Math.round(Math.max(300,Math.min(room*0.6,saved>0?saved:room*0.32)))); };
   let drag=null;
@@ -283,6 +283,7 @@ function clock(){const s=Math.floor((Date.now()-t0)/1000); document.getElementBy
 function enterPV(i){ document.body.classList.add('pv'); if(window.pvSize) pvSize(); t0=Date.now(); clearInterval(tick); tick=setInterval(clock,1000); clock(); go(i); }
 function mount(id,i){ const box=document.getElementById(id); box.replaceChildren();
   if(i>=all.length){ box.innerHTML='<div class="last">마지막 장입니다</div>'; return; }
+  if(i<0){ box.innerHTML='<div class="last">첫 장입니다</div>'; return; }
   paint(all[i]); const c=all[i].cloneNode(true); c.removeAttribute('id'); c.classList.remove('cur'); box.appendChild(c); }
 function marks(){ return [...document.querySelectorAll('#toc a')].map(a=>all.indexOf(document.getElementById(a.getAttribute('href').slice(1)))).filter(k=>k>=0).sort((a,b)=>a-b); }
 function songRange(i){ let s=0,e=all.length; for(const k of marks()){ if(k<=i) s=k; else { e=k; break; } } return [s,e]; }   // 목차 표시 사이 = 한 노래(순서)
@@ -303,7 +304,7 @@ function thumbs(at){ const [s,e]=songRange(at==null?cur:at), box=document.getEle
   box.querySelectorAll('.th').forEach(t=>t.classList.toggle('on',+t.dataset.k===cur)); fit();
   const on=box.querySelector('.th.on'); if(on) on.scrollIntoView({block:'nearest'}); }
 function go(i,quiet){ const fe=document.activeElement; if(fe&&fe.closest&&fe.closest('#toc')) fe.blur();   // 목차 초점 테두리가 지난 항목에 남지 않게
-  cur=Math.max(0,Math.min(all.length-1,i)); mount('pvcur',cur); mount('pvnext',cur+1); if(peekAt!==null) unpeek(); else thumbs(); fit();
+  cur=Math.max(0,Math.min(all.length-1,i)); mount('pvcur',cur); mount('pvprev',cur-1); mount('pvnext',cur+1); if(peekAt!==null) unpeek(); else thumbs(); fit();
   document.getElementById('pvn').textContent=(cur+1)+' / '+all.length;
   let on=null;
   document.querySelectorAll('#toc a').forEach(a=>{ const k=all.indexOf(document.getElementById(a.getAttribute('href').slice(1))); if(k>=0&&k<=cur)on=a; a.classList.remove('on'); });
