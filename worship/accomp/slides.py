@@ -552,15 +552,21 @@ function bg(){ const n=startOf('news'), nx=n>=0&&all[n+1]&&!all[n+1].classList.c
   const plain=d=>d&&d.img&&!d.html&&!d.pic&&d.texts.some(t=>t.c==='#ffffff'&&t.a==='l');      // 흰 글자 왼쪽 맞춤 = 갈색 내용 장(소식·봉독)
   if(plain(nx)) return nx.img; const any=D.find(plain); return any?any.img:(n>=0?D[+all[n].dataset.i].img:''); }
 const ytId=u=>{ const m=String(u||'').match(/(?:youtu\.be\/|v=|embed\/|shorts\/|live\/)([\w-]{11})/); return m?m[1]:(/^[\w-]{11}$/.test(u)?u:''); };
-// 📖 성경 봉독 장: 구절을 한 장에 9줄(약 24자/줄)·3절까지 묶고, 한 절이 길면 글자를 줄인다 — 기존 「다함께 봉독」 장 모양 그대로 (2026-10-04 교장님)
-function readBg(){ const has=(d,w)=>d&&d.img&&!d.html&&d.texts.some(t=>t.t===w);
-  const a=D.find(d=>has(d,'다함께 봉독'))||D.find(d=>has(d,'회중봉독'))||D.find(d=>has(d,'봉독대표')); return a?a.img:bg(); }
-function bibleD(d){ const img=readBg(), V=(d.verses||[]).map(([v,t])=>v+' '+t), L=x=>Math.max(1,Math.ceil(x.length/24)), out=[]; let g=[], n=0;
-  V.forEach(x=>{ const l=L(x); if(g.length&&(n+l>9||g.length>=3)){ out.push(g); g=[]; n=0; } g.push(x); n+=l; }); if(g.length) out.push(g);
-  return out.map(g=>{ const n=g.reduce((a,x)=>a+L(x),0), s=n>9?Math.max(34,Math.floor(55*Math.sqrt(9/n))):55;
-    return {img, bible:1, texts:[{x:53,y:47,w:160,h:28,s:28,c:'#3b2a06',b:false,t:'다함께 봉독',a:'l'},
-      {x:230,y:44,w:900,h:32,s:30,c:'#f6e7c8',b:true,t:d.ref||'',a:'l'},
-      {x:45,y:92,w:1350,h:0,s,c:'#ffffff',b:true,t:g.join('\n'),a:'l',wrap:1,pre:true,lh:1.17}]}; }); }
+// 📖 성경 봉독 장 = 기존 봉독 장 원칙 그대로 (2026-10-04 교장님): 한 장에 두 절, 절마다 위에 금빛 라벨(봉독대표·회중봉독 번갈아,
+//   절 수가 홀수면 마지막 한 절은 「다함께 봉독」, 두 절 이하면 모두 「다함께 봉독」 — pptfill.read_label 과 같다). 긴 절은 글자만 줄인다.
+function readBg(two){ const has=(d,w)=>d&&d.img&&!d.html&&d.texts.some(t=>t.t===w);
+  const a=two?(D.find(d=>has(d,'봉독대표')&&has(d,'회중봉독'))):(D.find(d=>has(d,'다함께 봉독')&&!has(d,'회중봉독')));
+  return a?a.img:(D.find(d=>has(d,'봉독대표')||has(d,'다함께 봉독'))||{}).img||bg(); }
+function readLabel(k,n){ if(n<3) return '다함께 봉독'; if(k===n-1&&k%2===0) return '다함께 봉독'; return k%2===0?'봉독대표':'회중봉독'; }
+function bibleD(d){ const V=(d.verses||[]).map(([v,t])=>v+' '+t), n=V.length, out=[];
+  const fs=(x,room)=>{ const l=Math.ceil(x.length/24); return l<=room?55:Math.max(34,Math.floor(55*Math.sqrt(room/l))); };
+  for(let k=0;k<n;k+=2){ const two=k+1<n, texts=[];
+    texts.push({x:53,y:47,w:150,h:28,s:28,c:'#3b2a06',b:false,t:readLabel(k,n),a:'l'},
+               {x:45,y:92,w:1350,h:0,s:fs(V[k],two?4:10),c:'#ffffff',b:true,t:V[k],a:'l',wrap:1,lh:1.17});
+    if(two) texts.push({x:53,y:385,w:150,h:28,s:28,c:'#3b2a06',b:false,t:readLabel(k+1,n),a:'l'},
+               {x:45,y:430,w:1350,h:0,s:fs(V[k+1],5),c:'#ffffff',b:true,t:V[k+1],a:'l',wrap:1,lh:1.17});
+    out.push({img:readBg(two), bible:1, texts}); }
+  return out; }
 function pageD(p){ const d=p.data||{}, b=bg();
   if(p.type==='bible') return bibleD(d);
   if(p.type==='text'){ const tl=Math.max(1,Math.ceil((d.title||'').length/22));
@@ -634,7 +640,7 @@ function form(sect,type,pg){ const d=(pg&&pg.data)||{};
     P().innerHTML='<h3>📖 성경 봉독 — 구절 찾기</h3><label>구절 (예: 역대상 25:1-5 · 대상 25:1~5 · 시편 23편 · 요 3:16)</label>'
       +'<div class="yts"><input class="q" list="bbooks" autocomplete="off" placeholder="책 장:절-절" value="'+esc(d.ref)+'"><button type="button" class="go">🔎 찾기</button></div><datalist id="bbooks"></datalist>'
       +'<div class="bpv" style="max-height:340px;overflow-y:auto;margin:8px 0;font-size:14.5px;line-height:1.6;color:#111;background:#f8fafc;border-radius:8px;padding:8px 12px"></div>'
-      +'<div class="hint">찾으면 바로 아래에 본문이 나옵니다. 「넣기」를 누르면 성경 봉독 뒤에 「다함께 봉독」 장으로 곧장 들어갑니다(한 장에 2~3절).</div>'
+      +'<div class="hint">찾으면 바로 아래에 본문이 나옵니다. 「넣기」를 누르면 성경 봉독 뒤에 「다함께 봉독」 장으로 곧장 들어갑니다(한 장에 두 절 · 절마다 봉독대표·회중봉독 라벨, 홀수 마지막 절은 다함께 봉독).</div>'
       +foot(pg?'고치기':'넣기')+(pg?'':'<div style="text-align:right;margin-top:6px"><a href="#" class="oth" style="font-size:13px;color:#64748b">다른 장(글·AI·유튜브) 넣기 →</a></div>');
     const q=P().querySelector('.q'), V=P().querySelector('.bpv'); let got=null, tm=null;
     fetch('/api/worship?bible=books').then(r=>r.json()).then(b=>{ const dl=P().querySelector('#bbooks'); if(dl) dl.innerHTML=b.map(x=>'<option value="'+esc(x[0])+' ">'+esc(x[1])+' · '+x[2]+'장</option>').join(''); }).catch(()=>{});
