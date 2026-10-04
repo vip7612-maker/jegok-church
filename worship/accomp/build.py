@@ -15,6 +15,7 @@ import base64, html, json, re, subprocess, sys
 from pathlib import Path
 
 import wsnav  # 예배 주간 쪽 공통 상단 메뉴 (2026-10-03)
+import themes  # 악보집 테마(예배 PPT 템플릿 디자인에 맞춤, 2026-10-04)
 HERE = Path(__file__).resolve().parent
 KIND = {"cover": "표지", "roster": "섬김표", "recite": "암송", "sermon_text": "설교본문",
         "sermon_summary": "설교요약", "creed": "사도신경", "scores": "악보"}
@@ -741,7 +742,7 @@ def build(date: str) -> Path:
     doc = f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{html.escape(d["title"])}</title><meta name="description" content="제곡교회 예배팀 · {int(date[5:7])}월 {int(date[8:10])}일 주일예배 예배자 악보 {len(d["pages"])}쪽">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
-<style>{CSS}{wsnav.CSS}</style></head><body>
+<style>{CSS}{wsnav.CSS}{themes.css(d)}</style></head><body>
 {wsnav.nav("score", wsnav.label(date), '<button class="sub on" data-mode="doc" onclick="wsMode(\'doc\')">📖 악보집</button><button class="sub" data-mode="sv" onclick="wsMode(\'sv\')">▣ 한 장씩</button><button class="sub" data-mode="pr" onclick="wsMode(\'pr\')">▶ 예배용 넘기기</button>', [("📄 HWPX 받기", "doc.hwpx"), ("📕 PDF 받기", "js:wsPdf()")], prep_js=True, day=date)}
 <main class="pages">{pages}</main><div id="sv"><aside id="rail"></aside><div id="split" title="끌어서 폭 조절"></div><div id="stage"><span id="hint">← → 방향키로 넘김 · Esc 나가기</span><span id="pn"></span></div></div>{prep_html(d, date)}<script data-share>{wsnav.JS}</script><script data-share>{FIT}</script><script data-share>{VIEW}</script><script data-share>{PREP}</script><script data-share>{BOARD}</script><script data-share>{PDF_JS.replace("@@NAME@@", f"{date} 예배자 악보.pdf")}</script></body></html>"""
     out = HERE / "out" / f"{date}.html"; out.parent.mkdir(exist_ok=True); out.write_text(doc)
