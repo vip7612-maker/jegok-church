@@ -384,6 +384,40 @@ def fetch(g, src: dict) -> Path:
     return p
 
 
+def fetch_parts(g, src: dict, parts: int) -> list[Path]:
+    """구글 슬라이드가 「too large to be exported」 면 사본을 만들어 장을 나눠 pptx 로 내보낸다(사본은 지움, 2026-10-05)."""
+    import prep
+    SRC.mkdir(parents=True, exist_ok=True)
+    pres = g.req("GET", f"{prep.SLIDES}/presentations/{src['id']}?fields=slides.objectId")
+    ids = [x["objectId"] for x in pres["slides"]]; size = -(-len(ids) // parts); out = []
+    for k, a in enumerate(range(0, len(ids), size), 1):
+        c = g.req("POST", f"{prep.DRIVE}/files/{src['id']}/copy?supportsAllDrives=true&fields=id", {"name": f"_임시 나눔 {k}"})
+        try:
+            keep = set(ids[a:a + size])
+            g.slides_batch(c["id"], [{"deleteObject": {"objectId": i}} for i in ids if i not in keep])
+            b = g.req("GET", f"{prep.DRIVE}/files/{c['id']}/export?mimeType={prep.PPTX_MIME}", timeout=900)
+        finally:
+            g.req("DELETE", f"{prep.DRIVE}/files/{c['id']}?supportsAllDrives=true")
+        q = SRC / f"{src['id']}~p{k}.pptx"; q.write_bytes(b); out.append(q)
+    return out
+
+
+def scan_split(g, src: dict, D, ix: dict, do_upload=False, weeks=None) -> list[str]:
+    """너무 큰 슬라이드: 2·3·4·6 조각으로 나눠 조각마다 scan_one (조각 경계에 걸친 곡은 앞 조각 쪽이 잘릴 수 있다)."""
+    for parts in (2, 3, 4, 6):
+        try:
+            files = fetch_parts(g, src, parts)
+        except RuntimeError as ex:
+            if "too large" in str(ex) or "exportSizeLimitExceeded" in str(ex): continue
+            raise
+        got = []
+        for k, _ in enumerate(files, 1):
+            got += scan_one(g, {**src, "id": f"{src['id']}~p{k}", "name": f"{src['name']} ({k}/{len(files)})"}, D, ix, do_upload, False, weeks)
+        (SCAN / f"{src['id']}.json").write_text(json.dumps({"src": src, "split": len(files)}, ensure_ascii=False), encoding="utf-8")
+        return got
+    raise RuntimeError("6조각으로 나눠도 구글 내보내기 크기 한도를 넘습니다")
+
+
 # ── 모으기 ──────────────────────────────────────────────────────
 def load_index() -> dict:
     return json.loads(INDEX.read_text(encoding="utf-8")) if INDEX.exists() else {}
@@ -449,7 +483,11 @@ def scan(only: list[str] | None = None, limit: int | None = None, do_upload: boo
             and (only or redo or not (SCAN / f"{s['id']}.json").exists())]
     for i, s in enumerate(todo[:limit] if limit else todo, 1):
         try:
-            got = scan_one(g, s, D, ix, do_upload, keep, weeks)
+            try:
+                got = scan_one(g, s, D, ix, do_upload, keep, weeks)
+            except RuntimeError as ex:
+                if s["mimeType"] != GSLIDES or not ("too large" in str(ex) or "exportSizeLimitExceeded" in str(ex)): raise
+                got = scan_split(g, s, D, ix, do_upload, weeks)
             save_index(ix)
             print(f"[{i}/{len(todo)}] {s['date']} {s['kind']} {s['name']}: {len(got)}곡 새로 — {', '.join(got)}", flush=True)
         except Exception as e:  # 한 파일이 깨져도 나머지는 계속

@@ -2,6 +2,7 @@
 """예배 플랫폼 옮기기 — 지금까지 파일로 만들던 것을 DB(Turso)+그림 창고(Blob)로 (2026-10-03 교장님 승인).
 
   python3 accomp/migrate.py songs [곡명 …]     곡별 PPT(songppt/db) → songs·song_slides·song_uses (다시 돌려도 같은 결과)
+  python3 accomp/migrate.py songs --new --small  DB 에 없는 곡만, 그림은 256색 PNG 로 줄여서
   python3 accomp/migrate.py deck 2026-10-04    그 주 예배 PPT → services(배경 그림 지문·글자·곡 참조·목차·내려받기 뼈대)
   python3 accomp/migrate.py scores [N]         드라이브 「찬양 악보 모음」 + 노션 보관함 → scores(그림은 Blob 에 한 번만)
 """
@@ -22,9 +23,20 @@ def _ext(b: bytes) -> str:
     return "png" if b[:8] == b"\x89PNG\r\n\x1a\n" else "jpg" if b[:3] == b"\xff\xd8\xff" else "gif" if b[:3] == b"GIF" else "bin"
 
 
-def push_song(song: dict, rec: dict | None = None) -> int:
+def small_png(b: bytes) -> bytes:
+    """곡 장 그림(투명 PNG)을 256색 PNG 로 — 크기 약 1/4, 투명도·PNG 형식은 그대로(2026-10-05, 그림 창고 용량)."""
+    import io
+    from PIL import Image
+    if b[:8] != b"\x89PNG\r\n\x1a\n" or len(b) < 60_000: return b
+    im = Image.open(io.BytesIO(b)).convert("RGBA").quantize(colors=256, method=Image.Quantize.FASTOCTREE)
+    o = io.BytesIO(); im.save(o, "PNG", optimize=True)
+    return o.getvalue() if o.tell() < len(b) else b
+
+
+def push_song(song: dict, rec: dict | None = None, small: bool = False) -> int:
     """곡 하나 → DB. 그림은 지문으로(이미 있으면 다시 올리지 않음). 돌려주는 값: 곡 번호."""
     imgs = [base64.b64decode(sl["img"]) for sl in song["slides"]]
+    if small: imgs = [small_png(b) for b in imgs]
     urls = S.put_assets([(b, _ext(b)) for b in imgs])
     rec = rec or {}
     uses = rec.get("uses", [])
@@ -51,14 +63,20 @@ def push_song(song: dict, rec: dict | None = None) -> int:
     return sid
 
 
-def songs(only: list[str] | None = None) -> None:
+def songs(only: list[str] | None = None, new_only: bool = False, small: bool = False) -> None:
+    """new_only: DB 에 이미 있는 곡은 건드리지 않음(자막 손질·AI 번역을 지키려고)."""
     ix = json.loads(INDEX.read_text(encoding="utf-8")) if INDEX.exists() else {}
     dirs = sorted(p for p in DB.iterdir() if (p / "song.json").exists())
+    have = {r["title"] for r in S.sql("SELECT title FROM songs")} if new_only else set()
     done = 0
     for d in dirs:
         song = json.loads((d / "song.json").read_text(encoding="utf-8"))
         if only and song["title"] not in only: continue
-        push_song(song, ix.get(song["title"]))
+        if song["title"] in have: continue
+        try:
+            push_song(song, ix.get(song["title"]), small)
+        except Exception as e:
+            print(f"  ✗ {song['title']}: {e}", flush=True); continue
         done += 1
         if done % 20 == 0: print(f"  {done}곡 …", flush=True)
     print(f"곡 {done}개 옮김 ·", json.dumps(S.stats(), ensure_ascii=False))
@@ -219,7 +237,9 @@ def scores(limit: int | None = None) -> None:
 
 if __name__ == "__main__":
     a = sys.argv[1:]
-    if a and a[0] == "songs": songs(a[1:] or None)
+    if a and a[0] == "songs":
+        fl = [x for x in a[1:] if x.startswith("--")]; names = [x for x in a[1:] if not x.startswith("--")]
+        songs(names or None, "--new" in fl, "--small" in fl)
     elif a and a[0] == "scores": scores(int(a[1]) if len(a) > 1 else None)
     elif a and a[0] == "deck":
         for d in a[1:]: print(d, deck(d))
