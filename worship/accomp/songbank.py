@@ -413,7 +413,11 @@ def scan_split(g, src: dict, D, ix: dict, do_upload=False, weeks=None) -> list[s
         got = []
         for k, _ in enumerate(files, 1):
             got += scan_one(g, {**src, "id": f"{src['id']}~p{k}", "name": f"{src['name']} ({k}/{len(files)})"}, D, ix, do_upload, False, weeks)
-        (SCAN / f"{src['id']}.json").write_text(json.dumps({"src": src, "split": len(files)}, ensure_ascii=False), encoding="utf-8")
+        groups = []
+        for k in range(1, len(files) + 1):
+            q = SCAN / f"{src['id']}~p{k}.json"
+            if q.exists(): groups += json.loads(q.read_text(encoding="utf-8")).get("groups", [])
+        (SCAN / f"{src['id']}.json").write_text(json.dumps({"src": src, "split": len(files), "groups": groups, "heads": {}}, ensure_ascii=False), encoding="utf-8")
         return got
     raise RuntimeError("6조각으로 나눠도 구글 내보내기 크기 한도를 넘습니다")
 

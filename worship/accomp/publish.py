@@ -76,6 +76,7 @@ def past_services() -> list[dict]:
     """곡 스캔(songppt/scan)으로 찾은 지난 예배(2021~ 주일·수요·금요…) — 날짜·종류·곡·원본 PPT."""
     out = []
     for f in sorted((HERE / "songppt" / "scan").glob("*.json")):
+        if "~p" in f.name: continue          # 큰 슬라이드를 나눠 읽은 조각 — 묶음 기록(같은 id.json)만 쓴다
         try:
             d = json.loads(f.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
@@ -84,7 +85,7 @@ def past_services() -> list[dict]:
         if not src.get("date") or "0000" in src["name"] or "템플릿" in src.get("path", ""): continue   # 예배준비 템플릿은 예배가 아니다
         link = (f"https://docs.google.com/presentation/d/{src['id']}/edit" if src["mimeType"].endswith("google-apps.presentation")
                 else f"https://drive.google.com/file/d/{src['id']}/view")
-        out.append({"date": src["date"], "kind": src["kind"], "songs": [g["title"] for g in d["groups"]], "src": link})
+        out.append({"date": src["date"], "kind": src["kind"], "songs": [g["title"] for g in d.get("groups", [])], "src": link})
     return out
 
 
