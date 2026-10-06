@@ -105,10 +105,32 @@ def index_page() -> None:
                       "ppt": sm["url"] + "/ppt.html", "cover": (sm["url"] + "/cover.jpg") if cover else ""})
     have = {(i["date"], i["kind"]) for i in items}
     items += [o for o in past_services() if (o["date"], o["kind"]) not in have]
-    data = json.dumps(sorted(items, key=lambda i: i["date"], reverse=True), ensure_ascii=False).replace("</", "<\\/")
-    doc = LANDING.replace("@@DATA@@", data)
     (SITE / INDEX).mkdir(exist_ok=True)
-    (SITE / INDEX / "index.html").write_text(doc)
+    (SITE / INDEX / "index.html").write_text(landing_html(items))
+
+
+def landing_html(items: list[dict]) -> str:
+    data = json.dumps(sorted(items, key=lambda i: i["date"], reverse=True), ensure_ascii=False).replace("</", "<\\/")
+    return LANDING.replace("@@SCHED@@", SCHED_JS).replace("@@DATA@@", data)
+
+
+# ── 예배 단추 넷 (2026-10-07 교장님) ─────────────────────────────────
+# 지금 띄울 예배 = 「끝나고 1시간」이 아직 안 지난 가장 이른 예배. 시간은 한국 시간 벽시계(Date 의 UTC 칸에 KST 를 담아 다룬다).
+# 새벽 월~금(토요일 새벽 없음, 주일은 주일예배) · 수요·금요 19:30~20:30 · 주일은 하루 종일 「오늘」.
+# tests/test_landing_schedule.py 가 이 JS 를 node 로 그대로 돌려 본다.
+SCHED_JS = r"""const SVC=[
+ {k:'dawn',name:'새벽예배',en:'Early Morning Prayer',ru:'Утренняя молитва',days:[1,2,3,4,5],s:'05:00',e:'06:00',hold:60},
+ {k:'wed',name:'수요예배',en:'Wednesday Worship',ru:'Богослужение в среду',days:[3],s:'19:30',e:'20:30',hold:60},
+ {k:'fri',name:'금요예배',en:'Friday Worship',ru:'Богослужение в пятницу',days:[5],s:'19:30',e:'20:30',hold:60},
+ {k:'sun',name:'주일예배',en:'Sunday Worship',ru:'Воскресное богослужение',days:[0],s:'00:00',e:'24:00',hold:0}];
+const _min=s=>{const p=s.split(':');return (+p[0]*60+ +p[1])*60e3;};
+function _scan(now,ok){const t=now.getTime(),d0=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate());
+  for(let i=0;i<10;i++){const d=d0+i*864e5,wd=new Date(d).getUTCDay();
+    const ev=SVC.filter(v=>ok(v)&&v.days.includes(wd)).map(v=>({v,s:d+_min(v.s),e:d+_min(v.e)})).sort((a,b)=>a.s-b.s);
+    for(const x of ev) if(x.e+x.v.hold*60e3>t) return {k:x.v.k,v:x.v,date:new Date(d).toISOString().slice(0,10),state:t<x.s?'ready':t<x.e?'live':'done'};}
+  return null;}
+function svcAt(now){return _scan(now,()=>true);}
+function nextOf(k,now){return _scan(now,v=>v.k===k);}"""
 
 
 LANDING = r"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -146,22 +168,46 @@ h3.sec{margin:28px 4px 10px;font-size:15px;color:#334155;display:flex;justify-co
 .pg{display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin:14px 0}
 .pg button{font:700 13px inherit;border:0;border-radius:10px;padding:8px 12px;background:#fff;color:#0b1430;cursor:pointer;box-shadow:0 1px 4px rgba(11,20,48,.08)}
 .pg button.on{background:#0b1430;color:#fff}.pg button:disabled{opacity:.4;cursor:default}
-@media(max-width:560px){.ready{aspect-ratio:auto;min-height:220px}.ready .msg br{display:none}header{padding:24px 16px 80px}.go{display:none}.hero{padding:12px}.d{flex-basis:48px}}
+/* 예배 단추 넷 + 새 템플릿(A 키노트) 표지 — 2026-10-07 */
+.svc{max-width:720px;margin:0 auto 12px;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);border-radius:16px;padding:6px;backdrop-filter:blur(6px)}
+.svc button{position:relative;font:inherit;border:0;border-radius:11px;padding:11px 4px 10px;background:transparent;color:#dbe3ff;font-weight:700;font-size:15px;cursor:pointer;line-height:1.2}
+.svc button small{display:block;font-size:11px;font-weight:600;color:#9fb0e0;margin-top:3px;min-height:13px}
+.svc button.now{color:#fff;box-shadow:inset 0 0 0 1.5px #f6c76b}
+.svc button.now small{color:#f6c76b}
+.svc button.on{background:#fff;color:#0b1430;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.svc button.on.now{box-shadow:inset 0 0 0 2px #f6c76b,0 4px 14px rgba(0,0,0,.18)}
+.svc button.on small{color:#8a5a00}
+.svc button:focus-visible{outline:2px solid #f6c76b;outline-offset:2px}
+.slide{position:relative;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#05070d;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.slide:before{content:"";position:absolute;inset:0;background:radial-gradient(55% 60% at 50% 38%,rgba(56,92,255,.30),transparent 62%),radial-gradient(40% 45% at 85% 95%,rgba(0,190,200,.14),transparent 60%),radial-gradient(35% 40% at 10% 90%,rgba(120,80,255,.12),transparent 60%)}
+.slide:after{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:36px 36px;-webkit-mask-image:radial-gradient(70% 65% at 50% 42%,#000,transparent);mask-image:radial-gradient(70% 65% at 50% 42%,#000,transparent)}
+.slide>*{position:relative;z-index:1}
+.slide .ch{font-size:11px;letter-spacing:.42em;color:rgba(255,255,255,.55);font-weight:600}
+.slide .nm{font-size:clamp(34px,8.4vw,58px);font-weight:900;letter-spacing:.06em;margin:6px 0 4px}
+.slide .en{font-size:13px;color:#cfd9ff}.slide .ru{font-size:11.5px;color:#8fb0ff;margin-top:2px}
+.slide .ln{width:44px;height:2px;background:#5b7cff;margin:12px 0 10px}
+.slide .tm{font-size:14px;color:#f6c76b;font-weight:700;letter-spacing:.04em}
+.svmsg{margin:12px 2px 0;font-size:14.5px;line-height:1.7;color:#334155}
+.svmsg small{display:block;color:#94a3b8;font-size:12.5px;margin-top:2px}
+.hero .tag.done{background:#e2e8f0;color:#475569}
+@media(max-width:560px){.svc button{font-size:13.5px;padding:10px 2px 9px}.svc button small{font-size:10.5px}.ready{aspect-ratio:auto;min-height:220px}.ready .msg br{display:none}header{padding:24px 16px 80px}.go{display:none}.hero{padding:12px}.d{flex-basis:48px}}
 </style></head><body>
 <header><span class="k">JEGOK CHURCH · WORSHIP TEAM</span><h1>제곡교회 예배 플랫폼</h1></header>
-<main><section class="hero" id="hero"></section>
+<main><nav class="svc" id="svc" aria-label="예배 고르기"></nav><section class="hero" id="hero"></section>
 <h3 class="sec">지난 예배 <span id="cnt"></span></h3><div class="list" id="list"></div><div class="pg" id="pg"></div></main>
 <script id="data" type="application/json">@@DATA@@</script>
 <script>
 const ALL=JSON.parse(document.getElementById('data').textContent);
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const kst=new Date(Date.now()+9*3600e3), TODAY=(new URLSearchParams(location.search).get('today'))||kst.toISOString().slice(0,10);   // ?today= 은 미리 보기용
+const Q=new URLSearchParams(location.search), NOW=Q.get('now')?new Date(Q.get('now')+':00Z'):new Date(Date.now()+9*3600e3);   // ?now=2026-10-07T19:45 미리 보기용(한국 시간)
+const TODAY=Q.get('today')||NOW.toISOString().slice(0,10);   // ?today= 은 옛 미리 보기용
+@@SCHED@@
 const W='일월화수목금토';
 const md=d=>{const x=new Date(d+'T00:00:00Z');return (x.getUTCMonth()+1)+'월 '+x.getUTCDate()+'일('+W[x.getUTCDay()]+')';};
 function nextSunday(){const x=new Date(TODAY+'T00:00:00Z');x.setUTCDate(x.getUTCDate()+((7-x.getUTCDay())%7||7));return x.toISOString().slice(0,10);}
 const sundays=ALL.filter(i=>i.ppt);
 const today=sundays.find(i=>i.date===TODAY);
-function hero(){const h=document.getElementById('hero');
+function hero(){const h=document.getElementById('hero');   // 주일예배
   if(today){const i=today;
     h.innerHTML='<div class="row"><span class="tag live">● 오늘 · '+md(i.date)+'</span><span class="who">'+(i.leader.length?'인도 '+esc(i.leader.join(', ')):'')+'</span></div>'
       +'<a class="shot" href="'+i.ppt+'#pv" style="background-image:url(\''+i.cover+'\')"></a>'
@@ -193,7 +239,23 @@ function list(p){const n=Math.max(1,Math.ceil(PAST.length/PER)); p=Math.min(Math
   pg.querySelectorAll('button').forEach(x=>x.onclick=()=>{location.hash='p='+x.dataset.p;});}
 function route(){list(+((location.hash.match(/p=(\d+)/)||[])[1]||1));}
 addEventListener('hashchange',()=>{route();document.getElementById('cnt').scrollIntoView({behavior:'smooth'});});
-hero(); route();
+const md2=d=>{const x=new Date(d+'T00:00:00Z');return (x.getUTCMonth()+1)+'월 '+x.getUTCDate()+'일('+W[x.getUTCDay()]+')';};
+function dayWord(d){const t=new Date(TODAY+'T00:00:00Z'),x=new Date(d+'T00:00:00Z'),n=Math.round((x-t)/864e5);return n===0?'오늘':n===1?'내일':md2(d);}
+function hm(s){const p=s.split(':'),h=+p[0],m=+p[1];return (h<12?'새벽 ':'저녁 ')+(h>12?h-12:h)+'시'+(m?' '+m+'분':'');}
+function heroSvc(r){const v=r.v,h=document.getElementById('hero'),w=dayWord(r.date);
+  const tag=r.state==='live'?'<span class="tag live">● 지금 예배 중</span>':r.state==='done'?'<span class="tag done">마쳤습니다 · '+md(r.date)+'</span>':'<span class="tag">준비 중 · '+md(r.date)+'</span>';
+  const msg=r.state==='live'?'지금 '+v.name+'를 드리고 있습니다.':r.state==='done'?w+' '+v.name+'를 마쳤습니다. 함께해 주셔서 고맙습니다.':w+' '+hm(v.s)+', '+v.name+'를 준비하고 있습니다.';
+  h.innerHTML='<div class="row">'+tag+'<span class="who">'+v.s+' ~ '+v.e+'</span></div>'
+    +'<div class="slide"><div class="ch">제 곡 교 회</div><div class="nm">'+v.name+'</div>'
+    +'<div class="en">'+v.en+'</div><div class="ru">'+v.ru+'</div><div class="ln"></div><div class="tm">'+md(r.date)+' · '+hm(v.s)+'</div></div>'
+    +'<p class="svmsg">'+msg+'<small>예배 PPT는 준비되는 대로 이곳에 올라옵니다.</small></p>';}
+const CUR=svcAt(NOW); let SEL=CUR.k;
+function svcTabs(){const n=document.getElementById('svc');
+  n.innerHTML=SVC.map(v=>{const isNow=v.k===CUR.k, sub=isNow?(function(w){return w==='오늘'||w==='내일'?w:CUR.date.slice(5).replace('-','/').replace(/^0/,'')+' 다음';})(dayWord(CUR.date)):'';
+    return '<button type="button" data-k="'+v.k+'" class="'+(v.k===SEL?'on ':'')+(isNow?'now':'')+'" aria-pressed="'+(v.k===SEL)+'">'+v.name+'<small>'+sub+'</small></button>';}).join('');
+  n.querySelectorAll('button').forEach(b=>b.onclick=()=>{SEL=b.dataset.k;svcTabs();show();});}
+function show(){if(SEL==='sun'){hero();return;} heroSvc(SEL===CUR.k?CUR:nextOf(SEL,NOW));}
+svcTabs(); show(); route();
 </script></body></html>"""
 
 

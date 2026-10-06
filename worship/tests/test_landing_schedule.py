@@ -1,0 +1,66 @@
+"""예배 플랫폼 첫 화면의 예배 단추 넷(새벽·수요·금요·주일) — 지금 어느 예배를 띄울지 (2026-10-07 교장님).
+
+규칙: 예배가 끝나고 1시간이 지나면 다음 예배로 넘어간다.
+  새벽 월~금 05:00~06:00(07:00에 넘어감, 토요일 새벽 없음) · 수요 19:30~20:30 · 금요 19:30~20:30(21:30에 넘어감)
+  주일은 하루 종일 「오늘」, 자정에 월요일 새벽으로.
+페이지의 JS(publish.SCHED_JS)를 node 로 그대로 돌려 본다.
+"""
+import json, shutil, subprocess, sys, tempfile, unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "accomp"))
+import publish  # noqa: E402
+
+# (한국 시간, 기대: 단추, 그 예배 날짜, 상태)   2026-10-05 월 · 10-07 수 · 10-09 금 · 10-10 토 · 10-11 일
+CASES = [
+    ("2026-10-07T06:30", "dawn", "2026-10-07", "done"),    # 수 새벽 끝난 뒤 1시간 안
+    ("2026-10-07T07:00", "wed",  "2026-10-07", "ready"),   # 수 아침 7시 → 수요예배 준비 중
+    ("2026-10-07T13:00", "wed",  "2026-10-07", "ready"),
+    ("2026-10-07T19:45", "wed",  "2026-10-07", "live"),
+    ("2026-10-07T21:00", "wed",  "2026-10-07", "done"),
+    ("2026-10-07T21:30", "dawn", "2026-10-08", "ready"),   # 끝나고 1시간 뒤 → 다음 날 새벽
+    ("2026-10-08T05:10", "dawn", "2026-10-08", "live"),
+    ("2026-10-08T07:00", "dawn", "2026-10-09", "ready"),   # 목 낮 → 금 새벽
+    ("2026-10-09T07:00", "fri",  "2026-10-09", "ready"),   # 금 아침 7시 → 금요예배 준비 중
+    ("2026-10-09T20:00", "fri",  "2026-10-09", "live"),
+    ("2026-10-09T21:30", "sun",  "2026-10-11", "ready"),   # 금요 끝나야 주일로(토 새벽 없음)
+    ("2026-10-10T05:30", "sun",  "2026-10-11", "ready"),   # 토요일 새벽은 없다
+    ("2026-10-11T00:00", "sun",  "2026-10-11", "live"),    # 주일 하루 종일
+    ("2026-10-11T23:59", "sun",  "2026-10-11", "live"),
+    ("2026-10-12T00:00", "dawn", "2026-10-12", "ready"),   # 월요일 0시 → 월 새벽
+    ("2026-10-05T12:00", "dawn", "2026-10-06", "ready"),   # 월 낮 → 화 새벽
+]
+
+
+@unittest.skipUnless(shutil.which("node"), "node 없음")
+class Schedule(unittest.TestCase):
+    def test_cases(self):
+        js = publish.SCHED_JS + "\nconst C=" + json.dumps(CASES) + ";\n" + r"""
+const out=C.map(([t])=>{const r=svcAt(new Date(t+':00Z'));return [r.k,r.date,r.state];});
+console.log(JSON.stringify(out));"""
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+            f.write(js)
+        got = json.loads(subprocess.run(["node", f.name], capture_output=True, text=True, check=True).stdout)
+        for (t, *want), g in zip(CASES, got):
+            with self.subTest(t=t):
+                self.assertEqual(g, want)
+
+    def test_next_of_each(self):
+        """다른 단추를 눌렀을 때: 그 예배의 다음 날짜 (수요일 13시 기준)."""
+        js = publish.SCHED_JS + r"""
+const n=new Date('2026-10-07T13:00:00Z');
+console.log(JSON.stringify(['dawn','wed','fri','sun'].map(k=>{const r=nextOf(k,n);return [r.date,r.state];})));"""
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+            f.write(js)
+        got = json.loads(subprocess.run(["node", f.name], capture_output=True, text=True, check=True).stdout)
+        self.assertEqual(got, [["2026-10-08", "ready"], ["2026-10-07", "ready"], ["2026-10-09", "ready"], ["2026-10-11", "ready"]])
+
+    def test_page_has_tabs(self):
+        doc = publish.landing_html([])
+        for w in ("새벽예배", "수요예배", "금요예배", "주일예배", 'id="svc"', "svcAt("):
+            self.assertIn(w, doc)
+        self.assertNotIn("@@", doc)
+
+
+if __name__ == "__main__":
+    unittest.main()
