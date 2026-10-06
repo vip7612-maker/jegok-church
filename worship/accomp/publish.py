@@ -115,6 +115,27 @@ def index_page() -> None:
     items += [o for o in past_services() if (o["date"], o["kind"]) not in have]
     (SITE / INDEX).mkdir(exist_ok=True)
     (SITE / INDEX / "index.html").write_text(landing_html(items))
+    # 「악보와 PPT」 곡 목록의 인도자 배지(2026-10-07 교장님: 한 번이라도 부른 곡엔 그 사람 이름표)
+    roles = json.loads((HERE / "services.json").read_text()) if (HERE / "services.json").exists() else {}
+    (SITE / INDEX / "song_leaders.json").write_text(json.dumps({"leaders": roles.get("leaders", []), "songs": song_leaders(items)}, ensure_ascii=False))
+
+
+def song_key(title: str) -> str:
+    """곡 제목 맞추기: 띄어쓰기·문장부호·괄호 속 덧말·끝 번호(「주의 인자하심이 1」)를 뺀다. 곡 페이지 JS 의 sk() 와 같은 규칙."""
+    t = re.sub(r"\([^)]*\)|\[[^\]]*\]", "", title or "")
+    t = re.sub(r"[^0-9A-Za-z가-힣]", "", t).lower()
+    return re.sub(r"\d+$", "", t) or t
+
+
+def song_leaders(items: list[dict]) -> dict:
+    """곡 → {인도자: 부른 횟수}. 인도자 기록이 없는 예배는 세지 않는다(지어내지 않는다)."""
+    out: dict[str, dict[str, int]] = {}
+    for i in items:
+        for ld in i.get("leader") or []:
+            for t in dict.fromkeys(song_key(x) for x in i.get("songs") or []):
+                if t:
+                    out.setdefault(t, {}); out[t][ld] = out[t].get(ld, 0) + 1
+    return out
 
 
 def landing_html(items: list[dict]) -> str:

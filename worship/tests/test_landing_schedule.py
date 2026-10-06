@@ -69,6 +69,19 @@ console.log(JSON.stringify(['dawn','wed','fri','sun'].map(k=>{const r=nextOf(k,n
         for w in ("정영선 목사", "이춘만 선교사", "김태헌 집사", 'id="flt"', "인도 정영화"[:2]):
             self.assertIn(w, doc)
 
+    def test_song_leaders(self):
+        """한 번이라도 부른 곡에 그 인도자 배지 — 콘티 기록에서 모은다. 제목은 띄어쓰기·문장부호 무시, 끝 번호(「… 1」)는 묶음."""
+        items = [
+            {"date": "2026-10-04", "kind": "주일", "leader": ["이경진"], "songs": ["주의 인자하심이", "괴로울 때 주님의 얼굴 보라"]},
+            {"date": "2026-01-18", "kind": "주일", "leader": ["정영화"], "songs": ["주의 인자하심이 1"]},
+            {"date": "2025-01-08", "kind": "수요", "leader": [], "songs": ["주의 인자하심이"]},   # 인도자 기록 없음 → 세지 않음
+        ]
+        got = publish.song_leaders(items)
+        k = publish.song_key("주의 인자하심이 1")
+        self.assertEqual(k, publish.song_key("주의인자하심이"))
+        self.assertEqual(got[k], {"이경진": 1, "정영화": 1})
+        self.assertEqual(got[publish.song_key("괴로울 때, 주님의 얼굴보라")], {"이경진": 1})
+
     def test_page_has_tabs(self):
         doc = publish.landing_html([])
         for w in ("새벽예배", "수요예배", "금요예배", "주일예배", 'id="svc"', "svcAt("):
