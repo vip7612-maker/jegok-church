@@ -55,6 +55,20 @@ console.log(JSON.stringify(['dawn','wed','fri','sun'].map(k=>{const r=nextOf(k,n
         got = json.loads(subprocess.run(["node", f.name], capture_output=True, text=True, check=True).stdout)
         self.assertEqual(got, [["2026-10-08", "ready"], ["2026-10-07", "ready"], ["2026-10-09", "ready"], ["2026-10-11", "ready"]])
 
+    def test_leader_from_path(self):
+        """지난 예배 폴더 이름(「2026 0118 주일예배 정영화/…」)에서 인도자를 읽는다. 없으면 빈 칸(지어내지 않는다)."""
+        f = publish.leader_from_path
+        self.assertEqual(f("2026/2026 0118 주일예배 정영화/2026 0118 주일예배 PPT.pptx"), "정영화")
+        self.assertEqual(f("2025/2025 1228 주일예배 이경진/2025 1228 제곡교회예배.pptx"), "이경진")
+        self.assertEqual(f("2025/20250108 수요예배.pptx"), "")
+        self.assertEqual(f("2025/20250316 제곡교회예배.pptx"), "")
+
+    def test_roles_and_filter_in_page(self):
+        """수요·금요 인도·설교(services.json)가 페이지에 들어가고, 지난 예배에 인도자 거르기가 있다."""
+        doc = publish.landing_html([{"date": "2026-01-18", "kind": "주일", "leader": ["정영화"], "songs": [], "src": "x"}])
+        for w in ("정영선 목사", "이춘만 선교사", "김태헌 집사", 'id="flt"', "인도 정영화"[:2]):
+            self.assertIn(w, doc)
+
     def test_page_has_tabs(self):
         doc = publish.landing_html([])
         for w in ("새벽예배", "수요예배", "금요예배", "주일예배", 'id="svc"', "svcAt("):
