@@ -14,7 +14,7 @@ async function call(method, { query = {}, body = null, ip = '10.9.9.' + Math.flo
   const sc = out.headers['set-cookie']; if (sc) cookie = sc.split(';')[0].endsWith('=') ? '' : sc.split(';')[0];
   return out;
 }
-const clean = () => api.batch([['DELETE FROM wor_order WHERE church=?', [C]], ['DELETE FROM wor_users WHERE church=?', [C]], ['DELETE FROM wor_settings WHERE church=?', [C]], ['DELETE FROM wor_assign WHERE church=?', [C]]]);
+const clean = () => api.batch([['DELETE FROM wor_order WHERE church=?', [C]], ['DELETE FROM wor_tpl WHERE church=?', [C]], ['DELETE FROM wor_users WHERE church=?', [C]], ['DELETE FROM wor_settings WHERE church=?', [C]], ['DELETE FROM wor_assign WHERE church=?', [C]]]);
 let n = 0; let r0; const ok = (c, m) => { assert.ok(c, m); n++; };
 try {
   await call('GET', { query: { info: 'jegok' } });      // 표 만들기
@@ -75,7 +75,43 @@ try {
   const saveCookie = cookie; cookie = '';
   r = await call('GET', { query: { order: C, date: '2026-10-09' } });
   ok(r.code === 401, '로그인 없으면 순서 못 봄');
+  // 주보 올리기(2026-10-07): 브라우저가 Blob 에 바로 올릴 열쇠 — 로그인·맡은 날·자리·확장자 확인 / 서버엔 주소만
+  const tok = (date, pathname) => call('POST', { body: { type: 'blob.generate-client-token', payload: { pathname, multipart: false, clientPayload: JSON.stringify({ church: C, date }) } } });
+  r = await tok('2026-10-09', `jubo/${C}/2026-10-09/1.hwp`);
+  ok(r.code === 403 && r.body.error.includes('비밀번호'), '로그인 없으면 올릴 열쇠 없음');
   cookie = saveCookie;
+  r = await tok('2026-10-09', `jubo/${C}/2026-10-09/1.hwp`);
+  ok(r.code === 200 && typeof r.body.clientToken === 'string' && r.body.clientToken.length > 20, '맡은 날은 올릴 열쇠');
+  r = await tok('2026-10-11', `jubo/${C}/2026-10-11/1.hwp`);
+  ok(r.code === 403, '맡지 않은 날은 열쇠 없음');
+  r = await tok('2026-10-09', `jubo/other/2026-10-09/1.hwp`);
+  ok(r.code === 403, '다른 자리에는 열쇠 없음');
+  r = await tok('2026-10-09', `jubo/${C}/2026-10-09/1.exe`);
+  ok(r.code === 403, '주보가 아닌 파일은 열쇠 없음');
+  r = await call('POST', { body: { action: 'jubo', church: C, date: '2026-10-09', name: '주보.hwp', url: 'https://evil.example.com/jubo/zz-test/2026-10-09/1.hwp' } });
+  ok(r.code === 400, '다른 곳 주소는 거절');
+  const good = `https://abc.public.blob.vercel-storage.com/jubo/${C}/2026-10-09/1-x.hwp`;
+  r = await call('POST', { body: { action: 'jubo', church: C, date: '2026-10-09', name: '10월9일 주보.hwp', url: good } });
+  ok(r.code === 200 && r.body.jubo.url === good && r.body.jubo.name === '10월9일 주보.hwp', '올린 주보 주소 기록');
+  r = await call('GET', { query: { order: C, date: '2026-10-09' } });
+  ok(r.body.jubo && r.body.jubo.url === good, '다시 열어도 주보 첨부가 보임');
+  // 순서에 맡은 분·설교 제목·성경 본문 (2026-10-07)
+  r = await call('POST', { body: { action: 'order', church: C, date: '2026-10-09', items: [
+    { t: '대표기도', who: ' 정상진 장로 ' }, { t: '성경봉독', who: '김인도 집사', ref: '마가복음 3:31-35' }, { t: '설교', who: '정영선 목사', title: '하나님의 가족', x: 'drop' }] } });
+  ok(r.code === 200 && r.body.items[0].who === '정상진 장로' && r.body.items[1].ref === '마가복음 3:31-35' && r.body.items[2].title === '하나님의 가족' && !('x' in r.body.items[2]), '맡은 분·본문·제목 저장(모르는 칸은 버림)');
+  r = await call('GET', { query: { order: C, date: '2026-10-09' } });
+  ok(r.body.items[2].who === '정영선 목사', '다시 읽어도 맡은 분');
+  // 교회 템플릿: 저장·목록·불러오기·지우기 — 날짜마다 바뀌는 제목·본문은 저장하지 않는다
+  r = await call('POST', { body: { action: 'tpl_save', church: C, name: '금요예배', items: [{ t: '찬양' }, { t: '설교', who: '정영선 목사', title: '이번 주 제목', ref: '요 3:16' }] } });
+  ok(r.code === 200, '템플릿 저장');
+  r = await call('GET', { query: { tpl: C } });
+  ok(r.code === 200 && r.body.list.length === 1 && r.body.list[0].name === '금요예배' && r.body.list[0].items[1].who === '정영선 목사' && !r.body.list[0].items[1].title && !r.body.list[0].items[1].ref, '템플릿 목록(제목·본문은 빼고)');
+  r = await call('POST', { body: { action: 'tpl_save', church: 'jegok', name: '남의교회', items: [{ t: '찬양' }] } });
+  ok(r.code === 400, '다른 교회 템플릿은 저장 못 함');
+  r = await call('POST', { body: { action: 'tpl_save', church: C, name: '', items: [{ t: '찬양' }] } });
+  ok(r.code === 400, '이름 없는 템플릿 거절');
+  r = await call('POST', { body: { action: 'tpl_del', church: C, name: '금요예배' } });
+  ok(r.code === 200 && (await call('GET', { query: { tpl: C } })).body.list.length === 0, '템플릿 지우기');
   // 틀린 비밀번호 여러 번 → 막힘
   const ip = '10.8.8.8';
   for (let i = 0; i < 5; i++) await call('POST', { ip, body: { action: 'login', church: C, name: '김인도', pw: 'wrong-' + i } });
