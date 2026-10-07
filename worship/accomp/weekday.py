@@ -45,7 +45,8 @@ def data_for(date: str, items: list[dict]) -> dict:
 def ensure(date: str) -> str:
     """data/<날짜>.json 이 없으면 만든다. 있으면 그대로."""
     f = HERE / "data" / f"{date}.json"
-    if f.exists(): return "있음"
+    if f.exists():
+        return refresh(date) if service(date) != "주일예배" else "있음"
     if service(date) == "주일예배":
         import weekly
         weekly.open_week(dt.date.fromisoformat(date)); return "주일 악보집 새로 엶"
@@ -54,3 +55,22 @@ def ensure(date: str) -> str:
     items = json.loads(row["items"]) if row and row.get("items") else []
     f.write_text(json.dumps(data_for(date, items), ensure_ascii=False, indent=1))
     return f"{service(date)} 악보집 새로 엶"
+
+
+def refresh(date: str) -> str:
+    """새벽·수요·금요 악보집의 말씀 쪽을 지금 예배순서(본문·제목)에 맞춘다 — 처음 만든 뒤 순서를 고쳐도 따라가게(2026-10-07)."""
+    import order_sync, reco_gen
+    f = HERE / "data" / f"{date}.json"
+    d = json.loads(f.read_text())
+    row = order_sync.load(date)
+    ref, title = reco_gen.source(json.loads(row["items"]) if row and row.get("items") else [])
+    st = next((p for p in d["pages"] if p["type"] == "sermon_text"), None)
+    if not ref and not title:
+        return "있음"
+    if st and st.get("ref") == ref and st.get("title") == title:
+        return "있음"
+    new = {"type": "sermon_text", "ref": ref, "title": title, "body": verses_html(ref)}
+    if st: st.update(new)
+    else: d["pages"].insert(1, new)
+    f.write_text(json.dumps(d, ensure_ascii=False, indent=1))
+    return f"말씀 쪽을 예배순서에 맞춤({ref} {title})".strip()

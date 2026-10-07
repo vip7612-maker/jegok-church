@@ -109,7 +109,9 @@ def index_page() -> None:
     for x in pub:
         sm = summary(x)
         cover = (SITE / "d" / sid_for(x) / "cover.jpg").exists()
-        items.append({"date": x, "kind": "주일", "title": sm["title"], "ref": sm["ref"], "leader": sm["leader"],
+        import weekday                                  # 새벽·수요·금요 악보집도 그 예배로(첫 화면 그 예배 칸의 [악보][PPT]가 열리게, 2026-10-07)
+        kind = {"새벽예배": "새벽", "수요예배": "수요", "금요예배": "금요"}.get(weekday.service(x), "주일")
+        items.append({"date": x, "kind": kind, "title": sm["title"], "ref": sm["ref"], "leader": sm["leader"],
                       "songs": sm["intro"] + sm["main"] + sm["apply"], "book": sm["url"] + "/",
                       "ppt": sm["url"] + "/ppt.html", "cover": (sm["url"] + "/cover.jpg") if cover else ""})
     have = {(i["date"], i["kind"]) for i in items}

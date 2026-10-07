@@ -19,6 +19,22 @@ class WeekdayTests(unittest.TestCase):
         nd = W.data_for("2026-10-08", [{"t": "찬송"}])
         self.assertNotIn("sermon_text", [p["type"] for p in nd["pages"]])   # 본문·제목이 없으면 말씀 쪽 없음
 
+    def test_refresh_follows_order(self):
+        import json, tempfile, order_sync, reco_gen
+        from pathlib import Path
+        tmp = Path(tempfile.mkdtemp()); (tmp / "data").mkdir()
+        old_here, old_load = W.HERE, order_sync.load
+        try:
+            W.HERE = tmp; W.verses_html = lambda ref: "본문:" + ref
+            (tmp / "data" / "2026-10-08.json").write_text(json.dumps(W.data_for("2026-10-08", [{"t": "성경봉독", "ref": "시편"}]), ensure_ascii=False))
+            order_sync.load = lambda d: {"items": json.dumps([{"t": "성경봉독", "ref": "시편23편"}, {"t": "말씀", "title": "선한 목자"}], ensure_ascii=False)}
+            self.assertIn("시편23편", W.refresh("2026-10-08"))
+            st = [p for p in json.loads((tmp / "data" / "2026-10-08.json").read_text())["pages"] if p["type"] == "sermon_text"][0]
+            self.assertEqual((st["ref"], st["title"], st["body"]), ("시편23편", "선한 목자", "본문:시편23편"))
+            self.assertEqual(W.refresh("2026-10-08"), "있음")      # 같으면 그대로
+        finally:
+            W.HERE, order_sync.load = old_here, old_load
+
 
 if __name__ == "__main__":
     unittest.main()
