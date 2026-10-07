@@ -702,11 +702,6 @@ def _divider(slide) -> str | None:
     return None
 
 
-def _song_titles(date: str) -> list[str]:
-    d = json.loads((HERE / "data" / f"{date}.json").read_text()).get("songs", {})
-    return [x.get("title", "") for g in ("intro", "main", "apply") for x in d.get(g, [])]
-
-
 def is_song_slide(slide) -> bool:
     return any(sh.name.startswith(SONG_TAG) for sh in slide.shapes)
 
@@ -752,14 +747,20 @@ def songs(pptx: Path, date: str) -> list[str]:
     import songbank, songppt as SP
     prs = Presentation(str(pptx)); W, H = prs.slide_width, prs.slide_height; kx, ky = W / 1920, H / 1080
     strip_songs(prs)                                               # 예전에 넣은 곡 장 빼기
-    titles = _song_titles(date)
+    for i in reversed(range(1, len(prs.slides))):                 # 같은 표지가 연달아 있으면 1장만(2026-10-07 교장님: 찬양과경배 표지는 1개, 곡은 그 아래)
+        if _divider(prs.slides[i]) and _divider(prs.slides[i]) == _divider(prs.slides[i - 1]): drop(prs, i)
+    import slides as SL
+    try: d = json.loads((HERE / "data" / f"{date}.json").read_text()).get("songs", {})
+    except Exception: d = {}
+    groups = {g: [x.get("title", "") for x in d.get(g, [])] for g in ("intro", "main", "apply")}
     divs = [i for i, s in enumerate(prs.slides) if _divider(s)]
-    if len(titles) != len(divs):
-        return [f"곡 {len(titles)}개와 찬양 자리 {len(divs)}개가 맞지 않음 — 곡 장을 넣지 않음"]
+    plan = SL.song_plan([_divider(prs.slides[i]) for i in divs], groups)
+    if sum(map(len, plan)) < sum(map(len, groups.values())):
+        return [f"찬양 표지가 없어 곡 장을 넣지 않음(표지 {len(divs)}장)"]
     blank = next((l for l in prs.slide_layouts if l.name.upper() == "BLANK"), prs.slide_layouts[-1])
     import store
     log, shift = [], 0
-    for di, title in zip(divs, titles):
+    for di, title in ((di, t) for di, ts in zip(divs, plan) for t in ts):   # 표지 하나 아래 그 순서 곡을 차례로
         key = store.song_find(title)                              # 곡별 PPT 는 예배 DB + 그림 창고에서(로컬 사본 없이)
         song = store.song_load(key) if key else None
         if not song:

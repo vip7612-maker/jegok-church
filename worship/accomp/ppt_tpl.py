@@ -208,7 +208,8 @@ def make(date: str, sid: str) -> Path:
     out_slides = slides.add_extra(out_slides, date, sd)
     title = f"예배 PPT 템플릿 ({TPL.parent.name})" if y == "2000" else f"{int(m)}월 {int(d)}일 주일예배 PPT"
     note = "" if info else '<span style="color:#fbbf24;font-size:12px">주보가 오면 맡은 분·설교·봉독·소식이 채워집니다</span>'
-    (folder / "ppt.html").write_text(slides.render(out_slides, title, note, slides.song_titles(date)))
+    # date= 를 꼭 넘긴다 — 빠지면 ＋ 장 넣기·교회 소식 고치기·끼운 장 불러오기가 모두 꺼진다(10/11 PPT 에서 빠졌던 것, 2026-10-07 교장님)
+    (folder / "ppt.html").write_text(slides.render(out_slides, title, note, slides.song_titles(date), date=None if y == "2000" else date))
     for x in ("worship.pdf", "worship.pptx"): (folder / x).unlink(missing_ok=True)
     return folder
 

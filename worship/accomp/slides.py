@@ -82,7 +82,7 @@ def merge(texts: list[dict], W: float) -> list[dict]:
 
 def outline(slides: list[dict], songs: list[str] | None = None) -> list[tuple[int, str]]:
     """바로가기 — 순서 표지 장과, 찬양 곡 이름(가려진 구간 표시의 첫 줄)."""
-    marks, last, seen = [], "", set()
+    marks, last, seen, cur = [], "", set(), ""   # cur = 바로 앞 순서 이름(곡 장은 빼고)
     def is_mark(x):   # 순서 이름(사도신경·대표기도 …)으로 시작하는 장 — 사도신경처럼 글이 길어도 표지로 본다
         f = re.sub(r"\s", "", x["plain"])
         return any(y in f[:40] for y in SECTIONS)
@@ -94,14 +94,18 @@ def outline(slides: list[dict], songs: list[str] | None = None) -> list[tuple[in
             # 가사가 아직 없는 틀(2026-10-03): 곡마다 「찬양과경배」 표지 장만 있다 — 같은 표지가 또 나오면 곡 자리로 보고 곡 이름을 단다
             ph = sec in ("찬양과경배", "찬양과결단") and "Praise&Worship" in flat
             empty = k + 1 >= len(slides) or is_mark(slides[k + 1])   # 바로 다음이 또 표지 = 가사 장이 없는 자리
-            if ph and sec in seen and not empty and songs:          # 곡마다 다시 나오는 「찬양과경배」 표지 = 다음 곡의 시작(목차도 그 곡으로)
+            again = ph and sec == cur   # 바로 앞 순서도 같은 찬양 = 곡마다 다시 나오는 표지. 사이에 사도신경 등이 있으면 새 순서로 목차에 다시 단다(2026-10-07)
+            if again and not empty and songs:                       # 곡마다 다시 나오는 「찬양과경배」 표지 = 다음 곡의 시작(목차도 그 곡으로)
                 marks.append((s["n"], "♪ " + songs.pop(0))); last = "song"; continue
-            if not (ph and sec in seen):
+            if not again:
                 marks.append((s["n"], name))
-            seen.add(sec); last = sec
+            seen.add(sec); last = sec; cur = sec
             if ph and empty and songs:
                 marks.append((s["n"], "♪ " + songs.pop(0))); last = "song"
             continue
+        if s.get("start"):                                         # add_song_frames 가 곡 첫 장에 단 곡 이름
+            if songs: songs.pop(0)
+            marks.append((s["n"], "♪ " + s["start"])); last = "song"; continue
         if last in ("찬양과경배", "찬양과결단"):
             m = re.match(r"\s*1\.\s*([^/0-9]+?)(?:\s+\d+\.|$)", s["hidden"])
             nm = songs.pop(0) if songs else (m.group(1).strip()[:18] if m else "찬양")
@@ -273,7 +277,9 @@ function gridSec(a){ const L=TOC(); a=a||L[0]; if(!a) return; gA=a; const k=idxO
   all.forEach((s,i)=>{ const on=i>=k&&i<end; s.classList.toggle('sec',on); s.classList.remove('cur'); if(on) paint(s); });
   L.forEach(x=>x.classList.toggle('on',x===a)); a.scrollIntoView({block:'nearest'});
   document.getElementById('gname').textContent=a.textContent.replace(/^♪\s*/,''); document.getElementById('gcnt').textContent=(end-k)+'장 · 누르면 크게';
+  if(window.xpGrid) xpGrid(k,end);
   window.scrollTo(0,0); requestAnimationFrame(fit); }
+window.wsGridAgain=()=>{ if(gA) gridSec(gA); };
 function wsGrid(){ const L=TOC(); let a=gA; if(ONE()){ a=null; L.forEach(x=>{ if(idxOf(x)<=cur) a=x; }); } gridSec(a); }
 deck.addEventListener('click',e=>{ if(!document.body.classList.contains('grid')||document.body.classList.contains('pr')) return;
   const sl=e.target.closest('.sl.sec'); if(!sl) return; document.body.classList.remove('grid'); document.body.classList.add('one'); view(all.indexOf(sl)); });
@@ -546,6 +552,10 @@ XP_CSS = """
 #pvthumbs .th.add:hover{border-color:#f6c76b;color:#f6c76b}
 #pvthumbs .th .xpb{position:absolute;left:6px;top:6px;display:flex;gap:4px;z-index:3}#pvthumbs .th{position:relative}
 #pvthumbs .th .xpb button{border:0;border-radius:6px;background:rgba(15,23,42,.85);color:#fff;font-size:14px;padding:3px 7px;cursor:pointer}
+.gadd{display:none}body.grid:not(.pr) .gadd{display:flex;align-items:center;justify-content:center;aspect-ratio:16/9;border:3px dashed #475569;border-radius:8px;color:#cbd5e1;font:800 22px 'Pretendard Variable',sans-serif;cursor:pointer}
+body.grid:not(.pr) .gadd:hover{border-color:#f6c76b;color:#f6c76b}
+main .sl>.xpb{position:absolute;left:8px;top:8px;display:flex;gap:4px;z-index:5}body:not(.grid) main .sl>.xpb{display:none}
+main .sl>.xpb button{border:0;border-radius:6px;background:rgba(15,23,42,.85);color:#fff;font-size:15px;padding:4px 8px;cursor:pointer}
 #xpbox{position:fixed;inset:0;z-index:90;display:none;background:rgba(0,0,0,.6);align-items:center;justify-content:center}
 #xpbox.on{display:flex}#xpbox .p{background:#fff;color:#111;border-radius:14px;width:min(820px,94vw);max-height:92vh;overflow:auto;padding:18px 20px;font:15px 'Pretendard Variable',sans-serif}
 #xpbox h3{margin:0 0 10px}#xpbox .ch3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
@@ -615,6 +625,7 @@ function applyPages(list){ const curEl=all[cur];
       deck.insertBefore(sec, all[at]||document.getElementById('vbar')); all.splice(at,0,sec); at++; io.observe(sec); })); }
   window.XP=list; const k=all.indexOf(curEl); if(k>=0) cur=k;
   fit(); thR=null;
+  if(document.body.classList.contains('grid')&&window.wsGridAgain) wsGridAgain();   // 모아 보기 중이면 새 장·＋ 칸을 다시 그림
   if(document.body.classList.contains('pv')) go(cur,true); else if(SCREEN) show(cur,true); else if(ONE()) view(cur);
   clearTimeout(poll); if(list.some(p=>p.type==='html'&&(p.status==='wait'||p.status==='work'))) poll=setTimeout(loadPages,8000);
 }
@@ -627,14 +638,23 @@ window.xpReload=loadPages;
 async function save(body){ const r=await fetch('/api/worship',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({date:NDATE,key:NKEY},body))});
   const j=await r.json().catch(()=>({})); if(!j.ok) throw new Error(j.error||'저장 실패'); await loadPages(); if(bc) bc.postMessage({pages:1}); return j; }
 // ── 미리 보기 칸: 교회 소식·설교 구간이면 ＋, 끼운 장에는 ✏️ 🗑
+function xpBar(sect,sl){ const id=+sl.dataset.xp, pg=(window.XP||[]).find(p=>p.id===id); const bar=document.createElement('div'); bar.className='xpb';
+  const ed=document.createElement('button'); ed.textContent='✏️'; ed.title='고치기'; ed.onclick=ev=>{ ev.stopPropagation(); open(sect,pg); };
+  const del=document.createElement('button'); del.textContent='🗑'; del.title='빼기'; del.onclick=async ev=>{ ev.stopPropagation(); if(confirm('이 장을 뺄까요?')){ try{ await save({action:'pagedel',id}); }catch(err){ alert(err.message); } } };
+  bar.append(ed,del); return bar; }
 window.xpThumbs=(box,s,e)=>{
   const sect=sects().find(x=>startOf(x)===s); if(!sect||SCREEN) return;
-  box.querySelectorAll('.th').forEach(t=>{ const sl=all[+t.dataset.k]; if(!sl||!sl.classList.contains('xp')) return;
-    const id=+sl.dataset.xp, pg=(window.XP||[]).find(p=>p.id===id); const bar=document.createElement('div'); bar.className='xpb';
-    const ed=document.createElement('button'); ed.textContent='✏️'; ed.title='고치기'; ed.onclick=ev=>{ ev.stopPropagation(); open(sect,pg); };
-    const del=document.createElement('button'); del.textContent='🗑'; del.title='빼기'; del.onclick=async ev=>{ ev.stopPropagation(); if(confirm('이 장을 뺄까요?')){ try{ await save({action:'pagedel',id}); }catch(err){ alert(err.message); } } };
-    bar.append(ed,del); t.appendChild(bar); });
+  box.querySelectorAll('.th').forEach(t=>{ const sl=all[+t.dataset.k]; if(!sl||!sl.classList.contains('xp')) return; t.appendChild(xpBar(sect,sl)); });
   const add=document.createElement('div'); add.className='th add'; add.textContent='＋ 장 넣기'; add.title=NAME[sect]+' 뒤에 장 넣기'; add.onclick=()=>open(sect,null); box.appendChild(add);
+};
+// ── PPT 모아 보기에도 같은 ＋ (2026-10-07 교장님: 교회 소식·특송·설교 …) — 그 순서 장들 맨 끝에 ＋ 칸, 끼운 장에는 ✏️ 🗑
+window.xpGrid=(s,e)=>{
+  deck.querySelectorAll('.gadd,.sl>.xpb').forEach(x=>x.remove());
+  const sect=sects().find(x=>startOf(x)===s); if(!sect||SCREEN||!NDATE) return;
+  all.slice(s,e).filter(sl=>sl.classList.contains('xp')).forEach(sl=>sl.appendChild(xpBar(sect,sl)));
+  const add=document.createElement('div'); add.className='gadd'; add.textContent='＋ 장 넣기'; add.title=NAME[sect]+' 뒤에 장 넣기';
+  add.onclick=ev=>{ ev.stopPropagation(); open(sect,null); };
+  deck.insertBefore(add, all[e]||document.getElementById('vbar'));
 };
 // ── 넣기·고치기 창
 const box=document.createElement('div'); box.id='xpbox'; box.innerHTML='<div class="p"></div>';
@@ -827,33 +847,73 @@ def rewrap(slides: list[dict], pptx: Path | None) -> list[dict]:
     return slides
 
 
-def add_song_frames(slides: list[dict], date: str, out: Path) -> list[dict]:
-    """예배 PPT 에 가사 슬라이드가 아직 없을 때 — 찬양과경배·찬양과결단 표지 바로 뒤에 곡마다 틀 한 장(곡 제목 + 악보)을 끼운다
-    (2026-10-03 교장님 지시: 9/27 예배 PPT 처럼 곡마다 자리가 있게). 표지 뒤에 이미 가사 장이 있으면 손대지 않는다."""
-    from PIL import Image
+_flat40 = lambda s: re.sub(r"\s", "", s["plain"])[:40]
+
+
+def cover_kind(s: dict) -> str | None:
+    """찬양 표지 장이면 「경배」·「결단」(가사 장처럼 글이 긴 장은 아니다)."""
+    f = _flat40(s)
+    if ("찬양과경배" in f or "찬양과결단" in f) and len(re.sub(r"\s", "", s["plain"])) < 160:
+        return "결단" if "찬양과결단" in f else "경배"
+    return None
+
+
+def collapse_covers(slides: list[dict]) -> list[dict]:
+    """같은 찬양 표지가 연달아 있으면 1장만 남긴다 — 템플릿에 곡 자리마다 표지가 있던 것
+    (2026-10-07 교장님: 찬양과경배 표지는 1개, 곡은 그 아래 여러 개). 사이에 가사 장이 있으면 그대로 둔다."""
+    res = []
+    for s in slides:
+        k = cover_kind(s)
+        if k and res and cover_kind(res[-1]) == k:
+            continue
+        res.append(s)
+    for n, s in enumerate(res, 1): s["n"] = n
+    return res
+
+
+def song_plan(kinds: list[str], groups: dict) -> list[list]:
+    """표지마다 넣을 곡. 경배 표지가 둘이면 도입곡 → 첫째(사도신경 앞), 진행곡 → 둘째. 하나면 둘 다 그 아래.
+    적용송 → 결단 표지(없으면 마지막 경배 표지). 표지가 결단뿐이면 모두 그 아래."""
+    plan = [[] for _ in kinds]
+    W = [i for i, k in enumerate(kinds) if k == "경배"]; K = [i for i, k in enumerate(kinds) if k == "결단"]
+    intro, main, apply = list(groups.get("intro", [])), list(groups.get("main", [])), list(groups.get("apply", []))
+    if len(W) >= 2: plan[W[0]] += intro; plan[W[1]] += main
+    elif W: plan[W[0]] += intro + main
+    elif K: plan[K[0]] += intro + main
+    if K: plan[K[0]] += apply
+    elif W: plan[W[-1]] += apply
+    return plan
+
+
+def add_song_frames(slides: list[dict], date: str, out: Path | None) -> list[dict]:
+    """찬양과경배·찬양과결단 표지 뒤에 그 순서의 곡을 모두 끼운다 — 곡마다 곡별 PPT 장, 없으면 틀 한 장(곡 제목 + 악보)
+    (2026-10-03 교장님: 곡마다 자리가 있게 / 2026-10-07: 표지는 순서마다 1장, 곡은 그 아래 여러 개).
+    표지 뒤에 이미 가사 장이 있으면 곡은 손대지 않는다."""
+    slides = collapse_covers(slides)
     try:
         d = json.loads((HERE / "data" / f"{date}.json").read_text()).get("songs", {})
     except Exception:
         return slides
-    songs = [(lab, x) for g, name in (("intro", "도입곡"), ("main", ""), ("apply", "적용송"))
-             for i, x in enumerate(d.get(g, [])) for lab in [name or str(i + 1)]]
-    flat = lambda s: re.sub(r"\s", "", s["plain"])[:40]
-    is_div = lambda s: ("찬양과경배" in flat(s) or "찬양과결단" in flat(s)) and len(re.sub(r"\s", "", s["plain"])) < 160
-    is_sec = lambda s: any(x in flat(s) for x in SECTIONS)   # 다음 장이 곧바로 다른 순서 표지 = 가사 장 없음
-    divs = [k for k, s in enumerate(slides) if is_div(s)]
+    lab = lambda g, i: {"intro": "도입곡", "apply": "적용송"}.get(g) or str(i + 1)
+    groups = {g: [(lab(g, i), x) for i, x in enumerate(d.get(g, []))] for g in ("intro", "main", "apply")}
+    is_sec = lambda s: any(x in _flat40(s) for x in SECTIONS)   # 다음 장이 곧바로 다른 순서 표지 = 가사 장 없음
+    divs = [k for k, s in enumerate(slides) if cover_kind(s)]
     empty = [k for k in divs if k + 1 >= len(slides) or is_sec(slides[k + 1])]
-    if not songs or len(empty) < len(divs):   # 가사 장이 이미 들어 있는 PPT
+    if not any(groups.values()) or not divs or len(empty) < len(divs) or out is None:   # 가사 장이 이미 들어 있는 PPT
         return slides
+    from PIL import Image
+    plan = dict(zip(divs, song_plan([cover_kind(slides[k]) for k in divs], groups)))
     W, H = int(slides[0]["w"]), int(slides[0]["h"])
     for f in out.glob("song_*.jpg"): f.unlink()
     res, si = [], 0
     for k, s in enumerate(slides):
         res.append(s)
-        if k in divs and si < len(songs):
-            lab, x = songs[si]; si += 1
+        for lab_, x in plan.get(k, []):
+            si += 1
+            name_ = x.get("title") or "곡 미정"
             got = song_slides(x.get("title", ""), si, W, H, out)       # 곡별 PPT DB 에 있으면 그 곡의 장을 모두
             if got:
-                res += got; continue
+                got[0]["start"] = name_; res += got; continue
             name = f"frame_{si:02d}.jpg"
             cv = Image.new("RGB", (W, H), "white")
             if x.get("img") and (HERE / x["img"]).exists():
@@ -862,11 +922,11 @@ def add_song_frames(slides: list[dict], date: str, out: Path) -> list[dict]:
                 r = min(bw / im.width, bh / im.height); im = im.resize((max(1, int(im.width * r)), max(1, int(im.height * r))))
                 cv.paste(im, ((W - im.width) // 2, 110 + (bh - im.height) // 2))
             cv.save(out / name, "JPEG", quality=85)
-            title = ("♬ " + (lab + ". " if lab.isdigit() else lab + " · ") + (x.get("title") or "곡 미정"))
+            title = ("♬ " + (lab_ + ". " if lab_.isdigit() else lab_ + " · ") + name_)
             texts = [{"x": 40, "y": 30, "w": W - 80, "h": 60, "s": 48, "c": "#6b5444", "b": True, "t": title, "a": "c"}]
             if not x.get("img"):
                 texts.append({"x": 40, "y": H // 2, "w": W - 80, "h": 40, "s": 32, "c": "#9ca3af", "b": False, "t": "악보·가사 준비 중", "a": "c"})
-            res.append({"n": 0, "w": W, "h": H, "img": name, "texts": texts, "plain": x.get("title", ""), "hidden": x.get("title", "")})
+            res.append({"n": 0, "w": W, "h": H, "img": name, "texts": texts, "plain": x.get("title", ""), "hidden": x.get("title", ""), "start": name_})
     for n, s in enumerate(res, 1): s["n"] = n
     return res
 

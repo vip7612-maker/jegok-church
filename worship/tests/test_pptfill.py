@@ -28,5 +28,31 @@ class PptFillTests(unittest.TestCase):
         self.assertEqual(F._lines_needed(t, 46.24, 883), 2); self.assertEqual(F._lines_needed(t, 44, 883), 1)
 
 
+try:
+    import pptx as _pptx
+except ImportError:
+    _pptx = None
+
+
+@unittest.skipUnless(_pptx, "python-pptx 없는 파이썬 — /usr/local/bin/python3 로")
+class OneCoverPptxTests(unittest.TestCase):
+    """pptx 에서도 찬양과경배 표지는 순서마다 1장(2026-10-07 교장님)."""
+    def test_adjacent_covers_dropped(self):
+        import tempfile
+        from pathlib import Path
+        from pptx import Presentation
+        from pptx.util import Inches
+        prs = Presentation(); lay = prs.slide_layouts[6]
+        def add(t):
+            sl = prs.slides.add_slide(lay); sl.shapes.add_textbox(0, 0, Inches(4), Inches(1)).text_frame.text = t
+        cover = "찬양과경배 이 백성은 Praise&Worship"
+        add(cover); add("사도신경 Apostles' Creed"); [add(cover) for _ in range(6)]; add("대표기도 Prayer"); add("찬양과결단 Praise&Worship")
+        with tempfile.TemporaryDirectory() as d:
+            px = Path(d) / "t.pptx"; prs.save(str(px))
+            F.songs(px, "1999-01-03")                       # 곡 기록 없는 날 — 표지만 정리
+            kinds = [F._divider(s) or "-" for s in Presentation(str(px)).slides]
+        self.assertEqual(kinds, ["경배", "-", "경배", "-", "결단"])
+
+
 if __name__ == "__main__":
     unittest.main()
