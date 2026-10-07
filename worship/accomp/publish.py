@@ -221,6 +221,9 @@ h3.sec{margin:28px 4px 10px;font-size:15px;color:#334155;display:flex;justify-co
 .svmsg{margin:12px 2px 0;font-size:14.5px;line-height:1.7;color:#334155}
 .svmsg small{display:block;color:#94a3b8;font-size:12.5px;margin-top:2px}
 .hero .tag.done{background:#e2e8f0;color:#475569}
+.foot{max-width:860px;margin:10px auto 0;padding:22px 18px 34px;border-top:1px solid #dfe4ec;color:#64748b;font-size:12.5px;line-height:1.85;text-align:center}
+.foot b{display:block;color:#0b1430;font-size:14.5px;margin-bottom:4px}.foot .sep{margin:0 6px;color:#cbd2dc}
+.foot a{color:#64748b}.foot .adm{display:inline-block;margin-top:8px;font-size:11px;color:#94a3b8;text-decoration:none}
 .btns a.off{opacity:.45;cursor:default;pointer-events:none}
 .flt{display:flex;flex-wrap:wrap;gap:6px;margin:0 2px 10px}.flt .g{display:flex;flex-wrap:wrap;gap:6px;width:100%}
 .flt button{font:inherit;font-size:12.5px;font-weight:700;border:1px solid #dbe1ea;background:#fff;color:#334155;border-radius:999px;padding:5px 11px;cursor:pointer}
@@ -232,6 +235,7 @@ h3.sec{margin:28px 4px 10px;font-size:15px;color:#334155;display:flex;justify-co
 <header><span class="k">JEGOK CHURCH · WORSHIP TEAM</span><h1>제곡교회 예배 플랫폼</h1></header>
 <main><nav class="svc" id="svc" aria-label="예배 고르기"></nav><section class="hero" id="hero"></section>
 <h3 class="sec">지난 예배 <span id="cnt"></span></h3><div class="flt" id="flt"></div><div class="list" id="list"></div><div class="pg" id="pg"></div></main>
+<footer class="foot" id="foot"><b>제곡교회</b></footer>
 <script id="data" type="application/json">@@DATA@@</script><script id="roles" type="application/json">@@ROLES@@</script>
 <script>
 const ALL=JSON.parse(document.getElementById('data').textContent);
@@ -312,6 +316,15 @@ function svcTabs(){const n=document.getElementById('svc');
   n.querySelectorAll('button').forEach(b=>b.onclick=()=>{SEL=b.dataset.k;svcTabs();show();});}
 function show(){if(SEL==='sun'){hero();return;} heroSvc(SEL===CUR.k?CUR:nextOf(SEL,NOW));}
 svcTabs(); show(); route();
+// 하단 교회 정보 (2026-10-07 교장님) — 관리자 화면에서 고친 값(api/wadmin ?info=). 비운 칸은 안 보인다. 맨 끝 작은 「관리자」
+(async function(){const f=document.getElementById('foot');let s={};
+  try{s=(await (await fetch('/api/wadmin?info=jegok')).json()).settings||{};}catch(e){}
+  const tel=t=>t?'<a href="tel:'+esc(t.replace(/[^0-9+]/g,''))+'">'+esc(t)+'</a>':'';
+  const L=[[s.denom,s.name].filter(Boolean).join(' ')||'제곡교회'];
+  const l2=[s.pastor?'담임목사 '+esc(s.pastor):'', s.address?esc((s.zip?s.zip+' ':'')+s.address):''].filter(Boolean);
+  const l3=[s.phone?'전화 '+tel(s.phone):'', s.phone2?'상담 '+tel(s.phone2):'', s.email?esc(s.email):''].filter(Boolean);
+  f.innerHTML='<b>'+esc(L[0])+'</b>'+(l2.length?'<div>'+l2.join('<span class="sep">·</span>')+'</div>':'')+(l3.length?'<div>'+l3.join('<span class="sep">·</span>')+'</div>':'')
+    +(s.times?'<div>'+esc(s.times)+'</div>':'')+'<div>© '+esc(s.name||'제곡교회')+' 예배팀 <span class="sep">·</span><a class="adm" href="admin.html">관리자</a></div>';})();
 </script></body></html>"""
 
 
@@ -343,6 +356,10 @@ def notion(date: str) -> str:
 def prepare(date: str) -> str:
     """주소 연결 + 모음 쪽 + 노션. 반환: 이 주 주소."""
     sid = sid_for(date); route(date, sid)
+    try:   # 관리자·인도자 계정 DB: 섬김표 인도자·준비 열쇠를 맞춘다(2026-10-07)
+        import wadmin; wadmin.sync()
+    except Exception as ex:  # noqa: BLE001 — 계정 DB 가 막혀도 게시는 한다
+        print(f"[계정 DB 동기화 실패] {ex}", file=sys.stderr)
     pub = set(json.loads(PUBLISHED.read_text())) if PUBLISHED.exists() else set()
     pub.add(date); PUBLISHED.write_text(json.dumps(sorted(pub)))
     index_page()

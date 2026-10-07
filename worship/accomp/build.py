@@ -280,8 +280,14 @@ PREP = r"""
     inner.querySelectorAll('.card').forEach(c=>c.onclick=()=>{zoom.innerHTML='';zoom.appendChild(c.querySelector('img').cloneNode());zoom.style.display='block';zoom.scrollTop=0});
   }
   zoom.onclick=()=>{zoom.style.display='none'};
-  window.wsUnlock=async e=>{ e.preventDefault(); const pw=document.getElementById('prep-pw').value.trim(); err.textContent='';
-    try{ await open(pw); sessionStorage.setItem('ws_prep',pw); }catch(_){ err.textContent='비밀번호가 맞지 않습니다'; } };
+  // 2026-10-07 교장님: 이름+비밀번호(관리자·맡은 인도자 — api/wadmin.js 가 열쇠를 준다). 이름을 비우면 예전 공용 비밀번호로.
+  async function keyFrom(body){ const r=await fetch('/api/wadmin',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(Object.assign({action:'prep',church:P.dataset.church,date:P.dataset.date},body))}); const j=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.error||'열지 못했습니다'); return j; }
+  window.wsUnlock=async e=>{ e.preventDefault(); const nm=(document.getElementById('prep-name')||{}).value||'', pw=document.getElementById('prep-pw').value; err.textContent='';
+    if(nm.trim()){ try{ const j=await keyFrom({name:nm.trim(),pw}); await open(j.key); sessionStorage.setItem('ws_prep',j.key); err.textContent=''; }
+                   catch(x){ err.textContent=x.message; } return; }
+    try{ await open(pw.trim()); sessionStorage.setItem('ws_prep',pw.trim()); }catch(_){ err.textContent='비밀번호가 맞지 않습니다'; } };
   window.wsPrep=()=>{
     if(document.body.classList.contains('prep')){ wsMode('doc'); return; }
     wsMode('doc'); document.body.classList.add('prep');
@@ -289,7 +295,8 @@ PREP = r"""
     const bar=document.querySelector('.bar'); P.style.top=Math.max(0,bar.getBoundingClientRect().bottom)+'px';
     const pw=sessionStorage.getItem('ws_prep');
     if(inner.hidden && pw) open(pw).catch(()=>sessionStorage.removeItem('ws_prep'));
-    if(inner.hidden) setTimeout(()=>document.getElementById('prep-pw').focus(),50);
+    else if(inner.hidden) keyFrom({}).then(j=>open(j.key).then(()=>sessionStorage.setItem('ws_prep',j.key))).catch(()=>{});   // 이미 로그인했으면 바로
+    if(inner.hidden) setTimeout(()=>{ const f=document.getElementById('prep-name')||document.getElementById('prep-pw'); f.focus(); },50);
   };
   const m0=window.wsMode; window.wsMode=x=>{ document.body.classList.remove('prep'); zoom.style.display='none'; m0(x); };
   if(location.hash==='#prep') wsPrep();
@@ -484,8 +491,9 @@ def prep_html(d: dict, date: str) -> str:
              f'<div id="board" data-date="{date}" data-key="{bkey}"><div class="empty">편집판을 불러오는 중…</div></div>')
     inner += conti_html(date)
     box = seal(inner)
-    return ('<div id="prep"><div class="lock"><h3>🔒 준비자 전용</h3><p>비밀번호를 넣으면 이번 주 후보 악보가 열립니다.</p>'
-            '<form onsubmit="wsUnlock(event)"><input id="prep-pw" type="password" inputmode="numeric" autocomplete="off" placeholder="비밀번호">'
+    return (f'<div id="prep" data-church="jegok" data-date="{date}"><div class="lock"><h3>🔒 준비자 전용</h3><p>이름과 비밀번호를 넣으면 이번 주 후보 악보가 열립니다.<br><small>관리자와 이 예배를 맡은 인도자만 열립니다</small></p>'
+            '<form onsubmit="wsUnlock(event)"><input id="prep-name" autocomplete="username" placeholder="이름" style="margin-bottom:6px">'
+            '<input id="prep-pw" type="password" autocomplete="current-password" placeholder="비밀번호">'
             '<button>열기</button></form><div class="err" id="prep-err"></div></div><div class="in" hidden></div></div><div id="zoom"></div>'
             f'<script type="application/json" id="prep-box" data-share>{json.dumps(box)}</script>')
 

@@ -84,10 +84,25 @@ console.log(JSON.stringify(['dawn','wed','fri','sun'].map(k=>{const r=nextOf(k,n
 
     def test_page_has_tabs(self):
         doc = publish.landing_html([])
-        for w in ("새벽예배", "수요예배", "금요예배", "주일예배", 'id="svc"', "svcAt(", "#prep\">예배준비</a>", "function svcBtns("):
+        for w in ("새벽예배", "수요예배", "금요예배", "주일예배", 'id="svc"', "svcAt(", "#prep\">예배준비</a>", "function svcBtns(", 'id="foot"', "admin.html\">관리자</a>", "/api/wadmin?info=jegok"):
             self.assertIn(w, doc)
         self.assertNotIn("@@", doc)
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Wadmin(unittest.TestCase):
+    """맥미니 쪽 계정 DB 맞추기 문장 — 교회 정보는 처음만(DO NOTHING), 주일 인도는 섬김표를 따름, 관리자 이경진, 준비 열쇠."""
+    def test_sync_statements(self):
+        import wadmin
+        st = wadmin.sync_statements({"2026-10-11": {"인도자": ["정상진"]}, "2026-10-18": {"인도자": []}},
+                                    {"wed": {"인도": "정영선 목사", "설교": "이춘만 선교사"}}, "9999", church="zz")
+        sql = [s for s, _ in st]; args = [a for _, a in st]
+        self.assertTrue(any("wor_settings" in s and "DO NOTHING" in s for s in sql))
+        self.assertIn(["zz", "wed", "정영선", "이춘만 선교사"], args)
+        self.assertIn(["zz", "2026-10-11", "정상진"], args)
+        self.assertFalse(any(a and a[1:2] == ["2026-10-18"] for a in args))     # 인도자 없는 주는 넣지 않음
+        self.assertIn(["zz", "9999"], args)
+        self.assertIn(["zz", "이경진", "", "admin"], args)
