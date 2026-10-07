@@ -175,6 +175,24 @@ def svc_cover(svc: str, sd: Path) -> str:
     return f"{name}.jpg"
 
 
+def add_prayer(slides: list, date: str) -> list:
+    """합심기도 표지 뒤에 노션 「공동기도제목」의 가장 최근 금요기도회 기도제목 — 교회 소식 장과 같은 꼴(news_bg)."""
+    import order_sync, svc as _svc
+    k = next((i for i, s in enumerate(slides) if s.get("_sec") and order_sync.canon(s["_sec"]["t"]) == "합심기도"), None)
+    if k is None: return slides
+    try:
+        import prayer
+        when, lines = prayer.latest(_svc.ymd(date))
+    except Exception as e:
+        print("기도제목 못 읽음:", e, file=sys.stderr); return slides
+    if not lines: return slides
+    s0 = slides[k]
+    add = [{"n": 0, "w": s0["w"], "h": s0["h"], "img": "news_bg", "texts": txt, "plain": "", "hidden": ""}
+           for txt in pages(news_blocks(lines), 53, 63, 64, top=54)]
+    print(f"합심기도 기도제목 {when} · {len(add)}장")
+    return slides[:k + 1] + add + slides[k + 1:]
+
+
 def make(date: str, sid: str) -> Path:
     import slides, publish
     T = json.loads((TPL / "slides.json").read_text())
@@ -227,6 +245,7 @@ def make(date: str, sid: str) -> Path:
             continue
         out_slides.append(s)
     out_slides = order_sync.restructure(out_slides, items, info)   # 예배순서대로 표지·딸린 장을 다시 놓는다(없으면 템플릿 순서)
+    out_slides = add_prayer(out_slides, date) if y != "2000" else out_slides   # 합심기도 표지 뒤에 금요기도회 기도제목(2026-10-07)
     folder = publish.SITE / "d" / sid; sd = folder / "slides"
     if sd.exists(): shutil.rmtree(sd)
     sd.mkdir(parents=True)

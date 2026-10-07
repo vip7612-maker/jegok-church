@@ -158,10 +158,12 @@ def restructure(slides: list[dict], items: list[dict] | None, info: dict) -> lis
     pool: dict[str, list[int]] = {}
     for i, (c, _) in enumerate(segs): pool.setdefault(c, []).append(i)
     base = next((g[0] for c, g in segs if c == "특송"), None) or next((g[0] for _, g in segs), None)
-    out = list(head)
+    out = list(head); after_sermon = False
     for it in items:
         c = canon(it.get("t", ""))
         if not c: continue
+        if c == "찬양과경배" and norm(it.get("t", "")) in ("찬양", "찬송") and after_sermon: c = "찬양과결단"   # 설교 뒤 「찬양」 = 결단 찬양(곡도 그 아래)
+        if c == "설교": after_sermon = True
         if pool.get(c):
             got = segs[pool[c].pop(0)][1]
         elif any(cc == c for cc, _ in segs):          # 같은 순서를 한 번 더(셋째 찬양과 경배 등) — 표지만 하나 더
