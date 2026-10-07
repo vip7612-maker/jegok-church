@@ -57,21 +57,27 @@ def _clean(x: str, pdf: bool = False) -> str:
 
 # ── 1. 주보 → 순서 ────────────────────────────────────────────────────────
 def jubo_items(rows: list[list[str]], pdf: bool = False) -> list[dict]:
-    """주보 순서표(jubo_form.parse 의 order) → 순서 줄. 예배인도·봉헌기도는 PPT 순서가 아니라 뺀다.
-    「찬양」은 설교 앞이면 특송, 뒤면 찬양과 결단(넷째 칸은 곡 이름이라 본문으로 쓰지 않는다)."""
-    out, after_sermon = [], False
-    for r in rows:
-        if len(r) < 2 or not norm(r[0]): continue
-        k = norm(r[0])
-        if k in ("예배인도", "봉헌기도"): continue
-        c = ("찬양과결단" if after_sermon else "특송") if k == "찬양" else canon(r[0])
-        if c == "설교": after_sermon = True
-        it = {"t": show(c)}
-        who = _clean(r[1], pdf); extra = _clean(r[3], pdf) if len(r) > 3 else ""
-        if who: it["who"] = who
-        if c == "성경봉독" and extra: it["ref"] = re.sub(r"\s+", "", extra) if pdf else extra
-        if c == "설교" and extra: it["title"] = extra
-        out.append(it)
+    """주보 순서표 줄 → 예배순서 줄. 규칙은 jubo_rules(교회마다 다른 주보 꼴, 2026-10-07)."""
+    import jubo_rules
+    return jubo_rules.items_from_rows([r for r in rows if r and jubo_rules.name_of(r[0]) is not False])
+
+
+def word(md: str, d: dict) -> tuple[str, str]:
+    """주보 「오늘의 말씀」의 설교 제목·본문. HWP 는 jubo_form.parse 가 읽고(s_title·s_ref), PDF 는 표 안에 들어 있어 따로 찾는다."""
+    t, r = d.get("s_title", ""), d.get("s_ref", "")
+    if not t:
+        m = re.search(r"오늘의\s*말씀\s*</th>\s*</tr>\s*<tr>\s*<td>(.*?)<br>\s*(\([^)]*\))", md or "", re.S)
+        if m: t, r = m.group(1), m.group(2)
+    return _clean(t), _clean(r).strip("()").strip()
+
+
+def fill_word(items: list[dict], w: tuple[str, str]) -> list[dict]:
+    """순서표에 설교 제목·봉독 본문이 비었으면 「오늘의 말씀」 값으로."""
+    title, ref = w; out = [dict(x) for x in items]
+    for x in out:
+        c = canon(x["t"])
+        if c == "설교" and title and not x.get("title"): x["title"] = title
+        if c == "성경봉독" and ref and not x.get("ref"): x["ref"] = ref
     return out
 
 
@@ -245,16 +251,19 @@ def take_jubo(row: dict, dry: bool = False) -> list[str]:
         old = J / f"{date}.{x}"
         if old.exists(): old.rename(J / "prev" / f"{date}.{x}.{dt.datetime.now():%H%M%S}")
     (J / f"{date}.{ext}").write_bytes(data)
-    import jubo_form
+    import jubo_form, jubo_rules
     md, _ = jubo_form.kordoc(data)
-    rows = jubo_form.parse(md).get("order", [])
-    got = jubo_items(rows, pdf=ext == "pdf")
+    if len(jubo_rules.nospace(re.sub(r"<[^>]+>", "", md))) < 40:          # 글자가 없는 PDF(스캔한 그림) — 첨부만
+        _db([("UPDATE wor_order SET jubo_done=? WHERE church=? AND date=?", ["image", CHURCH, date])])
+        return [f"{date} 주보 PDF 에 글자가 없어(스캔) 순서는 채우지 않음"]
+    got, how = jubo_rules.read(md)                                        # 순서표 찾기·칸 가르기·이름 맞추기·원문 대조
+    got = fill_word(got, word(md, jubo_form.parse(md)))
     cur = json.loads(row["items"] or "[]") or [dict(x) for x in DEFAULT_SUN]
     merged = merge_jubo(cur, got) if got else cur
     sunday = dt.date.fromisoformat(date).weekday() == 6
     _db([("UPDATE wor_order SET items=?, jubo_done=?, src=CASE WHEN src='user' THEN 'user' ELSE 'jubo' END, rev=COALESCE(rev,0)+?, updated=? "
           "WHERE church=? AND date=? AND updated IS ?", [json.dumps(merged, ensure_ascii=False), now, 1 if sunday else 0, now, CHURCH, date, row["updated"]])])
-    return [f"{date} 주보 {j.get('name')} → 순서 {len(got)}줄 읽음, 예배순서 {len(merged)}줄" + (" · PPT 다시 만들 차례" if sunday else "")]
+    return [f"{date} 주보 {j.get('name')} → 순서 {len(got)}줄 읽음({how['by']}), 예배순서 {len(merged)}줄" + (" · PPT 다시 만들 차례" if sunday else "")]
 
 
 def build(row: dict, dry: bool = False) -> list[str]:

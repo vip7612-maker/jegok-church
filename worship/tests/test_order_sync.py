@@ -63,6 +63,20 @@ class JuboTests(unittest.TestCase):
         self.assertEqual(d["설교"], {"t": "설교", "who": "정영선 목사", "title": "내 아들 솔로몬아"})
         self.assertNotIn("ref", d["찬양과 결단"])                                  # 설교 뒤 찬양의 넷째 칸은 곡 이름 — 본문 아님
 
+    def test_pdf_three_columns(self):   # PDF 주보 순서표는 칸이 셋 — 본문이 셋째 칸 (2026-10-07 10/11 PDF)
+        j = O.jubo_items([["성경봉독", "박서준 학 생", "역대상28:1-10"], ["설 교", "정영선 목 사", ""], ["찬 양", "다같이", "."]], pdf=True)
+        self.assertEqual(j[0], {"t": "성경봉독", "who": "박서준 학생", "ref": "역대상28:1-10"})
+        self.assertNotIn("title", j[1])
+
+    def test_word_fallback(self):       # 순서표에 설교 제목이 없으면 「오늘의 말씀」 칸에서
+        md = "<table>\n<tr><th><table>\n<tr><th>오늘의 말씀</th></tr>\n<tr><td>내 아들 솔로몬아<br>(역대상 28:1-10)<br>다윗은 인생의</td></tr></table></th></tr></table>"
+        self.assertEqual(O.word(md, {}), ("내 아들 솔로몬아", "역대상 28:1-10"))
+        self.assertEqual(O.word("", {"s_title": "이름없는 사람들", "s_ref": "(역대상 25:1-5)"}), ("이름없는 사람들", "역대상 25:1-5"))
+        j = O.fill_word([{"t": "성경봉독", "who": "박서준 학생"}, {"t": "설교", "who": "정영선 목사"}], ("내 아들 솔로몬아", "역대상 28:1-10"))
+        self.assertEqual(j[0]["ref"], "역대상 28:1-10"); self.assertEqual(j[1]["title"], "내 아들 솔로몬아")
+        j = O.fill_word([{"t": "성경봉독", "ref": "역대상28:1-10"}], ("제목", "다른 본문"))
+        self.assertEqual(j[0]["ref"], "역대상28:1-10")   # 순서표 값이 먼저
+
     def test_pdf_spacing(self):
         j = O.jubo_items([["기도", "올 랴 선교사", "", ""]], pdf=True)
         self.assertEqual(j[0]["who"], "올랴 선교사")
