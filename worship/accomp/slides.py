@@ -133,6 +133,11 @@ body.pr .sl{{display:none;position:fixed;inset:0;margin:auto;width:min(100vw,cal
 /* 한 장 보기(기본) — 목차를 누르면 스크롤 없이 그 장만 바로 (2026-10-03 교장님 지시) */
 body.one:not(.pr) main .sl{{display:none;width:min(100%,calc((100vh - var(--navh,88px) - 80px)*16/9))}}body.one:not(.pr) main .sl.cur{{display:block}}
 #vbar{{display:none;align-items:center;gap:10px;font-weight:700}}body.one #vbar{{display:flex}}body.pr #vbar{{display:none}}
+/* PPT 모아 보기(처음 화면, 2026-10-07 교장님): 왼쪽 목차에서 고른 순서의 모든 장을 오른쪽에 격자로. 장을 누르면 크게 */
+body.grid:not(.pr) main{{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));align-content:start;align-items:start;gap:12px}}
+body.grid:not(.pr) main .sl{{display:none;width:100%}}body.grid:not(.pr) main .sl.sec{{display:block;cursor:pointer}}body.grid:not(.pr) main .sl.sec:hover{{outline:3px solid #f6c76b}}
+body.grid #vbar{{display:none!important}}#gbar{{grid-column:1/-1;display:none;align-items:center;gap:10px;font-weight:700;color:#cbd5e1}}body.grid:not(.pr) #gbar{{display:flex}}
+#gbar b{{color:#f6c76b}}#vgrid{{display:none}}body.one #vgrid{{display:inline-block}}
 #vbar button{{font:700 14px inherit;border:0;border-radius:999px;padding:8px 18px;background:#fff;color:#111;cursor:pointer}}
 /* 발표자 보기(메인 모니터) — 청중 화면은 두 번째 모니터 창 (2026-10-03 교장님 지시) */
 /* 3분면 (2026-10-04 교장님): 왼쪽 목차 · 가운데 이 순서의 모든 장 · 오른쪽 지금/다음 장(접었다 폈다, 가운데 막대로 폭 조절) */
@@ -156,9 +161,9 @@ body.pvfold .pvside{{display:none}}.pvth{{display:flex;align-items:center;gap:10
 .pvstop{{flex:0 0 auto;background:#475569;color:#fff}}.pvnote{{font-size:12px;color:#94a3b8;line-height:1.5}}
 #fstip{{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:30;background:rgba(0,0,0,.7);color:#fff;padding:10px 18px;border-radius:999px;font-size:16px}}
 @media (max-width:760px){{#pv{{left:0}}#toc{{display:none}}.top b{{flex:1 0 100%}}main{{padding:8px}}}}
-{navcss}</style></head><body class="one">
+{navcss}</style></head><body class="grid">
 {nav}
-<div class="wrap"><nav id="toc">{toc}</nav><main id="deck">{slides}<div id="vbar"><button onclick="view(cur-1)">◀ 이전</button><span id="vn"></span><button onclick="view(cur+1)">다음 ▶</button></div></main></div>
+<div class="wrap"><nav id="toc">{toc}</nav><main id="deck"><div id="gbar"><b id="gname"></b><span id="gcnt"></span></div>{slides}<div id="vbar"><button id="vgrid" onclick="wsGrid()">☷ 모아 보기</button><button onclick="view(cur-1)">◀ 이전</button><span id="vn"></span><button onclick="view(cur+1)">다음 ▶</button></div></main></div>
 <div id="pv"><div class="pvt"><div class="pvth"><div class="pvlab" id="pvtlab">이 노래·순서의 모든 장 — 누르면 프레젠테이션에 바로 나갑니다</div><button id="pvscr" onclick="present().then(()=>{{if(scr&&!scr.closed)this.style.display='none';}})" title="두 번째 모니터에 프레젠테이션 창 열기">📺 프레젠테이션 열기</button><button id="pvfold" onclick="pvFold()" title="오른쪽 칸 접기·열기">접기 ▶</button></div><div id="pvthumbs"></div></div>
 <div id="pvsplit" title="끌어서 오른쪽 폭 조절 (두 번 누르면 처음대로)"></div>
 <div class="pvside"><div class="pvl"><div class="pvlab">지금 프레젠테이션</div><div id="pvcur" class="pvbox"></div><div class="pvpn"><div class="pvq" onclick="go(cur-1)" title="이전 장으로"><div class="pvlab">◀ 이전 장</div><div id="pvprev" class="pvbox"></div></div><div class="pvq" onclick="go(cur+1)" title="다음 장으로"><div class="pvlab" style="text-align:right">다음 장 ▶</div><div id="pvnext" class="pvbox"></div></div></div></div>
@@ -204,7 +209,7 @@ document.addEventListener('fullscreenchange',()=>{{ if(!SCREEN&&!document.fullsc
 deck.addEventListener('click',e=>{{ if(!document.body.classList.contains('pr')) return; show(cur+(e.clientX>innerWidth/2?1:-1)); }});
 let x0=null; deck.addEventListener('touchstart',e=>x0=e.touches[0].clientX,{{passive:true}});
 deck.addEventListener('touchend',e=>{{ if(x0===null||!document.body.classList.contains('pr'))return; const dx=e.changedTouches[0].clientX-x0; if(Math.abs(dx)>40)show(cur+(dx<0?1:-1)); x0=null; }});
-document.querySelectorAll('#toc a:not(.bgm)').forEach(a=>a.onclick=ev=>{{ev.preventDefault(); a.blur(); if(window.bgmClose) bgmClose(); const el=document.getElementById(a.getAttribute('href').slice(1)); if(document.body.classList.contains('pv')){{peek(all.indexOf(el),a);return;}} if(ONE()){{view(all.indexOf(el));return;}} el.scrollIntoView({{behavior:'instant',block:'start'}});}});
+document.querySelectorAll('#toc a:not(.bgm)').forEach(a=>a.onclick=ev=>{{ev.preventDefault(); a.blur(); if(window.bgmClose) bgmClose(); const el=document.getElementById(a.getAttribute('href').slice(1)); if(document.body.classList.contains('pv')){{peek(all.indexOf(el),a);return;}} if(document.body.classList.contains('grid')){{gridSec(a);return;}} if(ONE()){{view(all.indexOf(el));return;}} el.scrollIntoView({{behavior:'instant',block:'start'}});}});
 {pvjs}
 </script></body></html>"""
 
@@ -256,9 +261,23 @@ function back(){ if(ONE()) view(cur); else all[cur].scrollIntoView({block:'cente
 function toggleList(){ const b=document.getElementById('lbtn');
   if(ONE()){ document.body.classList.remove('one'); all.forEach(s=>s.classList.remove('cur')); fit(); all[cur].scrollIntoView({block:'start'}); }
   else { const i=firstVisible(); document.body.classList.add('one'); view(i); }
-  document.getElementById('b-one').classList.toggle('on',ONE()); if(b) b.classList.toggle('on',!ONE()); }
+  const o=document.getElementById('b-one'); if(o) o.classList.toggle('on',ONE()); if(b) b.classList.toggle('on',!ONE()); }
 function wsView(one){ if(one!==ONE()) toggleList(); }
-if(!SCREEN){ view(0);
+// ── PPT 모아 보기 (2026-10-07 교장님) — 순서 이름을 누르면 그 순서의 모든 장, ♪ 곡 이름이면 그 곡의 장만 ──
+const TOC=()=>[...document.querySelectorAll('#toc a:not(.bgm)')].filter(a=>/^#s/.test(a.getAttribute('href')||''));
+const idxOf=a=>all.indexOf(document.getElementById(a.getAttribute('href').slice(1)));
+let gA=null;
+function gridSec(a){ const L=TOC(); a=a||L[0]; if(!a) return; gA=a; const k=idxOf(a), song=a.classList.contains('song');
+  const nx=L.slice(L.indexOf(a)+1).find(b=>song||!b.classList.contains('song')); const end=nx?idxOf(nx):all.length;
+  document.body.classList.remove('one'); document.body.classList.add('grid');
+  all.forEach((s,i)=>{ const on=i>=k&&i<end; s.classList.toggle('sec',on); s.classList.remove('cur'); if(on) paint(s); });
+  L.forEach(x=>x.classList.toggle('on',x===a)); a.scrollIntoView({block:'nearest'});
+  document.getElementById('gname').textContent=a.textContent.replace(/^♪\s*/,''); document.getElementById('gcnt').textContent=(end-k)+'장 · 누르면 크게';
+  window.scrollTo(0,0); requestAnimationFrame(fit); }
+function wsGrid(){ const L=TOC(); let a=gA; if(ONE()){ a=null; L.forEach(x=>{ if(idxOf(x)<=cur) a=x; }); } gridSec(a); }
+deck.addEventListener('click',e=>{ if(!document.body.classList.contains('grid')||document.body.classList.contains('pr')) return;
+  const sl=e.target.closest('.sl.sec'); if(!sl) return; document.body.classList.remove('grid'); document.body.classList.add('one'); view(all.indexOf(sl)); });
+if(!SCREEN){ cur=0; requestAnimationFrame(()=>{ if(!document.body.classList.contains('pv')) gridSec(); });
   addEventListener('keydown',e=>{ const c=document.body.classList; if(!ONE()||c.contains('pr')||c.contains('pv')) return;
     if(['ArrowRight','ArrowDown','PageDown',' '].includes(e.key)){e.preventDefault();view(cur+1)}
     else if(['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){e.preventDefault();view(cur-1)}
@@ -743,9 +762,8 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
     m = _re.search(r"\d+월 \d+일", title)
     dls = [(("📊 PPT 받기" if h.endswith(".pptx") else "📕 PDF 받기"), h) for h in _re.findall(r'href="([^"]+)"', dl or "")]
     note = "" if dls else _re.sub(r"<[^>]+>", "", dl or "")
-    sub = ('<button class="sub" id="b-pv" onclick="present()">▶ 예배용(두 화면)</button>'      # 예배용이 맨 앞 (2026-10-04 교장님)
-           '<button class="sub on" id="b-one" onclick="wsView(true)">▣ 한 장씩</button>'
-           '<button class="sub" id="lbtn" onclick="wsView(false)">☰ 목록</button>')
+    sub = ('<button class="sub on" id="b-grid" onclick="if(document.body.classList.contains(\'pv\'))endPV();wsGrid()">📑 PPT</button>'   # 2026-10-07 교장님: PPT / 예배용(두 화면) / BGM
+           '<button class="sub" id="b-pv" onclick="present()">▶ 예배용(두 화면)</button>')
     tail = f'<span class="note">{html.escape(note)}</span>' if note.strip() else ""
     if not date and m:                            # 날짜를 안 받았으면 제목(「10월 11일」)에서
         import datetime as dt
@@ -764,7 +782,7 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
     # 2단 밑줄(켜짐)은 지금 보기를 따라간다 — 발표자 보기면 ▶ 예배용, 아니면 한 장씩·목록 (2026-10-04 교장님)
     nav_pv += ("<script>addEventListener('DOMContentLoaded',()=>{ const sync=()=>{ const c=document.body.classList, pv=c.contains('pv');"
                "const set=(id,on)=>{ const b=document.getElementById(id); if(b) b.classList.toggle('on',on); };"
-               "set('b-pv',pv); set('b-one',!pv&&c.contains('one')); set('lbtn',!pv&&!c.contains('one')); };"
+               "set('b-pv',pv); set('b-grid',!pv); };"
                "new MutationObserver(sync).observe(document.body,{attributes:true,attributeFilter:['class']}); sync(); });</script>")
     nav = nav_pv + wsnav.nav("ppt", m.group(0) if m else title, sub, dls, day=date) + f"<script>{wsnav.JS}</script>" + bgm_html(items) + f"<script>{CHAT_JS}</script><script>{XP_JS}</script>"
     return PAGE.format(title=html.escape(title), n=len(slides), slides=sl, toc=toc, dl=dl, nav=nav, navcss=wsnav.CSS + BGM_CSS + CHAT_CSS + XP_CSS,
