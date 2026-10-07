@@ -15,13 +15,16 @@ async function call(method, { query = {}, body = null, ip = '10.9.9.' + Math.flo
   return out;
 }
 const clean = () => api.batch([['DELETE FROM wor_users WHERE church=?', [C]], ['DELETE FROM wor_settings WHERE church=?', [C]], ['DELETE FROM wor_assign WHERE church=?', [C]]]);
-let n = 0; const ok = (c, m) => { assert.ok(c, m); n++; };
+let n = 0; let r0; const ok = (c, m) => { assert.ok(c, m); n++; };
 try {
   await call('GET', { query: { info: 'jegok' } });      // 표 만들기
   await clean();
   await api.batch([['INSERT INTO wor_users(church,name,title,role,hash,ver,active,at) VALUES(?,?,?,?,NULL,0,1,?)', [C, '관리자', '', 'admin', 'x']],
                    ['INSERT INTO wor_settings(church,k,v) VALUES(?,?,?)', [C, '_prep_key', '4321']],
                    ['INSERT INTO wor_settings(church,k,v) VALUES(?,?,?)', [C, 'name', '시험교회']]]);
+  // 비밀번호를 아직 안 정한 계정으로 로그인하면 안내만 하고 틀린 횟수로 세지 않는다
+  for (let i = 0; i < 6; i++) r0 = await call('POST', { ip: '10.7.7.7', body: { action: 'login', church: C, name: '관리자', pw: 'whatever' } });
+  ok(r0.code === 409 && r0.body.error.includes('비밀번호 정하기'), '비밀번호 정하기 전 로그인은 안내(409), 6번 해도 안 막힘');
   // 처음 정하기
   let r = await call('POST', { body: { action: 'setup', church: C, name: '관리자', key: 'nope', pw: 'abcdef1' } });
   ok(r.code === 403, '틀린 링크 열쇠는 막힘');

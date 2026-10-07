@@ -3,6 +3,7 @@
 
   python3 accomp/wadmin.py sync          # 교회 정보 첫값·예배별 인도(섬김표·services.json)·준비 탭 열쇠·관리자(이경진) 자리를 DB 에 맞춘다
   python3 accomp/wadmin.py link 이경진    # 그 사람이 비밀번호를 처음 정하는 링크를 찍는다(교장님이 직접 실행)
+  python3 accomp/wadmin.py link --admin  # 관리자(이경진) 링크
 
 웹 API 는 daily-briefing/report-site/api/wadmin.js. 표: wor_users · wor_settings · wor_assign (예배 DB).
 publish.prepare() 가 게시할 때마다 sync 를 부른다(섬김표 인도자·준비 열쇠가 늘 맞게).
@@ -97,5 +98,5 @@ def link(name: str) -> None:
 if __name__ == "__main__":
     a = sys.argv[1:]
     if a[:1] == ["sync"]: sync()
-    elif a[:1] == ["link"] and len(a) == 2: link(a[1])
+    elif a[:1] == ["link"] and len(a) == 2: link(ADMIN if a[1] == "--admin" else a[1])   # --admin: 터미널에 한글을 못 칠 때
     else: print(__doc__)
