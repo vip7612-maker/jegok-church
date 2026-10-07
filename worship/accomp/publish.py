@@ -258,7 +258,7 @@ function hero(){const h=document.getElementById('hero');   // 주일예배
     +'<div class="msg">함께 예배를 준비하는 동역자 여러분, 고맙습니다.<br> 이번 한 주도 말씀과 찬양으로 마음을 준비해 주세요.<br> 주일 아침, 기쁨으로 만나요.</div></div>'
     +(up?'<h2>'+esc(up.title||'주일예배')+'</h2><p class="ref">'+esc(up.ref)+'</p>'
       +(up.songs.length?'<ul class="chips">'+up.songs.map(s=>'<li>'+esc(s)+'</li>').join('')+'</ul>':'')
-      +'<div class="btns"><a href="'+up.book+'">예배자 악보 미리 보기</a><a href="'+up.ppt+'">예배 PPT 미리 보기</a></div>':'');}
+      +'<div class="btns"><a class="p" href="'+up.book+'#prep">예배준비</a><a href="'+up.book+'">악보</a><a href="'+up.ppt+'">PPT</a></div>':'');}
 const PAST0=ALL.filter(i=>i!==today&&i.date<=TODAY), PER=10;
 const KINDS=['주일','수요','금요'], NOREC='기록 없음';
 const kOf=i=>KINDS.includes(i.kind)?i.kind:'기타', lOf=i=>(i.leader&&i.leader.length)?i.leader:[NOREC];
