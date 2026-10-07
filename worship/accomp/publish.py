@@ -49,6 +49,35 @@ def svc_d8(date: str) -> str:
     return svc.d8(date)
 
 
+def unpublish(date: str, keep: Path | None = None) -> list[str]:
+    """예배준비 [초기화](2026-10-07 교장님) — 그 때의 악보집·PPT 를 사이트에서 내린다.
+    지우지 않고 keep 폴더(기본 out/reset/<때>-<시각>)로 옮긴다: 사이트 폴더 d/<id>, data/<때>.json, out/<때>.html, jubo/<때>.*"""
+    import datetime as _dt, shutil
+    keep = keep or HERE / "out" / "reset" / f"{date}-{_dt.datetime.now():%Y%m%d%H%M%S}"
+    out = []
+    pub = set(json.loads(PUBLISHED.read_text())) if PUBLISHED.exists() else set()
+    if date in pub:
+        pub.discard(date); PUBLISHED.write_text(json.dumps(sorted(pub))); out.append("첫 화면 목록에서 뺌")
+    p = SITE / "vercel.json"
+    if p.exists():
+        v = json.loads(p.read_text()); s_ = "/" + slug(date)
+        n0 = len(v.get("rewrites", [])) + len(v.get("redirects", []))
+        v["rewrites"] = [r for r in v.get("rewrites", []) if not r["source"].startswith(s_ + "/")]
+        v["redirects"] = [r for r in v.get("redirects", []) if r["source"] != s_]
+        if len(v["rewrites"]) + len(v["redirects"]) != n0:
+            p.write_text(json.dumps(v, ensure_ascii=False, indent=2)); out.append("주소 내림")
+    reg = json.loads(SHARES.read_text()) if SHARES.exists() else {}
+    sid = reg.get(f"/accomp/{date}")
+    moves = ([SITE / "d" / sid] if sid else []) + [HERE / "data" / f"{date}.json", HERE / "out" / f"{date}.html"] + \
+            [HERE / "jubo" / f"{date}.{x}" for x in ("hwp", "hwpx", "pdf")]
+    for m in moves:
+        if m.exists():
+            keep.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(m), str(keep / (("site-" + m.name) if m.parent.name == "d" else m.name)))
+            out.append(f"옮김 {m.name}")
+    return out
+
+
 def wait_live(date: str, limit: int = 600) -> bool:
     """docsave 가 사이트에 다 올릴 때까지 기다린다(10분까지) — 「다 만들었습니다」를 올리기 전에 알리지 않게(2026-10-07).
     맥미니에서 만든 뒤 Vercel 배포가 1~2분 더 걸려, 그 사이 열면 예전 악보집이 보였다."""

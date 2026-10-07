@@ -131,6 +131,25 @@ try {
   ok(rq && rq.reco_req === r.body.at, '요청 시각이 순서에 적힘');
   r = await call('POST', { body: { action: 'reco_req', church: C, date: '2026-10-11' } });
   ok(r.code === 403, '맡지 않은 날은 요청 못 함');
+  // 예배준비 [초기화](2026-10-07): 예배순서·추천·콘티·PPT 고친 글자를 지우고 맥미니에 내리기 요청 — 템플릿은 그대로
+  const RD = '1999-01-03', cs = adminCookie;
+  { const keep = cookie; cookie = cs;
+    await api.batch([['INSERT INTO wor_order(church,date,items,confirmed,updated) VALUES(?,?,?,1,?)', [C, RD, '[{"t":"찬양"}]', 'x']],
+                     ['INSERT INTO wor_reco(church,date,src,data,updated) VALUES(?,?,?,?,?)', [C, RD, 's', '{}', 'x']],
+                     ['INSERT INTO wor_tpl(church,name,items,by,updated) VALUES(?,?,?,?,?) ON CONFLICT(church,name) DO NOTHING', [C, '남는템플릿', '[{"t":"찬양"}]', 'x', 'x']]]);
+    r = await call('POST', { body: { action: 'occ_reset', church: C, date: RD } });
+    ok(r.code === 200 && r.body.done.includes('예배순서') && r.body.done.includes('추천'), '초기화: 예배순서·추천 지움');
+    const left = await api.batch([['SELECT COUNT(*) n FROM wor_order WHERE church=? AND date=?', [C, RD]], ['SELECT COUNT(*) n FROM wor_reco WHERE church=? AND date=?', [C, RD]],
+                                  ['SELECT COUNT(*) n FROM wor_tpl WHERE church=? AND name=?', [C, '남는템플릿']], ['SELECT COUNT(*) n FROM wor_reset WHERE church=? AND date=?', [C, RD]]]);
+    ok(+left[0][0].n === 0 && +left[1][0].n === 0, '예배순서·추천이 없어짐');
+    ok(+left[2][0].n === 1, '템플릿은 그대로');
+    ok(+left[3][0].n === 1, '맥미니에 악보집·PPT 내리기 요청');
+    r = await call('GET', { query: { order: C, date: RD } });
+    ok(r.code === 200 && !r.body.saved && !r.body.jubo, '초기화 뒤 다시 열면 기본 순서·주보 없음');
+    await api.batch([['DELETE FROM wor_reset WHERE church=?', [C]], ['DELETE FROM wor_tpl WHERE church=? AND name=?', [C, '남는템플릿']]]);
+    cookie = '';
+    r = await call('POST', { body: { action: 'occ_reset', church: C, date: RD } }); ok(r.code === 401, '로그인 없으면 초기화 못 함');
+    cookie = keep; }
   // 교회 템플릿: 저장·목록·불러오기·지우기 — 날짜마다 바뀌는 제목·본문은 저장하지 않는다
   r = await call('POST', { body: { action: 'tpl_save', church: C, name: '금요예배', items: [{ t: '찬양' }, { t: '설교', who: '정영선 목사', title: '이번 주 제목', ref: '요 3:16' }] } });
   ok(r.code === 200, '템플릿 저장');

@@ -329,6 +329,22 @@ def sync(dry: bool = False) -> None:
     for row in _db([("SELECT date,jubo,items,updated FROM wor_order WHERE church=? AND jubo IS NOT NULL AND jubo<>'' AND (jubo_done IS NULL OR jubo_done='')", [CHURCH])])[0]:
         try: lines += take_jubo(row, dry)
         except Exception as e: lines.append(f"{row['date']} 주보 읽기 실패: {e}")
+    try:   # 예배준비 [초기화] — 악보집·PPT 를 사이트에서 내리고(옮겨 두고) 첫 화면을 다시(2026-10-07 교장님)
+        resets = _db([("SELECT date,at FROM wor_reset WHERE church=?", [CHURCH])])[0]
+    except Exception:
+        resets = []
+    for row in resets:
+        if dry: lines.append(f"{row['date']} 초기화 차례"); continue
+        try:
+            import publish
+            done = publish.unpublish(row["date"])
+            publish.index_page()
+            r = subprocess.run([str(Path.home() / ".local/node/bin/vercel"), "deploy", "--prod", "--yes"], cwd=str(publish.SITE),
+                               capture_output=True, text=True, timeout=900)
+            lines.append(f"{row['date']} 초기화: " + (" · ".join(done) or "내릴 것 없음") + (" · 사이트 반영" if r.returncode == 0 else " · 사이트 반영 실패"))
+        except Exception as e:
+            lines.append(f"{row['date']} 초기화 실패: {e}")
+        _db([("DELETE FROM wor_reset WHERE church=? AND date=? AND at=?", [CHURCH, row["date"], row["at"]])])
     for row in _db([("SELECT date,items,reco_req FROM wor_order WHERE church=? AND reco_req IS NOT NULL AND reco_req<>''", [CHURCH])])[0]:
         if dry: lines.append(f"{row['date']} 추천곡에 반영 차례"); continue
         try:                                          # [추천곡에 반영] — 본문·제목·주보 설교 요약으로 다시(2026-10-07 교장님)
