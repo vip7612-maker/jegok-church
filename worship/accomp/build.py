@@ -561,7 +561,8 @@ def roster_html(date: str) -> str:
     """섬김표 — roster.json 하나로 관리(주보마다 따로 두지 않음). 이번 주부터 6주, 지원팀은 날짜와 상관없는 명단."""
     import datetime as _dt
     R = json.loads(ROSTER.read_text())
-    start = _dt.date.fromisoformat(date)
+    import svc
+    start = _dt.date.fromisoformat(svc.ymd(date))
     days = [start + _dt.timedelta(weeks=k) for k in range(WEEKS_SHOWN)]
     head = "".join(f'<th class="{"now" if k == 0 else ""}"><b>{x.month}.{x.day}</b>{"<i>이번 주</i>" if k == 0 else ""}</th>' for k, x in enumerate(days))
     rows = []
@@ -607,7 +608,8 @@ def focus_verse(p: dict, date: str) -> int | None:
     head = re.sub(r"<[^>]+>", "", p.get("heading", ""))
     for key, v in json.loads(RECITE.read_text()).items():
         if key.startswith("_") or key not in head: continue
-        weeks = (_dt.date.fromisoformat(date) - _dt.date.fromisoformat(v["from"])).days // 7
+        import svc
+        weeks = (_dt.date.fromisoformat(svc.ymd(date)) - _dt.date.fromisoformat(v["from"])).days // 7
         return v["verse"] + weeks if weeks >= 0 else None
     return None
 
@@ -635,7 +637,9 @@ def cover_html(p: dict) -> str:
     rays = "".join(f'<path d="M1180 -40 L {700+i*110} 820 L {760+i*110} 820 Z" fill="#ffffff" fill-opacity=".025"/>' for i in range(5))
     cross = '<g stroke="#f6c76b" stroke-opacity=".5" stroke-width="3" stroke-linecap="round"><line x1="1262" y1="92" x2="1262" y2="190"/><line x1="1230" y1="124" x2="1294" y2="124"/></g>'
     bg = f'<svg class="bg" viewBox="0 0 1403 992" preserveAspectRatio="xMidYMid slice">{rays}{staff}{notes}{cross}</svg>'
-    return (f'<div class="cover">{bg}<div class="in"><span class="kick">SUNDAY WORSHIP · SCORE BOOK</span>'
+    kick = {"주일예배": "SUNDAY WORSHIP", "새벽예배": "EARLY MORNING PRAYER", "수요예배": "WEDNESDAY WORSHIP",
+            "금요예배": "FRIDAY WORSHIP"}.get(re.sub(r"\s", "", p.get("title", "")), "WORSHIP")   # 표지 영문도 그 예배로(2026-10-07)
+    return (f'<div class="cover">{bg}<div class="in"><span class="kick">{kick} · SCORE BOOK</span>'
             f'<h1>{p["title"].replace(" ", "")}</h1><p class="sub">{p["sub"]}</p><span class="rule"></span>'
             f'<div class="foot"><span class="date">{y}. {m:02d}. {d:02d}<small>{wd + ('일' if wd == '주' else '요일')}</small></span>'
             f'<span class="ch"><b>{p.get("church", "제곡교회")}</b>{p.get("team", "예배팀")}</span></div></div></div>')
@@ -695,7 +699,7 @@ def song_keys(s: dict, date: str) -> list[tuple[str, str]]:
             r = bank.load()["songs"]; t = bank.norm(s["title"])
             sc = next((v["scores"] for n, v in r.items() if bank.norm(n) == t), {})
             k = (next(iter(sc)) if len(sc) == 1
-                 else next((c for c, v in sc.items() if any(u.startswith(date) for u in v.get("used", []))), ""))
+                 else next((c for c, v in sc.items() if any(u.startswith(date + " ") for u in v.get("used", []))), ""))
         except Exception:
             k = ""
     return [(k, s["img"])]

@@ -9,7 +9,12 @@ import json, shutil, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "accomp"))
-import publish  # noqa: E402
+import publish
+
+
+def SJ():   # 예배 탭은 예배 구분 표에서(게시 때 넣는다) — 시험은 처음 네 가지로
+    import svc
+    return publish.SCHED_JS.replace("@@SVCS@@", json.dumps([{k: v[k] for k in ("id", "name", "days", "time", "place", "legacy")} for v in svc.DEFAULT], ensure_ascii=False))  # noqa: E402
 
 # (한국 시간, 기대: 단추, 그 예배 날짜, 상태)   2026-10-05 월 · 10-07 수 · 10-09 금 · 10-10 토 · 10-11 일
 CASES = [
@@ -35,7 +40,7 @@ CASES = [
 @unittest.skipUnless(shutil.which("node"), "node 없음")
 class Schedule(unittest.TestCase):
     def test_cases(self):
-        js = publish.SCHED_JS + "\nconst C=" + json.dumps(CASES) + ";\n" + r"""
+        js = SJ() + "\nconst C=" + json.dumps(CASES) + ";\n" + r"""
 const out=C.map(([t])=>{const r=svcAt(new Date(t+':00Z'));return [r.k,r.date,r.state];});
 console.log(JSON.stringify(out));"""
         with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
@@ -47,7 +52,7 @@ console.log(JSON.stringify(out));"""
 
     def test_next_of_each(self):
         """다른 단추를 눌렀을 때: 그 예배의 다음 날짜 (수요일 13시 기준)."""
-        js = publish.SCHED_JS + r"""
+        js = SJ() + r"""
 const n=new Date('2026-10-07T13:00:00Z');
 console.log(JSON.stringify(['dawn','wed','fri','sun'].map(k=>{const r=nextOf(k,n);return [r.date,r.state];})));"""
         with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:

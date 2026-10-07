@@ -13,8 +13,15 @@ BIBLE = Path.home() / "dev/next_api_bot/worker/bible_lookup.py"
 
 
 def service(date: str) -> str:
-    """요일 → 예배 이름(api/wadmin.js·prep.html SVN 과 같게). 주일 외 수·금은 저녁 예배, 나머지는 새벽예배."""
-    return {6: "주일예배", 2: "수요예배", 4: "금요예배"}.get(dt.date.fromisoformat(date).weekday(), "새벽예배")
+    """때 → 예배 이름(관리자 화면 「예배 구분」, svc.py). 날짜만이면 그 요일 처음 예배."""
+    import svc
+    return svc.name(date)
+
+
+def sunday_book(date: str) -> bool:
+    """섬김표·암송·사도신경이 든 주일 악보집(weekly.open_week)인가 — 처음 있던 주일예배(날짜만)뿐."""
+    import svc
+    return svc.split(date)[1] is None and svc.service_of(date)["id"] == "sun"
 
 
 def verses_html(ref: str) -> str:
@@ -32,7 +39,8 @@ def data_for(date: str, items: list[dict]) -> dict:
     """주일이 아닌 날의 악보집 data — 예배순서에서 본문·제목을 읽는다."""
     import reco_gen
     ref, title = reco_gen.source(items)
-    d = dt.date.fromisoformat(date)
+    import svc
+    d = dt.date.fromisoformat(svc.ymd(date))
     name = service(date)
     pages = [{"type": "cover", "title": " ".join(name), "sub": "예배자 악보", "date": f"{d:%Y.%m.%d}", "church": "제곡교회"}]
     if ref or title:
@@ -46,8 +54,8 @@ def ensure(date: str) -> str:
     """data/<날짜>.json 이 없으면 만든다. 있으면 그대로."""
     f = HERE / "data" / f"{date}.json"
     if f.exists():
-        return refresh(date) if service(date) != "주일예배" else "있음"
-    if service(date) == "주일예배":
+        return refresh(date) if not sunday_book(date) else "있음"
+    if sunday_book(date):
         import weekly
         weekly.open_week(dt.date.fromisoformat(date)); return "주일 악보집 새로 엶"
     import order_sync

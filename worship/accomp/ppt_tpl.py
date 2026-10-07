@@ -157,12 +157,31 @@ def set_small(s: dict, val: str) -> None:
             return
 
 
+SVC_EN = {"새벽예배": ("Early Morning Prayer", "Утренняя молитва"), "수요예배": ("Wednesday Worship", "Богослужение в среду"),
+          "금요예배": ("Friday Worship", "Богослужение в пятницу")}
+
+
+def svc_cover(svc: str, sd: Path) -> str:
+    """주일예배가 아닌 예배의 표지 그림 — 템플릿 디자인(tpl_design)으로 영문·러시아어 줄만 바꿔 한 번 그려 두고 쓴다."""
+    import hashlib, tpl_design
+    style = {"template3": "A", "template4": "B", "template5": "C"}.get(TPL.parent.name)
+    if not style: return "k_cover.jpg"
+    en, ru = SVC_EN.get(svc, ("", ""))
+    name = f"k_cover_{hashlib.md5((style + en + ru).encode()).hexdigest()[:8]}"
+    if not (TPL / f"{name}.jpg").exists():
+        h = tpl_design.bg_html(style, "cover").replace("Sunday Worship", en).replace("Воскресное богослужение", ru)
+        tpl_design.render({name: h}, TPL)
+    shutil.copy(TPL / f"{name}.jpg", sd / f"{name}.jpg")
+    return f"{name}.jpg"
+
+
 def make(date: str, sid: str) -> Path:
     import slides, publish
     T = json.loads((TPL / "slides.json").read_text())
     S = copy.deepcopy(T["slides"])
     info = jubo_info(date)
-    y, m, d = date.split("-")
+    import svc as _svc
+    y, m, d = _svc.ymd(date).split("-")   # 때(날짜-예배열쇠)여도 날짜만
     import order_sync                                   # 예배순서(예배준비 화면)가 기준 — 맡은 분·제목·본문은 순서 값이 주보보다 먼저 (2026-10-07 교장님)
     row = order_sync.load(date) if y != "2000" else None
     items = json.loads(row["items"]) if row and row.get("items") else None
@@ -176,6 +195,10 @@ def make(date: str, sid: str) -> Path:
             for t in s["texts"]:
                 if svc != "주일예배" and isinstance(t.get("t"), str) and re.sub(r"\s", "", t["t"]) == "주일예배":   # 새벽·수요·금요 표지
                     t["t"] = svc; s["plain"] = re.sub(r"주\s*일\s*예\s*배", svc, s["plain"])   # 목차도 그 이름으로
+                elif svc != "주일예배" and t.get("t") in ("Sunday Worship", "Воскресное богослужение"):   # 표지 영문·러시아어도 그 예배로
+                    en, ru = {"새벽예배": ("Early Morning Prayer", "Утренняя молитва"), "수요예배": ("Wednesday Worship", "Богослужение в среду"),
+                              "금요예배": ("Friday Worship", "Богослужение в пятницу")}.get(svc, ("", ""))
+                    t["t"] = en if t["t"] == "Sunday Worship" else ru
                 if re.search(r"\d{4}년\s*\d{1,2}월\s*\d{1,2}일", t["t"]):
                     t["t"] = re.sub(r"\d{4}년\s*\d{1,2}월\s*\d{1,2}일", "○○○○년 ○○월 ○○일" if y == "2000" else f"{y}년 {m}월 {d}일", t["t"])
         if f.startswith(KEYS["prayer"]):
@@ -208,6 +231,11 @@ def make(date: str, sid: str) -> Path:
     if sd.exists(): shutil.rmtree(sd)
     sd.mkdir(parents=True)
     for f_ in TPL.glob("*.jpg"): shutil.copy(f_, sd / f_.name)
+    if svc != "주일예배" and out_slides:               # 표지 그림에 박힌 「Sunday Worship」을 그 예배 이름으로(2026-10-07 교장님)
+        try:
+            out_slides[0]["img"] = svc_cover(svc, sd)
+        except Exception as e:
+            print("예배 표지 그림 못 만듦:", e, file=sys.stderr)
     roles = _roles()
     for s in out_slides:
         if s["img"] == "verse_bg": s["img"] = roles["verse_bg"]

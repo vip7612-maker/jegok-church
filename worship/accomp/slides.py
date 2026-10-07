@@ -88,6 +88,9 @@ def outline(slides: list[dict], songs: list[str] | None = None) -> list[tuple[in
         return any(y in f[:40] for y in SECTIONS)
     for k, s in enumerate(slides):
         flat = re.sub(r"\s", "", s["plain"])
+        if k == 0 and s.get("img", "").startswith("k_cover"):   # 템플릿 표지 = 그 예배 이름(관리자가 만든 예배 이름도, 2026-10-07)
+            big = next((t["t"] for t in s.get("texts", []) if t.get("s", 0) >= 100 and str(t.get("t", "")).strip()), "")
+            if big: marks.append((s["n"], re.sub(r"\s+", "", big))); continue
         sec = next((x for x in SECTIONS if x in flat[:40]), "")
         if sec and (len(flat) < 160 or sec == "사도신경" and "사도신경" in flat[:30] and last != "사도신경"):
             name = {"교회소식": "교회 소식", "성경봉독": "성경 봉독", "특송": "특송", "선교보고": "선교 보고", "찬양과결단": "찬양과 결단", "예배를마칩니다": "마침"}.get(sec, sec)
@@ -425,7 +428,8 @@ def bgm(date: str, n: int = 5) -> list[dict]:
     import datetime as dt, subprocess
     f = HERE / "out" / "bgm" / f"{date}.json"
     if f.exists(): return json.loads(f.read_text())
-    wk = dt.date.fromisoformat(date).isocalendar()[1]
+    import svc
+    wk = dt.date.fromisoformat(svc.ymd(date)).isocalendar()[1]
     seen, out, extra = set(), [], []
     for q in (BGM_Q[wk % len(BGM_Q)], BGM_Q[(wk + 3) % len(BGM_Q)]):
         try:
@@ -1035,7 +1039,7 @@ def song_titles(date: str) -> list[str]:
         for title, rec in bank.items():
             for sc in rec["scores"].values():
                 for u in sc.get("used", []):
-                    if u.startswith(date):
+                    if u.startswith(date + " "):   # 같은 날 다른 예배(날짜-열쇠)와 섞이지 않게
                         lab = u.split(" ", 1)[1]
                         hits.append((order.get(lab, int(re.sub(r"\D", "", lab) or 50)), title))
         return [t for _, t in sorted(hits)]

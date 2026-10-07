@@ -110,6 +110,9 @@ def sync(dry: bool = False) -> None:
             if bad: err = bad[0][:300]
         except Exception as e:
             lines, err = [f"{row['date']} 만들기 실패: {e}"], f"{type(e).__name__}: {e}"[:300]
+        if not err:                                   # 사이트에 다 올라간 뒤에 「다 만들었습니다」(예배준비 화면이 built_rev 를 본다)
+            import publish
+            if not publish.wait_live(row["date"]): lines.append("사이트 올리기가 늦어집니다(조금 뒤 열립니다)")
         S.sql("UPDATE conti SET built_rev=?, err=? WHERE date=? AND built_rev<?", rev, err, row["date"], rev)
         LOG.parent.mkdir(exist_ok=True)
         with LOG.open("a") as fp:

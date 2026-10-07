@@ -36,5 +36,16 @@ KEYNOTE = f"""
 THEMES = {"keynote": KEYNOTE}
 
 
+# 예배 PPT 템플릿 → 악보집 테마. 악보집에 테마를 따로 안 정했으면 늘 지금 쓰는 PPT 템플릿을 따른다(2026-10-07 교장님: PPT 를 기준으로)
+TPL_THEME = {3: "keynote"}
+
+
 def css(d: dict) -> str:
-    return THEMES.get((d or {}).get("theme") or "", "")
+    t = (d or {}).get("theme") or ""
+    if not t:
+        try:
+            import tpl
+            t = TPL_THEME.get(tpl.current(), "")
+        except Exception:
+            t = ""
+    return THEMES.get(t, "")

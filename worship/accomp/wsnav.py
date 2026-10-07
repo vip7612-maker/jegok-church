@@ -68,7 +68,7 @@ JS = r"""
   // 📢 예배팀 소통 전광판 — 체크 안 한 메시지를 하나씩 깜빡이며 번갈아 (2026-10-04 교장님). 5초마다 새로 불러온다
   (function(){ const r1=document.querySelector('.wsnav .r1'), box=document.querySelector('.wsnav .tick'); if(!r1||!box) return;
     let msgs=[], k=0;
-    const day=()=>r1.dataset.date||((location.pathname.match(/jegok_worship_(\d{4})(\d{2})(\d{2})|\/jegok\/(\d{4})(\d{2})(\d{2})/)||[]).filter(Boolean).slice(1).join('-'));
+    const day=()=>r1.dataset.date||(m=>m?m[1]+'-'+m[2]+'-'+m[3]+(m[4]?'-'+m[4]:''):'')(location.pathname.match(/(?:jegok_worship_|\/jegok\/)(\d{4})(\d{2})(\d{2})(?:-([a-z0-9]{1,16}))?/)));
     function show(){ if(!msgs.length){ box.textContent=''; return; } k%=msgs.length; const m=msgs[k];
       box.innerHTML='<b>📢 '+(k+1)+'/'+msgs.length+'</b>'; box.appendChild(document.createTextNode(m.text)); box.title=m.text;
       box.classList.remove('blink'); void box.offsetWidth; box.classList.add('blink'); k++; }
@@ -90,7 +90,8 @@ def label(date: str) -> str:
 
 def r1(cur: str, when: str, date: str | None = None, prep_js: bool = False, day: str | None = None) -> str:
     """1단: 🏠 제곡교회 예배 플랫폼 ……… [10월 4일 주일예배] [악보] [PPT] [자료실 ▾ 주보·악보와 PPT] [🔒 준비] (2026-10-03 교장님)"""
-    root = f"{PUBLIC}/{date.replace('-', '')}/" if date else "./"
+    import svc
+    root = f"{PUBLIC}/{svc.d8(date)}/" if date else "./"
     def tab(key, name, href):
         return f'<a class="tab{" cur" if key == cur else ""}" href="{href}">{name}</a>'
     prep = ''   # 2026-10-07 교장님: 맨 위 🔒 준비(잠금 메뉴)는 없앰 — 예배준비는 첫 화면 [예배준비] → prep.html
@@ -105,11 +106,10 @@ def r1(cur: str, when: str, date: str | None = None, prep_js: bool = False, day:
 
 
 def svc_name(day: str | None) -> str:
-    """날짜 → 예배 이름(새벽·수요·금요·주일). 날짜를 못 읽으면 주일예배 (2026-10-07 교장님)."""
+    """때 → 예배 이름(예배 구분 표). 못 읽으면 주일예배 (2026-10-07 교장님)."""
     try:
-        import re as _re, weekday
-        m = _re.search(r"(\d{4})-?(\d{2})-?(\d{2})", str(day or ""))
-        return weekday.service(f"{m.group(1)}-{m.group(2)}-{m.group(3)}") if m else "주일예배"
+        import svc
+        return svc.name(day) if day else "주일예배"
     except Exception:
         return "주일예배"
 

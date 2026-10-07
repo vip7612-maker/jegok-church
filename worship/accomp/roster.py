@@ -76,6 +76,7 @@ def show(R: dict, start: str | None) -> None:
 def rebuild(changed: list[str]) -> None:
     """바뀐 날짜가 6주 창에 들어가는 악보집만 다시 만들어 올린다."""
     for f in sorted((HERE / "data").glob("2*.json")):
+        if len(f.stem) != 10: continue   # 섬김표는 주일(날짜만) 악보집만 — 같은 날 다른 예배(날짜-열쇠)는 빼고
         d0 = dt.date.fromisoformat(f.stem)
         if any(d0 <= dt.date.fromisoformat(c) < d0 + dt.timedelta(weeks=6) for c in changed):
             out = subprocess.run([sys.executable, str(HERE / "build.py"), f.stem, "--share"], capture_output=True, text=True).stdout.split()

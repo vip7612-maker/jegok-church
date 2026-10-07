@@ -25,11 +25,13 @@ NOTION_CFG = HERE / "notion_book.json"
 
 
 def slug(date: str) -> str:
-    return f"{INDEX}_{date.replace('-', '')}"
+    import svc   # 때(날짜 또는 날짜-예배열쇠) → jegok_worship_20261011(-youth) (2026-10-07)
+    return f"{INDEX}_{svc.d8(date)}"
 
 
 def url(date: str) -> str:
-    return f"{PUBLIC}/{date.replace('-', '')}"
+    import svc
+    return f"{PUBLIC}/{svc.d8(date)}"
 
 
 def sid_for(date: str) -> str:
@@ -42,6 +44,28 @@ def sid_for(date: str) -> str:
     return reg[key]
 
 
+def svc_d8(date: str) -> str:
+    import svc
+    return svc.d8(date)
+
+
+def wait_live(date: str, limit: int = 600) -> bool:
+    """docsave 가 사이트에 다 올릴 때까지 기다린다(10분까지) — 「다 만들었습니다」를 올리기 전에 알리지 않게(2026-10-07).
+    맥미니에서 만든 뒤 Vercel 배포가 1~2분 더 걸려, 그 사이 열면 예전 악보집이 보였다."""
+    import time, urllib.request
+    sid = sid_for(date); t0 = time.time()
+    time.sleep(3)
+    while time.time() - t0 < limit:
+        try:
+            st = json.load(urllib.request.urlopen(f"http://127.0.0.1:8765/share/status?id={sid}", timeout=10))
+            if st.get("live") and not st.get("deploying"): return True
+            if st.get("error"): return False
+        except Exception:
+            return False
+        time.sleep(10)
+    return False
+
+
 def route(date: str, sid: str) -> None:
     p = SITE / "vercel.json"; v = json.loads(p.read_text())
     s = "/" + slug(date)
@@ -50,7 +74,7 @@ def route(date: str, sid: str) -> None:
     keep = [r for r in v.get("redirects", []) if r["source"] not in (s, "/" + INDEX)]
     v["redirects"] = keep + [{"source": s, "destination": s + "/", "permanent": False}]
     # 옛 주소(jegokworship20261004)는 새 주소로 넘긴다
-    old = "/jegokworship" + date.replace("-", "")
+    old = "/jegokworship" + svc_d8(date)
     v["rewrites"] = [r for r in v["rewrites"] if not r["source"].startswith(old)]
     v["redirects"] = [r for r in v["redirects"] if r["source"] != old] + [{"source": old, "destination": s + "/", "permanent": False}]
     p.write_text(json.dumps(v, ensure_ascii=False, indent=2))
@@ -109,9 +133,10 @@ def index_page() -> None:
     for x in pub:
         sm = summary(x)
         cover = (SITE / "d" / sid_for(x) / "cover.jpg").exists()
-        import weekday                                  # 새벽·수요·금요 악보집도 그 예배로(첫 화면 그 예배 칸의 [악보][PPT]가 열리게, 2026-10-07)
-        kind = {"새벽예배": "새벽", "수요예배": "수요", "금요예배": "금요"}.get(weekday.service(x), "주일")
-        items.append({"date": x, "kind": kind, "title": sm["title"], "ref": sm["ref"], "leader": sm["leader"],
+        import svc                                      # 예배 구분(관리자 화면)으로 — 첫 화면 그 예배 칸의 [악보][PPT]가 열리게(2026-10-07)
+        sv = svc.service_of(x)
+        kind = {"sun": "주일", "wed": "수요", "fri": "금요", "dawn": "새벽"}.get(sv["id"], sv["name"]) if not svc.split(x)[1] else sv["name"]
+        items.append({"date": svc.ymd(x), "occ": x, "svc": sv["id"], "kind": kind, "title": sm["title"], "ref": sm["ref"], "leader": sm["leader"],
                       "songs": sm["intro"] + sm["main"] + sm["apply"], "book": sm["url"] + "/",
                       "ppt": sm["url"] + "/ppt.html", "cover": (sm["url"] + "/cover.jpg") if cover else ""})
     have = {(i["date"], i["kind"]) for i in items}
@@ -155,22 +180,33 @@ def song_leaders(items: list[dict]) -> dict:
     return out
 
 
+def svc_js() -> str:
+    """첫 화면 예배 탭 — 관리자 화면 「예배 구분」(게시 때 넣고, 열 때 /api/wadmin?info 로 다시 받는다)."""
+    import svc
+    return json.dumps([{k: v[k] for k in ("id", "name", "days", "time", "place", "legacy")} for v in svc.services()], ensure_ascii=False)
+
+
 def landing_html(items: list[dict]) -> str:
     data = json.dumps(sorted(items, key=lambda i: i["date"], reverse=True), ensure_ascii=False).replace("</", "<\\/")
     roles = json.loads((HERE / "services.json").read_text()) if (HERE / "services.json").exists() else {}
     roles = json.dumps(roles, ensure_ascii=False).replace("</", "<\\/")
-    return LANDING.replace("@@SCHED@@", SCHED_JS).replace("@@ROLES@@", roles).replace("@@DATA@@", data)
+    return LANDING.replace("@@SCHED@@", SCHED_JS.replace("@@SVCS@@", svc_js())).replace("@@ROLES@@", roles).replace("@@DATA@@", data)
 
 
 # ── 예배 단추 넷 (2026-10-07 교장님) ─────────────────────────────────
 # 지금 띄울 예배 = 「끝나고 1시간」이 아직 안 지난 가장 이른 예배. 시간은 한국 시간 벽시계(Date 의 UTC 칸에 KST 를 담아 다룬다).
 # 새벽 월~금(토요일 새벽 없음, 주일은 주일예배) · 수요·금요 19:30~20:30 · 주일은 하루 종일 「오늘」.
 # tests/test_landing_schedule.py 가 이 JS 를 node 로 그대로 돌려 본다.
-SCHED_JS = r"""const SVC=[
- {k:'dawn',name:'새벽예배',en:'Early Morning Prayer',ru:'Утренняя молитва',days:[1,2,3,4,5],s:'05:00',e:'06:00',hold:60},
- {k:'wed',name:'수요예배',en:'Wednesday Worship',ru:'Богослужение в среду',days:[3],s:'19:30',e:'20:30',hold:60},
- {k:'fri',name:'금요예배',en:'Friday Worship',ru:'Богослужение в пятницу',days:[5],s:'19:30',e:'20:30',hold:60},
- {k:'sun',name:'주일예배',en:'Sunday Worship',ru:'Воскресное богослужение',days:[0],s:'00:00',e:'24:00',hold:0}];
+SCHED_JS = r"""// 예배 탭 = 관리자 화면 「예배 구분」(2026-10-07 교장님). 처음 네 가지는 영어·러시아어 이름과 예배 시간(끝·마친 뒤 1시간까지 보임)을 그대로
+const KNOWN={dawn:{en:'Early Morning Prayer',ru:'Утренняя молитва'},wed:{en:'Wednesday Worship',ru:'Богослужение в среду'},
+ fri:{en:'Friday Worship',ru:'Богослужение в пятницу'},sun:{en:'Sunday Worship',ru:'Воскресное богослужение'}};
+const _hhmm=m=>String(Math.floor(m/60)%24).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+function svcList(rows){return rows.map(r=>{const t=r.time||'10:00',p=t.split(':'),m=+p[0]*60+ +p[1], sunday=r.id==='sun'&&+r.legacy;
+  return {k:r.id,name:r.name,place:r.place||'',legacy:+r.legacy||0,en:(KNOWN[r.id]&&+r.legacy?KNOWN[r.id].en:''),ru:(KNOWN[r.id]&&+r.legacy?KNOWN[r.id].ru:''),
+    days:String(r.days||'').split('').map(Number),s:sunday?'00:00':t,e:sunday?'24:00':_hhmm(m+60),hold:sunday?0:60};});}
+let SVC=svcList(@@SVCS@@);
+// 그 예배의 「때」 — 처음 네 가지는 날짜만, 새로 만든 예배는 날짜-열쇠(accomp/svc.py 와 같은 규칙)
+const occOf=(k,d)=>{const v=SVC.find(x=>x.k===k);return v&&v.legacy?d:d+'-'+k;}, d8Of=o=>o.slice(0,10).replace(/-/g,'')+o.slice(10);
 const _min=s=>{const p=s.split(':');return (+p[0]*60+ +p[1])*60e3;};
 function _scan(now,ok){const t=now.getTime(),d0=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate());
   for(let i=0;i<10;i++){const d=d0+i*864e5,wd=new Date(d).getUTCDay();
@@ -263,7 +299,7 @@ const TODAY=Q.get('today')||NOW.toISOString().slice(0,10);   // ?today= 은 옛 
 const W='일월화수목금토';
 const md=d=>{const x=new Date(d+'T00:00:00Z');return (x.getUTCMonth()+1)+'월 '+x.getUTCDate()+'일('+W[x.getUTCDay()]+')';};
 function nextSunday(){const x=new Date(TODAY+'T00:00:00Z');x.setUTCDate(x.getUTCDate()+((7-x.getUTCDay())%7||7));return x.toISOString().slice(0,10);}
-const sundays=ALL.filter(i=>i.ppt);
+const sundays=ALL.filter(i=>i.ppt&&(i.svc||'sun')==='sun');   // 주일예배 칸(오늘 PPT 크게)은 주일예배만
 const today=sundays.find(i=>i.date===TODAY);
 function hero(){const h=document.getElementById('hero');   // 주일예배
   if(today){const i=today;
@@ -282,13 +318,15 @@ function hero(){const h=document.getElementById('hero');   // 주일예배
       +(up.songs.length?'<ul class="chips">'+up.songs.map(s=>'<li>'+esc(s)+'</li>').join('')+'</ul>':'')
       +'<div class="btns"><a class="p" href="prep.html?d='+up.date.replace(/-/g,'')+'">예배준비</a><a href="'+up.book+'">악보</a><a href="'+up.ppt+'">PPT</a></div>':'');}
 const PAST0=ALL.filter(i=>i!==today&&i.date<=TODAY), PER=10;
-const KINDS=['주일','수요','금요'], NOREC='기록 없음';
-const kOf=i=>KINDS.includes(i.kind)?i.kind:'기타', lOf=i=>(i.leader&&i.leader.length)?i.leader:[NOREC];
+const NOREC='기록 없음';
+const KINDS=[...new Set(PAST0.map(i=>i.kind).filter(Boolean))];   // 지난 예배에 있는 예배 종류(예배 구분을 따라 늘어난다)
+const kOf=i=>i.kind||'기타', lOf=i=>(i.leader&&i.leader.length)?i.leader:[NOREC];
+const kName=k=>!k?'전체':/예배$/.test(k)?k:k+'예배';
 function hp(){const h=new URLSearchParams(location.hash.slice(1));return {p:+(h.get('p')||1),k:h.get('k')||'',l:h.get('l')||''};}
 function go(o){const h=new URLSearchParams();if(o.k)h.set('k',o.k);if(o.l)h.set('l',o.l);if(o.p>1)h.set('p',o.p);location.hash=h.toString()||'p=1';}
 function flt(st){const pool=PAST0.filter(i=>!st.k||kOf(i)===st.k), cnt={};pool.forEach(i=>lOf(i).forEach(n=>cnt[n]=(cnt[n]||0)+1));
   const names=Object.keys(cnt).sort((a,b)=>a===NOREC?1:b===NOREC?-1:cnt[b]-cnt[a]);
-  const kb=['','주일','수요','금요','기타'].map(k=>'<button type="button" data-k="'+k+'" class="'+(st.k===k?'on':'')+'">'+(k?k+'예배':'전체')+'</button>').join('');
+  const kb=['',...KINDS].map(k=>'<button type="button" data-k="'+esc(k)+'" class="'+(st.k===k?'on':'')+'">'+esc(kName(k))+'</button>').join('');
   const lb='<button type="button" data-l="" class="'+(!st.l?'on':'')+'">인도자 전체</button>'+names.map(n=>'<button type="button" data-l="'+esc(n)+'" class="'+(st.l===n?'on':'')+'">'+esc(n)+'<em>'+cnt[n]+'</em></button>').join('');
   const f=document.getElementById('flt'); f.innerHTML='<div class="g">'+kb+'</div><div class="g">'+lb+'</div>';
   f.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>go({k:b.dataset.k,l:''}));
@@ -297,7 +335,7 @@ function list(st){const PAST=PAST0.filter(i=>(!st.k||kOf(i)===st.k)&&(!st.l||lOf
   let p=st.p; const n=Math.max(1,Math.ceil(PAST.length/PER)); p=Math.min(Math.max(1,p),n); flt(st);
   document.getElementById('cnt').textContent=PAST.length+'개 · '+p+'/'+n+'쪽';
   document.getElementById('list').innerHTML=PAST.slice((p-1)*PER,p*PER).map(i=>{const x=new Date(i.date+'T00:00:00Z');
-    const href=i.ppt||i.src, t=i.ppt?(i.title||'주일예배'):(i.kind+'예배');
+    const href=i.ppt||i.src, t=i.ppt?(i.title||kName(i.kind)):kName(i.kind);
     const sub=(i.ref?i.ref+' · ':'')+(i.songs.length?i.songs.join(' · '):'곡 정보 없음');
     return '<a class="it" href="'+href+'"'+(i.ppt?'':' target="_blank" rel="noopener"')+'><div class="d"><b>'+(x.getUTCMonth()+1)+'.'+x.getUTCDate()+'</b><span>'+x.getUTCFullYear()+'</span></div>'
       +'<div class="m"><div class="t">'+esc(t)+(i.kind!=='주일'?'<span class="kind">'+esc(i.kind)+'</span>':'')+(i.leader&&i.leader.length?'<span class="ld">인도 '+esc(i.leader.join(', '))+'</span>':'')+'</div><div class="s">'+esc(sub)+'</div></div>'
@@ -311,19 +349,19 @@ function route(){list(hp());}
 addEventListener('hashchange',()=>{route();document.getElementById('cnt').scrollIntoView({behavior:'smooth'});});
 const md2=d=>{const x=new Date(d+'T00:00:00Z');return (x.getUTCMonth()+1)+'월 '+x.getUTCDate()+'일('+W[x.getUTCDay()]+')';};
 function dayWord(d){const t=new Date(TODAY+'T00:00:00Z'),x=new Date(d+'T00:00:00Z'),n=Math.round((x-t)/864e5);return n===0?'오늘':n===1?'내일':md2(d);}
-function hm(s){const p=s.split(':'),h=+p[0],m=+p[1];return (h<12?'새벽 ':'저녁 ')+(h>12?h-12:h)+'시'+(m?' '+m+'분':'');}
+function hm(s){const p=s.split(':'),h=+p[0],m=+p[1];return (h<7?'새벽 ':h<12?'오전 ':h<18?'오후 ':'저녁 ')+(h>12?h-12:h)+'시'+(m?' '+m+'분':'');}
 function heroSvc(r){const v=r.v,h=document.getElementById('hero'),w=dayWord(r.date);
   const tag=r.state==='live'?'<span class="tag live">● 지금 예배 중</span>':r.state==='done'?'<span class="tag done">마쳤습니다 · '+md(r.date)+'</span>':'<span class="tag">준비 중 · '+md(r.date)+'</span>';
   const msg=r.state==='live'?'지금 '+v.name+'를 드리고 있습니다.':r.state==='done'?w+' '+v.name+'를 마쳤습니다. 함께해 주셔서 고맙습니다.':w+' '+hm(v.s)+', '+v.name+'를 준비하고 있습니다.';
   h.innerHTML='<div class="row">'+tag+'<span class="who">'+v.s+' ~ '+v.e+'</span></div>'
     +'<div class="slide"><div class="ch">제 곡 교 회</div><div class="nm">'+v.name+'</div>'
-    +'<div class="en">'+v.en+'</div><div class="ru">'+v.ru+'</div><div class="ln"></div><div class="tm">'+md(r.date)+' · '+hm(v.s)+'</div></div>'
+    +(v.en?'<div class="en">'+v.en+'</div><div class="ru">'+v.ru+'</div>':'')+'<div class="ln"></div><div class="tm">'+md(r.date)+' · '+hm(v.s)+(v.place?' · '+esc(v.place):'')+'</div></div>'
     +'<p class="svmsg">'+msg+(roleOf(v.k,r.date)?'<span class="roles">'+esc(roleOf(v.k,r.date))+'</span>':'')+'</p>'+svcBtns(v.k,r.date);}
 // 새벽·수요·금요도 [예배준비][악보][PPT] (2026-10-07 교장님). 그 예배 자료가 올라와 있으면 열리고, 아직이면 흐리게 막아 둔다.
-function svcBtns(k,d){const kind={dawn:'새벽',wed:'수요',fri:'금요'}[k], it=ALL.find(i=>i.date===d&&i.kind===kind&&(i.book||i.ppt));
+function svcBtns(k,d){const occ=occOf(k,d), it=ALL.find(i=>(i.occ||i.date)===occ&&(i.book||i.ppt));
   const b=(cls,href,t)=>href?'<a class="'+cls+'" href="'+href+'">'+t+'</a>':'<a class="'+cls+' off" aria-disabled="true" title="아직 올라오지 않았습니다">'+t+'</a>';
   // 예배준비는 늘 열린다 (2026-10-07) — 그날의 예배준비 화면(prep.html: 예배순서·콘티준비·콘티확정)
-  return '<div class="btns">'+b('p','prep.html?d='+d.replace(/-/g,''),'예배준비')+b('',it&&it.book,'악보')+b('',it&&it.ppt,'PPT')+'</div>'
+  return '<div class="btns">'+b('p','prep.html?d='+d8Of(occ),'예배준비')+b('',it&&it.book,'악보')+b('',it&&it.ppt,'PPT')+'</div>'
     +(it?'':'<p class="svmsg" style="margin-top:8px"><small>악보와 PPT는 준비되는 대로 열립니다.</small></p>');}
 const ROLES=JSON.parse(document.getElementById('roles').textContent||'{}');
 function roleOf(k,d){const r=Object.assign({},ROLES[k]||{},(ROLES.dates||{})[d]||{});return [r['인도']?'인도 '+r['인도']:'',r['설교']?'설교 '+r['설교']:''].filter(Boolean).join(' · ');}
@@ -332,8 +370,11 @@ function svcTabs(){const n=document.getElementById('svc');
   n.innerHTML=SVC.map(v=>{const isNow=v.k===CUR.k, sub=isNow?(function(w){return w==='오늘'||w==='내일'?w:CUR.date.slice(5).replace('-','/').replace(/^0/,'')+' 다음';})(dayWord(CUR.date)):'';
     return '<button type="button" data-k="'+v.k+'" class="'+(v.k===SEL?'on ':'')+(isNow?'now':'')+'" aria-pressed="'+(v.k===SEL)+'">'+v.name+'<small>'+sub+'</small></button>';}).join('');
   n.querySelectorAll('button').forEach(b=>b.onclick=()=>{SEL=b.dataset.k;svcTabs();show();});}
-function show(){if(SEL==='sun'){hero();return;} heroSvc(SEL===CUR.k?CUR:nextOf(SEL,NOW));}
+function show(){if(SEL==='sun'){hero();return;} const r=SEL===CUR.k?CUR:nextOf(SEL,NOW); if(r) heroSvc(r);}
 svcTabs(); show(); route();
+// 관리자 화면에서 예배를 만들거나 고치면 다시 올리지 않아도 바로 — 열 때 예배 구분을 다시 받는다
+fetch('/api/wadmin?info=jegok').then(r=>r.json()).then(j=>{if(!j.services||!j.services.length)return;const nw=svcList(j.services);
+  if(JSON.stringify(nw)===JSON.stringify(SVC))return;SVC=nw;const c=svcAt(NOW);if(c){Object.assign(CUR,c);}if(!SVC.some(v=>v.k===SEL))SEL=CUR.k;svcTabs();show();}).catch(()=>{});
 // 하단 교회 정보 (2026-10-07 교장님) — 관리자 화면에서 고친 값(api/wadmin ?info=). 비운 칸은 안 보인다. 맨 끝 작은 「관리자」
 (async function(){const f=document.getElementById('foot');let s={};
   try{s=(await (await fetch('/api/wadmin?info=jegok')).json()).settings||{};}catch(e){}
@@ -360,6 +401,8 @@ def notion(date: str) -> str:
                              "곡 수": {"number": {}}, "악보집": {"url": {}}}})
         db = r["id"]; NOTION_CFG.write_text(json.dumps({"db": db, "url": r.get("url", "")}, ensure_ascii=False))
     tx = lambda v: {"rich_text": [{"text": {"content": v[:1900]}}]}
+    import svc
+    if svc.split(date)[1]: return ""          # 노션 「주일예배 기록」 DB 는 처음 네 가지 예배만(날짜 하나에 한 줄)
     d = dt.date.fromisoformat(date)
     props = {"제목": {"title": [{"text": {"content": f"{d.year}.{d.month:02d}.{d.day:02d} 주일예배"}}]}, "예배일": {"date": {"start": date}},
              "설교본문": tx(s["ref"]), "설교제목": tx(s["title"]), "인도자": tx(", ".join(s["leader"])),

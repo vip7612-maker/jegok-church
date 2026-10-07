@@ -262,7 +262,7 @@ def take_jubo(row: dict, dry: bool = False) -> list[str]:
     got = fill_word(got, word(md, jubo_form.parse(md)))
     cur = json.loads(row["items"] or "[]") or [dict(x) for x in DEFAULT_SUN]
     merged = merge_jubo(cur, got) if got else cur
-    sunday = dt.date.fromisoformat(date).weekday() == 6
+    sunday = True   # 예배마다 PPT 를 만든다(새벽·수요·금요·새로 만든 예배도, 2026-10-07)
     _db([("UPDATE wor_order SET items=?, jubo_done=?, src=CASE WHEN src='user' THEN 'user' ELSE 'jubo' END, rev=COALESCE(rev,0)+?, updated=? "
           "WHERE church=? AND date=? AND updated IS ?", [json.dumps(merged, ensure_ascii=False), now, 1 if sunday else 0, now, CHURCH, date, row["updated"]])])
     return [f"{date} 주보 {j.get('name')} → 순서 {len(got)}줄 읽음({how['by']}), 예배순서 {len(merged)}줄" + (" · PPT 다시 만들 차례" if sunday else "")]
@@ -278,9 +278,12 @@ def build(row: dict, dry: bool = False) -> list[str]:
         out.append(reco_gen.ensure_for(date, json.loads(cur["items"]) if cur and cur.get("items") else []))
     except Exception as e:
         out.append(f"{date} 추천 실패: {e}")
-    if dt.date.fromisoformat(date).weekday() == 6:     # PPT 는 주일만
+    if True:                                          # 예배마다 PPT(새벽·수요·금요·새로 만든 예배도, 2026-10-07)
         r = subprocess.run([PY, str(HERE / "build.py"), date, "--share"], capture_output=True, text=True, timeout=1800)
         out.append(f"{date} build {'ok' if r.returncode == 0 else '실패: ' + (r.stderr or r.stdout)[-300:]}")
+        if r.returncode == 0:                          # 사이트에 다 올라간 뒤에 「PPT에 반영했습니다」
+            import publish
+            publish.wait_live(date)
     _db([("UPDATE wor_order SET built_rev=? WHERE church=? AND date=? AND COALESCE(built_rev,0)<?", [rev, CHURCH, date, rev])])
     return out
 

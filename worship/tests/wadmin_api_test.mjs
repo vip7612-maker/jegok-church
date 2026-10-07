@@ -14,7 +14,7 @@ async function call(method, { query = {}, body = null, ip = '10.9.9.' + Math.flo
   const sc = out.headers['set-cookie']; if (sc) cookie = sc.split(';')[0].endsWith('=') ? '' : sc.split(';')[0];
   return out;
 }
-const clean = () => api.batch([['DELETE FROM wor_order WHERE church=?', [C]], ['DELETE FROM wor_tpl WHERE church=?', [C]], ['DELETE FROM wor_reco WHERE church=?', [C]], ['DELETE FROM wor_users WHERE church=?', [C]], ['DELETE FROM wor_settings WHERE church=?', [C]], ['DELETE FROM wor_assign WHERE church=?', [C]]]);
+const clean = () => api.batch([['DELETE FROM wor_order WHERE church=?', [C]], ['DELETE FROM wor_svc WHERE church=?', [C]], ['DELETE FROM wor_tpl WHERE church=?', [C]], ['DELETE FROM wor_reco WHERE church=?', [C]], ['DELETE FROM wor_users WHERE church=?', [C]], ['DELETE FROM wor_settings WHERE church=?', [C]], ['DELETE FROM wor_assign WHERE church=?', [C]]]);
 let n = 0; let r0; const ok = (c, m) => { assert.ok(c, m); n++; };
 try {
   await call('GET', { query: { info: 'jegok' } });      // 표 만들기
@@ -153,6 +153,28 @@ try {
   ok(r.code === 400, '이름 없는 템플릿 거절');
   r = await call('POST', { body: { action: 'tpl_del', church: C, name: '금요예배' } });
   ok(r.code === 200 && (await call('GET', { query: { tpl: C } })).body.list.length === 0, '템플릿 지우기');
+  // 예배 구분(2026-10-07): 처음 네 가지 · 새 예배 만들기 · 인도자에게 맡기기 · 같은 날 여러 예배 · 지우기
+  const leaderCookie = cookie; cookie = adminCookie;
+  r = await call('GET', { query: { info: C } });
+  ok(r.body.services.map(x => x.id).join() === 'sun,wed,fri,dawn' && !('tpl' in r.body.services[0]), '처음 네 가지 예배(공개 정보)');
+  r = await call('POST', { body: { action: 'svc_save', name: '청년예배', days: '60', time: '15:00', place: '청년부실' } });
+  const yid = r.body.id; ok(r.code === 200 && /^s[0-9a-f]{6}$/.test(yid), '새 예배 만들기');
+  r = await call('POST', { body: { action: 'svc_save', name: '', days: '' } }); ok(r.code === 400, '이름·요일 없으면 거절');
+  r = await call('GET', { query: { users: 1 } });
+  ok(r.body.services.some(x => x.id === yid && x.days === '06' && x.place === '청년부실' && x.time === '15:00'), '요일 정리·시간·장소');
+  cookie = leaderCookie;
+  r = await call('GET', { query: { order: C, date: `2026-10-11-${yid}` } }); ok(r.code === 403, '맡지 않은 예배는 못 엶');
+  cookie = adminCookie;
+  r = await call('POST', { body: { action: 'user_svcs', name: '김인도', svcs: [yid, 'nope'] } }); ok(r.body.svcs.join() === yid, '인도자에게 예배 맡기기(없는 예배는 뺌)');
+  r = await call('GET', { query: { users: 1 } }); ok(r.body.users.find(x => x.name === '김인도').svcs.join() === yid, '계정 목록에 맡은 예배');
+  cookie = leaderCookie;
+  r = await call('GET', { query: { order: C, date: `2026-10-11-${yid}` } }); ok(r.code === 200 && r.body.items.some(x => x.t === '사도신경'), '맡은 예배는 열림·주일이면 주일 순서로 시작');
+  r = await call('GET', { query: { order: C, date: '2026-10-11' } }); ok(r.code === 403, '같은 날 주일예배는 여전히 막힘');
+  r = await call('POST', { body: { action: 'order', church: C, date: `2026-10-11-${yid}`, items: [{ t: '찬양' }] } }); ok(r.code === 200, '같은 날 다른 예배 순서는 따로 저장');
+  r = await call('POST', { body: { action: 'order', church: C, date: '2026-10-11-../x', items: [{ t: '찬양' }] } }); ok(r.code === 400, '이상한 때는 거절');
+  cookie = adminCookie;
+  r = await call('POST', { body: { action: 'svc_del', id: yid } }); ok(r.code === 200 && !r.body.services.some(x => x.id === yid), '예배 지우기(목록에서 뺌)');
+  cookie = leaderCookie;
   // 틀린 비밀번호 여러 번 → 막힘
   const ip = '10.8.8.8';
   for (let i = 0; i < 5; i++) await call('POST', { ip, body: { action: 'login', church: C, name: '김인도', pw: 'wrong-' + i } });
