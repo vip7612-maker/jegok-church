@@ -18,6 +18,7 @@ sys.path.insert(0, str(HERE.parent))
 SITE = Path.home() / "dev/daily-briefing/report-site"
 SHARES = Path.home() / "dev/daily-briefing/docsave/shares.json"
 BASE = "https://report-site-kohl.vercel.app"
+PUBLIC = "https://worship-desk.vercel.app/jegok"   # 2026-10-07 교장님: 바깥에 알리는 주소. report-site 쪽 주소도 그대로 열린다
 INDEX = "jegok_worship"
 PUBLISHED = HERE / "published.json"
 NOTION_CFG = HERE / "notion_book.json"
@@ -28,7 +29,7 @@ def slug(date: str) -> str:
 
 
 def url(date: str) -> str:
-    return f"{BASE}/{slug(date)}"
+    return f"{PUBLIC}/{date.replace('-', '')}"
 
 
 def sid_for(date: str) -> str:
@@ -305,7 +306,10 @@ function heroSvc(r){const v=r.v,h=document.getElementById('hero'),w=dayWord(r.da
 // 새벽·수요·금요도 [예배준비][악보][PPT] (2026-10-07 교장님). 그 예배 자료가 올라와 있으면 열리고, 아직이면 흐리게 막아 둔다.
 function svcBtns(k,d){const kind={dawn:'새벽',wed:'수요',fri:'금요'}[k], it=ALL.find(i=>i.date===d&&i.kind===kind&&(i.book||i.ppt));
   const b=(cls,href,t)=>href?'<a class="'+cls+'" href="'+href+'">'+t+'</a>':'<a class="'+cls+' off" aria-disabled="true" title="아직 올라오지 않았습니다">'+t+'</a>';
-  return '<div class="btns">'+b('p',it&&it.book?it.book+'#prep':'','예배준비')+b('',it&&it.book,'악보')+b('',it&&it.ppt,'PPT')+'</div>'
+  // 예배준비는 늘 열린다 (2026-10-07 국장님) — 그 예배 악보집이 없으면 가장 가까운 주일 악보집의 준비 탭으로
+  const pb=(it&&it.book)||(function(){const bs=ALL.filter(i=>i.book&&i.kind==='주일').sort((a,b)=>a.date<b.date?-1:1);
+    return ((bs.find(i=>i.date>=TODAY))||bs[bs.length-1]||{}).book||'';})();
+  return '<div class="btns">'+b('p',pb?pb+'#prep':'','예배준비')+b('',it&&it.book,'악보')+b('',it&&it.ppt,'PPT')+'</div>'
     +(it?'':'<p class="svmsg" style="margin-top:8px"><small>악보와 PPT는 준비되는 대로 열립니다.</small></p>');}
 const ROLES=JSON.parse(document.getElementById('roles').textContent||'{}');
 function roleOf(k,d){const r=Object.assign({},ROLES[k]||{},(ROLES.dates||{})[d]||{});return [r['인도']?'인도 '+r['인도']:'',r['설교']?'설교 '+r['설교']:''].filter(Boolean).join(' · ');}

@@ -11,6 +11,7 @@ from __future__ import annotations
 import html as H
 
 BASE = "https://report-site-kohl.vercel.app"
+PUBLIC = "https://worship-desk.vercel.app/jegok"   # 2026-10-07 교장님: 교회별 주소 worship-desk.vercel.app/<교회>
 
 CSS = """
 .wsnav{position:sticky;top:0;z-index:40;display:block!important;padding:0!important;background:#1f2937;color:#fff;font:14px 'Pretendard Variable',Pretendard,'Noto Sans KR',system-ui,sans-serif;word-break:keep-all}
@@ -67,7 +68,7 @@ JS = r"""
   // 📢 예배팀 소통 전광판 — 체크 안 한 메시지를 하나씩 깜빡이며 번갈아 (2026-10-04 교장님). 5초마다 새로 불러온다
   (function(){ const r1=document.querySelector('.wsnav .r1'), box=document.querySelector('.wsnav .tick'); if(!r1||!box) return;
     let msgs=[], k=0;
-    const day=()=>r1.dataset.date||((location.pathname.match(/jegok_worship_(\d{4})(\d{2})(\d{2})/)||[]).slice(1).join('-'));
+    const day=()=>r1.dataset.date||((location.pathname.match(/jegok_worship_(\d{4})(\d{2})(\d{2})|\/jegok\/(\d{4})(\d{2})(\d{2})/)||[]).filter(Boolean).slice(1).join('-'));
     function show(){ if(!msgs.length){ box.textContent=''; return; } k%=msgs.length; const m=msgs[k];
       box.innerHTML='<b>📢 '+(k+1)+'/'+msgs.length+'</b>'; box.appendChild(document.createTextNode(m.text)); box.title=m.text;
       box.classList.remove('blink'); void box.offsetWidth; box.classList.add('blink'); k++; }
@@ -89,16 +90,16 @@ def label(date: str) -> str:
 
 def r1(cur: str, when: str, date: str | None = None, prep_js: bool = False, day: str | None = None) -> str:
     """1단: 🏠 제곡교회 예배 플랫폼 ……… [10월 4일 주일예배] [악보] [PPT] [자료실 ▾ 주보·악보와 PPT] [🔒 준비] (2026-10-03 교장님)"""
-    root = f"{BASE}/jegok_worship_{date.replace('-', '')}/" if date else "./"
+    root = f"{PUBLIC}/{date.replace('-', '')}/" if date else "./"
     def tab(key, name, href):
         return f'<a class="tab{" cur" if key == cur else ""}" href="{href}">{name}</a>'
     prep = ('<button class="tab" data-mode="prep" onclick="wsPrep()">🔒 준비</button>' if prep_js
             else f'<a class="tab" href="{root}#prep">🔒 준비</a>')
     lib = (f'<details class="lib"><summary class="tab{" cur" if cur in ("jubo", "song") else ""}">자료실 ▾</summary><div class="menu">'
            f'<a href="{root}jubo.html"{" class=on" if cur == "jubo" else ""}>📰 주보</a>'
-           f'<a href="{BASE}/jegok_worship/song.html"{" class=on" if cur == "song" else ""}>🎼 악보와 PPT</a></div></details>')
+           f'<a href="{PUBLIC}/song.html"{" class=on" if cur == "song" else ""}>🎼 악보와 PPT</a></div></details>')
     day = day or date
-    return (f'<div class="r1"{f" data-date={chr(34)}{day}{chr(34)}" if day else ""}><a class="ttl" href="{BASE}/jegok_worship">🏠 제곡교회 예배 플랫폼</a>'
+    return (f'<div class="r1"{f" data-date={chr(34)}{day}{chr(34)}" if day else ""}><a class="ttl" href="{PUBLIC}/">🏠 제곡교회 예배 플랫폼</a>'
             f'<div class="tick" aria-live="polite" title="예배팀 소통 메시지 — PPT 왼쪽 채팅에서 체크하면 사라집니다"></div>'
             f'<nav class="tabs"><a class="wk" href="{root}">{H.escape(when)} 주일예배</a>'
             f'{tab("score", "악보", root)}{tab("ppt", "PPT", root + "ppt.html")}{lib}{prep}</nav></div>')
