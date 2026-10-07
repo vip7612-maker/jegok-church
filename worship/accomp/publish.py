@@ -221,6 +221,7 @@ h3.sec{margin:28px 4px 10px;font-size:15px;color:#334155;display:flex;justify-co
 .svmsg{margin:12px 2px 0;font-size:14.5px;line-height:1.7;color:#334155}
 .svmsg small{display:block;color:#94a3b8;font-size:12.5px;margin-top:2px}
 .hero .tag.done{background:#e2e8f0;color:#475569}
+.btns a.off{opacity:.45;cursor:default;pointer-events:none}
 .flt{display:flex;flex-wrap:wrap;gap:6px;margin:0 2px 10px}.flt .g{display:flex;flex-wrap:wrap;gap:6px;width:100%}
 .flt button{font:inherit;font-size:12.5px;font-weight:700;border:1px solid #dbe1ea;background:#fff;color:#334155;border-radius:999px;padding:5px 11px;cursor:pointer}
 .flt button.on{background:#0b1430;color:#fff;border-color:#0b1430}.flt button em{font-style:normal;font-weight:500;opacity:.7;margin-left:3px}
@@ -248,7 +249,7 @@ function hero(){const h=document.getElementById('hero');   // 주일예배
     h.innerHTML='<div class="row"><span class="tag live">● 오늘 · '+md(i.date)+'</span><span class="who">'+(i.leader.length?'인도 '+esc(i.leader.join(', ')):'')+'</span></div>'
       +'<a class="shot" href="'+i.ppt+'#pv" style="background-image:url(\''+i.cover+'\')"></a>'
       +'<h2>'+esc(i.title||'주일예배')+'</h2><p class="ref">'+esc(i.ref)+'</p>'
-      +'<div class="btns"><a class="p" href="'+i.ppt+'#pv">▶ 예배용 PPT 열기</a><a href="'+i.book+'">예배자 악보</a></div>';
+      +'<div class="btns"><a class="p" href="'+i.book+'#prep">예배준비</a><a href="'+i.book+'">악보</a><a href="'+i.ppt+'#pv">PPT</a></div>';
     return;}
   const up=sundays.filter(i=>i.date>TODAY).sort((a,b)=>a.date<b.date?-1:1)[0];
   const day=up?up.date:nextSunday();
@@ -296,7 +297,12 @@ function heroSvc(r){const v=r.v,h=document.getElementById('hero'),w=dayWord(r.da
   h.innerHTML='<div class="row">'+tag+'<span class="who">'+v.s+' ~ '+v.e+'</span></div>'
     +'<div class="slide"><div class="ch">제 곡 교 회</div><div class="nm">'+v.name+'</div>'
     +'<div class="en">'+v.en+'</div><div class="ru">'+v.ru+'</div><div class="ln"></div><div class="tm">'+md(r.date)+' · '+hm(v.s)+'</div></div>'
-    +'<p class="svmsg">'+msg+(roleOf(v.k,r.date)?'<span class="roles">'+esc(roleOf(v.k,r.date))+'</span>':'')+'<small>예배 PPT는 준비되는 대로 이곳에 올라옵니다.</small></p>';}
+    +'<p class="svmsg">'+msg+(roleOf(v.k,r.date)?'<span class="roles">'+esc(roleOf(v.k,r.date))+'</span>':'')+'</p>'+svcBtns(v.k,r.date);}
+// 새벽·수요·금요도 [예배준비][악보][PPT] (2026-10-07 교장님). 그 예배 자료가 올라와 있으면 열리고, 아직이면 흐리게 막아 둔다.
+function svcBtns(k,d){const kind={dawn:'새벽',wed:'수요',fri:'금요'}[k], it=ALL.find(i=>i.date===d&&i.kind===kind&&(i.book||i.ppt));
+  const b=(cls,href,t)=>href?'<a class="'+cls+'" href="'+href+'">'+t+'</a>':'<a class="'+cls+' off" aria-disabled="true" title="아직 올라오지 않았습니다">'+t+'</a>';
+  return '<div class="btns">'+b('p',it&&it.book?it.book+'#prep':'','예배준비')+b('',it&&it.book,'악보')+b('',it&&it.ppt,'PPT')+'</div>'
+    +(it?'':'<p class="svmsg" style="margin-top:8px"><small>악보와 PPT는 준비되는 대로 열립니다.</small></p>');}
 const ROLES=JSON.parse(document.getElementById('roles').textContent||'{}');
 function roleOf(k,d){const r=Object.assign({},ROLES[k]||{},(ROLES.dates||{})[d]||{});return [r['인도']?'인도 '+r['인도']:'',r['설교']?'설교 '+r['설교']:''].filter(Boolean).join(' · ');}
 const CUR=svcAt(NOW); let SEL=CUR.k;
