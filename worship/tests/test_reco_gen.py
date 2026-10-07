@@ -24,6 +24,17 @@ class RecoTests(unittest.TestCase):
         self.assertEqual(len(d["guide"].splitlines()), 5)                                       # 5줄까지만
         self.assertIsNone(R.make("2026-10-08", [{"t": "찬송"}], run=fake))                       # 본문·제목 없으면 안 만듦
 
+    def test_summary_only(self):   # 본문·제목이 없어도 주보 설교 요약만으로 — 요약이 프롬프트에 들어간다
+        import publish
+        tb = {publish.song_key("주는 나의 목자"): {"t": "주는 나의 목자", "tempo": "느린곡", "deep": True}}
+        R.table = lambda: tb; R.bible = lambda ref: ""
+        seen = {}
+        def fake(p):
+            seen["p"] = p
+            return json.dumps({"theme": "t", "guide": "g", "songs": [{"title": "주는 나의 목자", "why": "w"}]}, ensure_ascii=False)
+        d = R.make("2026-10-08", [{"t": "찬송"}], run=fake, summary="다윗은 솔로몬에게 하나님을 알라고 당부합니다")
+        self.assertIn("다윗은 솔로몬에게", seen["p"]); self.assertTrue(d["summary"]); self.assertEqual(len(d["ccm"]), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

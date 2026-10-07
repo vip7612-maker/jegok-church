@@ -94,5 +94,16 @@ class PlusInGridTests(unittest.TestCase):
         self.assertRegex(src, r"slides\.render\([^\n]*date=")
 
 
+class WeekdayTocTests(unittest.TestCase):
+    """새벽예배 목차 — 표지 이름·예배순서에서 새로 넣은 순서(통성기도)도 (2026-10-07)."""
+    def test_toc(self):
+        head = sl(1, "JEGOK CHURCH 새벽예배")
+        base = {"n": 0, "w": 1440, "h": 810, "img": "c.jpg", "plain": "Special Praise 특 송",
+                "texts": [{"x": 0, "y": 168, "w": 300, "h": 30, "s": 22, "c": "#efe6dd", "t": "Special Praise"}, {"x": 0, "y": 205, "w": 600, "h": 150, "s": 150, "c": "#6b5444", "t": "특 송"}]}
+        g = S.make_cover(base, title="통성기도"); g["n"] = 3
+        names = [x[1] for x in S.outline([head, sl(2, "Sermon 설교"), g, sl(4, "예배를 마칩니다")], [])]
+        self.assertEqual(names, ["새벽예배", "설교", "통성기도", "마침"])
+
+
 if __name__ == "__main__":
     unittest.main()

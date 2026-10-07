@@ -21,7 +21,8 @@ LOG = HERE / "out" / "order_sync.log"
 CHURCH = "jegok"
 
 # ── 순서 이름 ─────────────────────────────────────────────────────────────
-_ALIAS = {"성경암송": "성경암송", "암송": "성경암송", "찬양과경배": "찬양과경배", "경배와찬양": "찬양과경배", "사도신경": "사도신경",
+# 「찬송」「찬양」 = 새벽·수요의 여는 찬양 → 찬양과 경배 표지(곡이 그 아래, 2026-10-07)
+_ALIAS = {"성경암송": "성경암송", "암송": "성경암송", "찬송": "찬양과경배", "찬양": "찬양과경배", "찬양과경배": "찬양과경배", "경배와찬양": "찬양과경배", "사도신경": "사도신경",
           "대표기도": "대표기도", "기도": "대표기도", "교회소식": "교회소식", "광고": "교회소식", "봉헌": "봉헌",
           "성경봉독": "성경봉독", "봉독": "성경봉독", "특송": "특송", "특별찬양": "특송", "설교": "설교", "말씀": "설교",
           "찬양과결단": "찬양과결단", "결단찬양": "찬양과결단", "축도": "축도"}
@@ -192,7 +193,8 @@ def _db(stmts):
 
 
 _ALTERS = ["ALTER TABLE wor_order ADD COLUMN rev INTEGER DEFAULT 0", "ALTER TABLE wor_order ADD COLUMN built_rev INTEGER DEFAULT 0",
-           "ALTER TABLE wor_order ADD COLUMN src TEXT", "ALTER TABLE wor_order ADD COLUMN jubo_done TEXT"]
+           "ALTER TABLE wor_order ADD COLUMN src TEXT", "ALTER TABLE wor_order ADD COLUMN jubo_done TEXT",
+           "ALTER TABLE wor_order ADD COLUMN reco_req TEXT"]   # reco_req: [추천곡에 반영]을 누른 때(맥미니가 만들면 비운다)
 
 
 def ensure() -> None:
@@ -289,6 +291,14 @@ def sync(dry: bool = False) -> None:
     for row in _db([("SELECT date,jubo,items,updated FROM wor_order WHERE church=? AND jubo IS NOT NULL AND jubo<>'' AND (jubo_done IS NULL OR jubo_done='')", [CHURCH])])[0]:
         try: lines += take_jubo(row, dry)
         except Exception as e: lines.append(f"{row['date']} 주보 읽기 실패: {e}")
+    for row in _db([("SELECT date,items,reco_req FROM wor_order WHERE church=? AND reco_req IS NOT NULL AND reco_req<>''", [CHURCH])])[0]:
+        if dry: lines.append(f"{row['date']} 추천곡에 반영 차례"); continue
+        try:                                          # [추천곡에 반영] — 본문·제목·주보 설교 요약으로 다시(2026-10-07 교장님)
+            import reco_gen
+            lines.append(reco_gen.ensure_for(row["date"], json.loads(row["items"] or "[]"), force=True))
+        except Exception as e:
+            lines.append(f"{row['date']} 추천 실패: {e}")
+        _db([("UPDATE wor_order SET reco_req=NULL WHERE church=? AND date=? AND reco_req=?", [CHURCH, row["date"], row["reco_req"]])])
     for row in _db([("SELECT date,rev,built_rev FROM wor_order WHERE church=? AND COALESCE(rev,0) > COALESCE(built_rev,0)", [CHURCH])])[0]:
         try: lines += build(row, dry)
         except Exception as e: lines.append(f"{row['date']} PPT 다시 만들기 실패: {e}")

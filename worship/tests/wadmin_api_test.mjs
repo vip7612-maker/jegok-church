@@ -124,11 +124,18 @@ try {
   r = await call('GET', { query: { order: C, date: '2026-10-09' } });
   ok(r.body.jubo_done === '', '새로 올리면 맥미니가 읽을 차례');
   ok(JSON.stringify(api.defaultOrder('2026-10-11').map(x => x.t)) === JSON.stringify(['성경암송', '찬양과 경배', '사도신경', '찬양과 경배', '대표기도', '교회소식', '봉헌', '성경봉독', '특송', '설교', '찬양과 결단', '축도']), '주일 기본 순서 = 템플릿 PPT 순서');
+  // [추천곡에 반영] — 순서가 있으면 요청 시각을 적는다(맥미니가 만들고 비움)
+  r = await call('POST', { body: { action: 'reco_req', church: C, date: '2026-10-09' } });
+  ok(r.code === 200 && r.body.at, '추천곡에 반영 요청');
+  const [rq] = (await api.batch([['SELECT reco_req FROM wor_order WHERE church=? AND date=?', [C, '2026-10-09']]]))[0] || [];
+  ok(rq && rq.reco_req === r.body.at, '요청 시각이 순서에 적힘');
+  r = await call('POST', { body: { action: 'reco_req', church: C, date: '2026-10-11' } });
+  ok(r.code === 403, '맡지 않은 날은 요청 못 함');
   // 교회 템플릿: 저장·목록·불러오기·지우기 — 날짜마다 바뀌는 제목·본문은 저장하지 않는다
   r = await call('POST', { body: { action: 'tpl_save', church: C, name: '금요예배', items: [{ t: '찬양' }, { t: '설교', who: '정영선 목사', title: '이번 주 제목', ref: '요 3:16' }] } });
   ok(r.code === 200, '템플릿 저장');
   r = await call('GET', { query: { tpl: C } });
-  ok(r.code === 200 && r.body.list.length === 1 && r.body.list[0].name === '금요예배' && r.body.list[0].items[1].who === '정영선 목사' && !r.body.list[0].items[1].title && !r.body.list[0].items[1].ref, '템플릿 목록(제목·본문은 빼고)');
+  ok(r.code === 200 && r.body.list.length === 1 && r.body.list[0].name === '금요예배' && JSON.stringify(r.body.list[0].items) === JSON.stringify([{ t: '찬양' }, { t: '설교', who: '정영선 목사', title: '이번 주 제목', ref: '요 3:16' }]), '템플릿은 적힌 그대로(빈 칸은 빈 대로)');
   // 칸 기록(최근 순서)·말씀에 맞는 곡
   await call('POST', { body: { action: 'order', church: C, date: '2026-10-09', items: [{ t: '설교', who: '정영선 목사', title: '제목' }] } });
   r = await call('GET', { query: { recent: C } });

@@ -167,11 +167,15 @@ def make(date: str, sid: str) -> Path:
     row = order_sync.load(date) if y != "2000" else None
     items = json.loads(row["items"]) if row and row.get("items") else None
     if items: info = order_sync.order_info(items, info)
+    import weekday
+    svc = "주일예배" if y == "2000" else weekday.service(date)
     out_slides = []
     for s in S:
         f = flat(s)
         if s is S[0]:
             for t in s["texts"]:
+                if svc != "주일예배" and isinstance(t.get("t"), str) and re.sub(r"\s", "", t["t"]) == "주일예배":   # 새벽·수요·금요 표지
+                    t["t"] = svc; s["plain"] = re.sub(r"주\s*일\s*예\s*배", svc, s["plain"])   # 목차도 그 이름으로
                 if re.search(r"\d{4}년\s*\d{1,2}월\s*\d{1,2}일", t["t"]):
                     t["t"] = re.sub(r"\d{4}년\s*\d{1,2}월\s*\d{1,2}일", "○○○○년 ○○월 ○○일" if y == "2000" else f"{y}년 {m}월 {d}일", t["t"])
         if f.startswith(KEYS["prayer"]):
@@ -213,7 +217,7 @@ def make(date: str, sid: str) -> Path:
     out_slides = slides.add_extra(out_slides, date, sd)
     if y != "2000": print(order_sync.write_back(date, order_sync.sections(out_slides), row))   # PPT → 예배순서
     for s_ in out_slides: s_.pop("_sec", None)
-    title = f"예배 PPT 템플릿 ({TPL.parent.name})" if y == "2000" else f"{int(m)}월 {int(d)}일 주일예배 PPT"
+    title = f"예배 PPT 템플릿 ({TPL.parent.name})" if y == "2000" else f"{int(m)}월 {int(d)}일 {svc} PPT"
     note = "" if info else '<span style="color:#fbbf24;font-size:12px">주보가 오면 맡은 분·설교·봉독·소식이 채워집니다</span>'
     # date= 를 꼭 넘긴다 — 빠지면 ＋ 장 넣기·교회 소식 고치기·끼운 장 불러오기가 모두 꺼진다(10/11 PPT 에서 빠졌던 것, 2026-10-07 교장님)
     (folder / "ppt.html").write_text(slides.render(out_slides, title, note, slides.song_titles(date), date=None if y == "2000" else date))

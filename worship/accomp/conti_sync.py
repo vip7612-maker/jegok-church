@@ -65,6 +65,9 @@ def _local(url: str, date: str) -> str:
 
 def apply(row: dict) -> list[str]:
     date = row["date"]; out = []
+    import weekday                                    # 새벽·수요·금요는 짧은 악보집 바탕을 만든다(2026-10-07)
+    made = weekday.ensure(date)
+    if made != "있음": out.append(made)
     f = HERE / "data" / f"{date}.json"
     d = json.loads(f.read_text())
     lists = {z: json.loads(row[z] or "[]") for z in ZONES}
@@ -95,12 +98,19 @@ def apply(row: dict) -> list[str]:
 
 def sync(dry: bool = False) -> None:
     rows = S.sql("SELECT * FROM conti WHERE rev > built_rev")
+    try: S.sql("ALTER TABLE conti ADD COLUMN err TEXT")   # 만들다 실패한 까닭(예배준비 화면에 보인다)
+    except Exception: pass
     for row in rows:
         if dry:
             print(row["date"], "rev", row["rev"], ">", row["built_rev"]); continue
         rev = int(row["rev"])
-        lines = apply(row)
-        S.sql("UPDATE conti SET built_rev=? WHERE date=? AND built_rev<?", rev, row["date"], rev)
+        try:                                          # 한 주가 실패해도 다음 주는 만든다 — 실패는 err 로 알린다(2026-10-07)
+            lines, err = apply(row), None
+            bad = [x for x in lines if "실패" in x]
+            if bad: err = bad[0][:300]
+        except Exception as e:
+            lines, err = [f"{row['date']} 만들기 실패: {e}"], f"{type(e).__name__}: {e}"[:300]
+        S.sql("UPDATE conti SET built_rev=?, err=? WHERE date=? AND built_rev<?", rev, err, row["date"], rev)
         LOG.parent.mkdir(exist_ok=True)
         with LOG.open("a") as fp:
             fp.write(f"[{dt.datetime.now():%m-%d %H:%M}] rev {rev}\n" + "\n".join("  " + x for x in lines) + "\n")

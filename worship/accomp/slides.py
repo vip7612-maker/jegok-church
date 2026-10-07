@@ -15,7 +15,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 SITE = Path.home() / "dev/daily-briefing/report-site"
-SECTIONS = ["주일예배", "성경암송", "찬양과경배", "사도신경", "대표기도", "교회소식", "봉헌", "성경봉독", "특송", "선교보고", "설교", "찬양과결단", "축도", "예배를마칩니다"]
+SECTIONS = ["주일예배", "새벽예배", "수요예배", "금요예배", "성경암송", "찬양과경배", "사도신경", "대표기도", "교회소식", "봉헌", "성경봉독", "특송", "선교보고", "설교", "찬양과결단", "축도", "예배를마칩니다"]
 
 
 def css_color(c: int) -> str:
@@ -103,6 +103,9 @@ def outline(slides: list[dict], songs: list[str] | None = None) -> list[tuple[in
             if ph and empty and songs:
                 marks.append((s["n"], "♪ " + songs.pop(0))); last = "song"
             continue
+        if s.get("cover") and not sec:                            # 예배순서에서 새로 넣은 순서 표지(통성기도·간증 등) — 목차에도 (2026-10-07)
+            big = next((t["t"] for t in s.get("texts", []) if t.get("s", 0) >= 100 and str(t.get("t", "")).strip()), "")
+            if big: marks.append((s["n"], big.strip())); last = cur = big.strip(); continue
         if s.get("start"):                                         # add_song_frames 가 곡 첫 장에 단 곡 이름
             if songs: songs.pop(0)
             marks.append((s["n"], "♪ " + s["start"])); last = "song"; continue
@@ -988,7 +991,7 @@ def make_cover(base: dict, title: str = "", label: str = "", name: str = "", sub
         if not val: continue
         cx = t["x"] + t["w"] / 2; w = t["w"] * max(1.0, len(val) / max(1, len(t["t"])))
         texts.append({**t, "t": val, "w": int(w), "x": int(cx - w / 2)})
-    s.update(texts=texts, plain=" ".join(t["t"] for t in texts), hidden="")
+    s.update(texts=texts, plain=" ".join(t["t"] for t in texts), hidden="", cover=True)
     return s
 
 
