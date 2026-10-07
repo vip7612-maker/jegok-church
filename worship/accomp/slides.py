@@ -426,44 +426,73 @@ if(!SCREEN&&EDIT.length){
 # ppt.html 을 만들 때 유튜브에서 찾아 퍼가기(임베드)가 되는 것만 5개. 같은 주는 out/bgm/<날짜>.json 에 두어 다시 만들어도 그대로.
 BGM_Q = ["신나는 CCM 찬양 모음", "기쁨의 찬양 CCM 플레이리스트", "경쾌한 CCM 찬양 연속듣기", "밝은 CCM 예배찬양 플레이리스트",
          "신나는 찬양 메들리", "드라이브 CCM 찬양 플레이리스트", "업비트 CCM 찬양 모음"]
+# BGM 고르기 단추 — 단추마다 유튜브 5개 (2026-10-07 교장님: 새벽예배든 다른 예배든)
+BGM_CATS = {
+    "기도용 CCM(경건)": ["기도할 때 듣는 찬양 피아노", "잔잔한 묵상 찬양 피아노 연주", "기도 찬양 피아노 플레이리스트", "경건한 찬송가 피아노 연주"],
+    "기도용 CCM(열정)": ["뜨거운 기도 찬양 연속듣기", "기도회 찬양 플레이리스트", "부흥 찬양 기도 모음", "성령 찬양 기도회 연속듣기"],
+    "경쾌한 CCM": BGM_Q,
+    "JAZZ CCM": ["재즈 찬양 피아노", "CCM 재즈 플레이리스트", "재즈 찬송가 연주", "jazz worship piano playlist"],
+}
 
 
-def bgm(date: str, n: int = 5) -> list[dict]:
-    import datetime as dt, subprocess
-    f = HERE / "out" / "bgm" / f"{date}.json"
-    if f.exists(): return json.loads(f.read_text())
-    import svc
-    wk = dt.date.fromisoformat(svc.ymd(date)).isocalendar()[1]
-    seen, out, extra = set(), [], []
-    for q in (BGM_Q[wk % len(BGM_Q)], BGM_Q[(wk + 3) % len(BGM_Q)]):
-        try:
-            r = subprocess.run(["yt-dlp", "--no-warnings", "--skip-download", "--print",
-                                "%(id)s\t%(title)s\t%(duration)s\t%(playable_in_embed)s\t%(channel)s", f"ytsearch8:{q}"],
-                               capture_output=True, text=True, timeout=180)
-        except Exception:
-            continue
-        for ln in r.stdout.splitlines():
-            p = ln.split("\t")
-            if len(p) < 5 or p[0] in seen or p[3] != "True" or not p[2].isdigit() or int(p[2]) < 180: continue
-            if re.search(r"(?i)shorts|MR|반주|inst", p[1]): continue
-            seen.add(p[0]); v = {"id": p[0], "title": p[1], "sec": int(p[2]), "ch": p[4]}
-            (out if v["ch"] not in {x["ch"] for x in out} else extra).append(v)      # 채널이 겹치지 않게 먼저
-    out = (out + extra)[:n]
-    if out:
-        f.parent.mkdir(parents=True, exist_ok=True); f.write_text(json.dumps(out, ensure_ascii=False, indent=1))
+def _yt(q: str) -> list[dict]:
+    import subprocess
+    try:
+        r = subprocess.run(["yt-dlp", "--no-warnings", "--skip-download", "--print",
+                            "%(id)s\t%(title)s\t%(duration)s\t%(playable_in_embed)s\t%(channel)s", f"ytsearch8:{q}"],
+                           capture_output=True, text=True, timeout=180)
+    except Exception:
+        return []
+    out = []
+    for ln in r.stdout.splitlines():
+        p = ln.split("\t")
+        if len(p) < 5 or p[3] != "True" or not p[2].isdigit() or int(p[2]) < 180: continue
+        if re.search(r"(?i)shorts|MR|반주|inst", p[1]): continue
+        out.append({"id": p[0], "title": p[1], "sec": int(p[2]), "ch": p[4]})
     return out
 
 
-def bgm_html(items: list[dict]) -> str:
-    if not items: return ""
+def _pick(cands: list[dict], n: int) -> list[dict]:
+    seen, out, extra = set(), [], []
+    for v in cands:
+        if v["id"] in seen: continue
+        seen.add(v["id"]); (out if v["ch"] not in {x["ch"] for x in out} else extra).append(v)   # 채널이 겹치지 않게 먼저
+    return (out + extra)[:n]
+
+
+def bgm(date: str, n: int = 5) -> dict[str, list[dict]]:
+    """단추별 BGM — {단추 이름: [유튜브 5개]}. 그 때(날짜·예배)마다 한 번 찾아 out/bgm/<때>.json 에 둔다. 주마다 찾는 말을 돌린다."""
+    import datetime as dt, svc
+    f = HERE / "out" / "bgm" / f"{date}.json"
+    old = json.loads(f.read_text()) if f.exists() else {}
+    if isinstance(old, list): old = {"경쾌한 CCM": old}          # 예전 꼴(목록 하나) = 경쾌한 CCM
+    wk = dt.date.fromisoformat(svc.ymd(date)).isocalendar()[1]
+    cats = {}
+    for name, qs in BGM_CATS.items():
+        if old.get(name): cats[name] = old[name]; continue
+        got = []
+        for q in (qs[wk % len(qs)], qs[(wk + 3) % len(qs)]): got += _yt(q)
+        cats[name] = _pick(got, n)
+    if any(cats.values()):
+        f.parent.mkdir(parents=True, exist_ok=True); f.write_text(json.dumps(cats, ensure_ascii=False, indent=1))
+    return cats
+
+
+def bgm_html(cats, first: str = "") -> str:
+    if isinstance(cats, list): cats = {"경쾌한 CCM": cats}
+    cats = {k: v for k, v in (cats or {}).items() if v}
+    if not cats: return ""
+    first = first if first in cats else next(iter(cats))
     tm = lambda s: f"{s // 3600}시간 {s % 3600 // 60}분" if s >= 3600 else f"{s // 60}분"
-    cards = "".join(f'<button class="bgmc" data-id="{html.escape(v["id"])}"><img src="https://i.ytimg.com/vi/{html.escape(v["id"])}/mqdefault.jpg" alt="" loading="lazy">'
-                    f'<span>{html.escape(v["title"])}</span><small>{html.escape(v["ch"])} · {tm(v["sec"])}</small></button>' for v in items)
-    return ('<div id="bgmbox"><div class="bgmh"><b>🎵 BGM · 성도의 교제를 위한 찬양</b><span id="bgmnow"></span><button class="bgmx" onclick="bgmClose()">닫기 (음악은 계속)</button></div>'
-            '<div id="bgmmode"></div><div id="bgmplay"></div><div class="bgml">' + cards + '</div><p class="bgmnote">누르면 BGM 전용 새 창(두 번째 모니터)에서 나옵니다 · 슬라이드를 넘기거나 다른 순서로 가도 음악은 계속 · 끝낼 때 ■ BGM 멈춤</p></div>'
+    card = lambda v: (f'<button class="bgmc" data-id="{html.escape(v["id"])}"><img src="https://i.ytimg.com/vi/{html.escape(v["id"])}/mqdefault.jpg" alt="" loading="lazy">'
+                      f'<span>{html.escape(v["title"])}</span><small>{html.escape(v["ch"])} · {tm(v["sec"])}</small></button>')
+    tabs = "".join(f'<button type="button" class="bgmt{" on" if k == first else ""}" data-cat="{html.escape(k)}">{html.escape(k)}</button>' for k in cats)
+    lists = "".join(f'<div class="bgml{" on" if k == first else ""}" data-cat="{html.escape(k)}">' + "".join(card(v) for v in L) + '</div>' for k, L in cats.items())
+    return ('<div id="bgmbox"><div class="bgmh"><b>🎵 BGM</b><span id="bgmnow"></span><button class="bgmx" onclick="bgmClose()">닫기 (음악은 계속)</button></div>'
+            '<div class="bgmtabs">' + tabs + '</div><div id="bgmmode"></div><div id="bgmplay"></div>' + lists + '<p class="bgmnote">누르면 BGM 전용 새 창(두 번째 모니터)에서 나옵니다 · 슬라이드를 넘기거나 다른 순서로 가도 음악은 계속 · 끝낼 때 ■ BGM 멈춤</p></div>'
             """<script>
 // 🎵 BGM 단추·목차 → 슬라이드 화면과 따로, 두 번째 모니터에 BGM 전용 창(목록 + 재생)을 연다 (2026-10-04 교장님)
-function bgmOpen(){ const items=[...document.querySelectorAll('#bgmbox .bgmc')].map(c=>({id:c.dataset.id,title:c.querySelector('span').textContent,ch:(c.querySelector('small').textContent.split(' · ')[0]||'')}));
+function bgmOpen(){ const items=[...document.querySelectorAll('#bgmbox .bgml.on .bgmc')].map(c=>({id:c.dataset.id,title:c.querySelector('span').textContent,ch:(c.querySelector('small').textContent.split(' · ')[0]||'')}));
   const o=window.WS_OTHER, f=o?('popup,left='+o.availLeft+',top='+o.availTop+',width='+o.availWidth+',height='+o.availHeight):'popup,width=1280,height=720';
   const w=window.open('/jegok_worship/bgm.html#'+encodeURIComponent(JSON.stringify(items)),'wsbgm',f);
   if(w){ wsBgm.w=w; wsBgm.id='list'; try{w.focus();}catch(e){} wsBgmBtn(); return; }
@@ -480,7 +509,11 @@ async function bgmOpenScreen(){ if(typeof present==='function'){ await present()
 function bgmClose(){ document.body.classList.remove('bgm'); const b=document.querySelector('#toc a.bgm'); if(b) b.classList.remove('on'); }
 addEventListener('DOMContentLoaded',()=>{
   const t=document.querySelector('#toc a.bgm'); if(t) t.onclick=e=>{ e.preventDefault(); t.blur(); bgmOpen(); };
-  document.querySelector('#bgmbox .bgml').onclick=e=>{ const c=e.target.closest('.bgmc'); if(!c) return;
+  // 단추(기도용 CCM 경건·열정 / 경쾌한 CCM / JAZZ CCM)를 누르면 그 5개가 보인다
+  document.querySelectorAll('#bgmbox .bgmt').forEach(b=>b.onclick=()=>{ const k=b.dataset.cat;
+    document.querySelectorAll('#bgmbox .bgmt').forEach(x=>x.classList.toggle('on',x===b));
+    document.querySelectorAll('#bgmbox .bgml').forEach(x=>x.classList.toggle('on',x.dataset.cat===k)); });
+  document.getElementById('bgmbox').onclick=e=>{ const c=e.target.closest('.bgmc'); if(!c) return;
     document.querySelectorAll('.bgmc').forEach(x=>x.classList.toggle('on',x===c));
     const name=c.querySelector('span').textContent.slice(0,40), P=document.getElementById('bgmplay');
     if(bgmScreen()) bc.postMessage({bgmStop:1});      // 예전 방식(프레젠테이션 위 덮개)이 떠 있으면 걷는다
@@ -497,7 +530,9 @@ BGM_CSS = """
 body.bgm #bgmbox{display:block}body.pv #bgmbox{z-index:60;left:0}body.pr #bgmbox{display:none!important}
 .bgmh{display:flex;align-items:center;gap:12px;margin-bottom:12px}.bgmh b{font-size:18px}#bgmnow{flex:1;color:#f6c76b;font-size:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .bgmx{font:700 13px inherit;border:0;border-radius:999px;padding:7px 14px;background:#fff;color:#111;cursor:pointer}
-#bgmmode{color:#cbd5e1;font-size:13.5px;margin:-4px 0 12px}#bgmmode .bgmx{margin-left:8px}
+#bgmmode{color:#cbd5e1;font-size:13.5px;margin:-4px 0 12px}
+.bgmtabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.bgmt{font:700 14px inherit;border:1px solid #334155;border-radius:999px;padding:8px 16px;background:#1e293b;color:#cbd5e1;cursor:pointer}
+.bgmt.on{background:#f6c76b;border-color:#f6c76b;color:#0b1430}#bgmbox .bgml:not(.on){display:none}#bgmmode .bgmx{margin-left:8px}
 .bgmon{display:flex;align-items:center;gap:12px;justify-content:center;background:#1e293b;border:1px solid #f6c76b;border-radius:10px;padding:18px;margin:0 auto 14px;max-width:960px;font-weight:700;color:#f6c76b}
 #bgmplay iframe{width:min(100%,960px);aspect-ratio:16/9;border:0;border-radius:10px;display:block;margin:0 auto 14px;background:#000}
 .bgml{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
@@ -799,7 +834,9 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
     if not date and m:                            # 날짜를 안 받았으면 제목(「10월 11일」)에서
         import datetime as dt
         mo, da = map(int, re.findall(r"\d+", m.group(0))); date = f"{dt.date.today().year}-{mo:02d}-{da:02d}"
-    items = bgm(date) if date else []
+    items = bgm(date) if date else {}
+    import svc as _svc
+    first_bgm = "기도용 CCM(경건)" if (date and _svc.service_of(date)["id"] == "dawn") else "경쾌한 CCM"   # 새벽예배는 경건한 기도 찬양부터
     if items:
         toc += '<a href="#bgm" class="bgm">🎵 BGM</a>'
         sub += '<button class="sub" onclick="bgmOpen()">🎵 BGM</button>'
@@ -815,7 +852,7 @@ def render(slides: list[dict], title: str, dl: str, songs: list[str] | None = No
                "const set=(id,on)=>{ const b=document.getElementById(id); if(b) b.classList.toggle('on',on); };"
                "set('b-pv',pv); set('b-grid',!pv); };"
                "new MutationObserver(sync).observe(document.body,{attributes:true,attributeFilter:['class']}); sync(); });</script>")
-    nav = nav_pv + wsnav.nav("ppt", m.group(0) if m else title, sub, dls, day=date) + f"<script>{wsnav.JS}</script>" + bgm_html(items) + f"<script>{CHAT_JS}</script><script>{XP_JS}</script>"
+    nav = nav_pv + wsnav.nav("ppt", m.group(0) if m else title, sub, dls, day=date) + f"<script>{wsnav.JS}</script>" + bgm_html(items, first_bgm) + f"<script>{CHAT_JS}</script><script>{XP_JS}</script>"
     return PAGE.format(title=html.escape(title), n=len(slides), slides=sl, toc=toc, dl=dl, nav=nav, navcss=wsnav.CSS + BGM_CSS + CHAT_CSS + XP_CSS,
                        data=json.dumps(data, ensure_ascii=False, separators=(",", ":")), pvjs=_news_globals(date) + PVJS)
 
