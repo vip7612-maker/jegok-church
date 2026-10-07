@@ -163,6 +163,10 @@ def make(date: str, sid: str) -> Path:
     S = copy.deepcopy(T["slides"])
     info = jubo_info(date)
     y, m, d = date.split("-")
+    import order_sync                                   # 예배순서(예배준비 화면)가 기준 — 맡은 분·제목·본문은 순서 값이 주보보다 먼저 (2026-10-07 교장님)
+    row = order_sync.load(date) if y != "2000" else None
+    items = json.loads(row["items"]) if row and row.get("items") else None
+    if items: info = order_sync.order_info(items, info)
     out_slides = []
     for s in S:
         f = flat(s)
@@ -195,6 +199,7 @@ def make(date: str, sid: str) -> Path:
                 out_slides.append({"n": 0, "w": s["w"], "h": s["h"], "img": "news_bg", "texts": txt, "plain": "", "hidden": ""})
             continue
         out_slides.append(s)
+    out_slides = order_sync.restructure(out_slides, items, info)   # 예배순서대로 표지·딸린 장을 다시 놓는다(없으면 템플릿 순서)
     folder = publish.SITE / "d" / sid; sd = folder / "slides"
     if sd.exists(): shutil.rmtree(sd)
     sd.mkdir(parents=True)
@@ -206,6 +211,8 @@ def make(date: str, sid: str) -> Path:
     for n, s in enumerate(out_slides, 1): s["n"] = n
     out_slides = slides.add_song_frames(out_slides, date, sd)
     out_slides = slides.add_extra(out_slides, date, sd)
+    if y != "2000": print(order_sync.write_back(date, order_sync.sections(out_slides), row))   # PPT → 예배순서
+    for s_ in out_slides: s_.pop("_sec", None)
     title = f"예배 PPT 템플릿 ({TPL.parent.name})" if y == "2000" else f"{int(m)}월 {int(d)}일 주일예배 PPT"
     note = "" if info else '<span style="color:#fbbf24;font-size:12px">주보가 오면 맡은 분·설교·봉독·소식이 채워집니다</span>'
     # date= 를 꼭 넘긴다 — 빠지면 ＋ 장 넣기·교회 소식 고치기·끼운 장 불러오기가 모두 꺼진다(10/11 PPT 에서 빠졌던 것, 2026-10-07 교장님)

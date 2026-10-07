@@ -118,3 +118,6 @@ if __name__ == "__main__":
             uploads.run()
             import ppt_pages                           # 예배 PPT 「＋ 장 넣기」 🎨 AI 디자인 페이지
             ppt_pages.run()
+            import order_sync                          # 예배순서 ↔ 주보 ↔ PPT (주보 읽기·확정한 순서로 PPT 다시 만들기, 2026-10-07)
+            try: order_sync.sync()
+            except Exception as e: print("order_sync:", e, file=sys.stderr)

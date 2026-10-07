@@ -974,31 +974,47 @@ def add_extra(slides: list[dict], date: str, out: Path | None = None) -> list[di
         extra = json.loads((HERE / "data" / f"{date}.json").read_text()).get("ppt_extra", [])
     except Exception:
         return slides
+    return insert_extra(slides, extra, out, date)
+
+
+def make_cover(base: dict, title: str = "", label: str = "", name: str = "", sub: str = "") -> dict:
+    """순서 표지 한 장 — base(같은 디자인 표지)의 배경을 빌려 글자만 바꾼다(그 주에만 끼우는 순서·예배순서에서 새로 넣은 순서)."""
+    s = json.loads(json.dumps(base)); s.pop("_sec", None); texts = []
+    for t in s["texts"]:
+        if t["s"] >= 100: val = title
+        elif t["s"] < 30 and t["y"] < 300: val = label
+        elif 40 <= t["s"] < 100: val = name
+        else: val = sub
+        if not val: continue
+        cx = t["x"] + t["w"] / 2; w = t["w"] * max(1.0, len(val) / max(1, len(t["t"])))
+        texts.append({**t, "t": val, "w": int(w), "x": int(cx - w / 2)})
+    s.update(texts=texts, plain=" ".join(t["t"] for t in texts), hidden="")
+    return s
+
+
+def insert_extra(slides: list[dict], extra: list[dict], out: Path | None, date: str = "") -> list[dict]:
     flat = lambda s: re.sub(r"\s", "", s["plain"])
+    big = lambda s: next((re.sub(r"\s", "", t["t"]) for t in s.get("texts", []) if t.get("s", 0) >= 100), "")
     for x in extra:
-        base = next((s for s in slides if flat(s).startswith(x.get("base", "ScriptureReading"))), None)
-        k = next((i for i, s in enumerate(slides) if flat(s).startswith(x["after"])), None)
-        if base is None or k is None: continue
-        s = json.loads(json.dumps(base)); texts = []
-        for t in s["texts"]:
-            if t["s"] >= 100: val = x.get("title", "")
-            elif t["s"] < 30 and t["y"] < 300: val = x.get("label", "")
-            elif 40 <= t["s"] < 100: val = x.get("name", "")
-            else: val = x.get("sub", "")
-            if not val: continue
-            cx = t["x"] + t["w"] / 2; w = t["w"] * max(1.0, len(val) / max(1, len(t["t"])))
-            texts.append({**t, "t": val, "w": int(w), "x": int(cx - w / 2)})
-        s.update(texts=texts, plain=" ".join(t["t"] for t in texts), hidden="")
-        add = [s]
+        same = next((i for i, s in enumerate(slides) if big(s) and big(s) == re.sub(r"\s", "", x.get("title", ""))), None)
+        if same is not None:           # 예배순서에 이미 이 순서가 있다(PPT → 예배순서로 적힌 뒤) — 표지는 두지 않고 보고 자료 장만 그 표지 뒤에 (2026-10-07)
+            k, add = same, []
+        else:
+            base = next((s for s in slides if flat(s).startswith(x.get("base", "ScriptureReading"))), None)
+            k = next((i for i, s in enumerate(slides) if flat(s).startswith(x["after"])), None)
+            if base is None or k is None: continue
+            s = make_cover(base, x.get("title", ""), x.get("label", ""), x.get("name", ""), x.get("sub", ""))
+            s["_sec"] = {"t": x.get("title", ""), **({"who": x["name"]} if x.get("name") else {})}   # 예배순서에 다시 적힐 줄
+            add = [s]
         # 보고 자료(PDF)가 있으면 장마다 그림 한 장씩 표지 뒤에 이어 붙인다 — 글자까지 원본 그대로 (2026-10-03 디마 선교사 몽골 단기선교 보고)
-        src = HERE / "extra" / date / x["pdf"] if x.get("pdf") else None
+        src = HERE / "extra" / date / x["pdf"] if x.get("pdf") and date else None
         if src and src.exists() and out is not None:
             import fitz
             doc = fitz.open(src); tag = re.sub(r"\W", "", x.get("name", "extra"))[:8] or "extra"
             for i, pg in enumerate(doc, 1):
                 name = f"x_{tag}_{i:02d}.jpg"
                 pg.get_pixmap(matrix=fitz.Matrix(1920 / pg.rect.width, 1920 / pg.rect.width)).save(str(out / name), jpg_quality=88)
-                add.append({"n": 0, "w": s["w"], "h": s["h"], "img": name, "texts": [], "plain": "", "hidden": ""})
+                add.append({"n": 0, "w": slides[k]["w"], "h": slides[k]["h"], "img": name, "texts": [], "plain": "", "hidden": ""})
         slides[k + 1:k + 1] = add
     for n, s in enumerate(slides, 1): s["n"] = n
     return slides
