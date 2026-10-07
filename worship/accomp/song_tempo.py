@@ -100,6 +100,22 @@ def build(table: dict, titles: dict[str, str], reco: dict[str, tuple[str, str]],
     return out
 
 
+def score_keys() -> dict[str, list[str]]:
+    """곡마다 악보가 있는 코드(악보 DB scores) — 추천·검색의 [C·D·E·F·G·A·B] 나누기 (2026-10-07 교장님)."""
+    import wadmin
+    out: dict[str, set] = {}
+    for r in wadmin.batch([("SELECT title, key FROM scores WHERE key IS NOT NULL AND key<>''", [])])[0]:
+        out.setdefault(key(r["title"]), set()).add(r["key"])
+    return {k: sorted(v) for k, v in out.items()}
+
+
+def add_keys(table: dict, keys: dict[str, list[str]]) -> dict:
+    for k, v in table.items():
+        if keys.get(k): v["keys"] = keys[k]
+        else: v.pop("keys", None)
+    return table
+
+
 def update(dry: bool = False, run=None) -> str:
     table = json.loads(TABLE.read_text()) if TABLE.exists() else {}
     titles, reco = all_titles(), from_reco()
@@ -110,6 +126,8 @@ def update(dry: bool = False, run=None) -> str:
     # 추천 값이 새로 생긴 곡은 빠르기를 추천 값으로 맞춘다(manual 제외)
     for k, (t, tempo) in reco.items():
         if k in table and table[k].get("by") == "claude": table[k].update(tempo=tempo, by="reco")
+    try: table = add_keys(table, score_keys())
+    except Exception as e: print("악보 코드 못 읽음:", e, file=sys.stderr)
     TABLE.write_text(json.dumps(table, ensure_ascii=False, indent=0))
     return f"곡 빠르기 표 {len(table)}곡(새로 {len(cls)}) · 주제곡 {sum(1 for v in table.values() if v.get('deep'))}"
 

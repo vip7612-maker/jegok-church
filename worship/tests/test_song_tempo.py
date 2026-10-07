@@ -24,6 +24,11 @@ class TempoTests(unittest.TestCase):
         self.assertEqual(out[k2], {"t": "나", "tempo": "중간곡", "deep": True, "by": "claude"})
         self.assertEqual(out[k3]["by"], "manual"); self.assertEqual(out[k3]["tempo"], "느린곡")   # 손으로 고친 값은 그대로
 
+    def test_add_keys(self):
+        k1, k2 = T.key("가"), T.key("나")
+        t = T.add_keys({k1: {"t": "가", "tempo": "빠른곡"}, k2: {"t": "나", "tempo": "느린곡", "keys": ["C"]}}, {k1: ["F", "G"]})
+        self.assertEqual(t[k1]["keys"], ["F", "G"]); self.assertNotIn("keys", t[k2])   # 악보가 없어진 곡은 코드도 뺌
+
 
 if __name__ == "__main__":
     unittest.main()
