@@ -93,8 +93,7 @@ def r1(cur: str, when: str, date: str | None = None, prep_js: bool = False, day:
     root = f"{PUBLIC}/{date.replace('-', '')}/" if date else "./"
     def tab(key, name, href):
         return f'<a class="tab{" cur" if key == cur else ""}" href="{href}">{name}</a>'
-    prep = ('<button class="tab" data-mode="prep" onclick="wsPrep()">🔒 준비</button>' if prep_js
-            else f'<a class="tab" href="{root}#prep">🔒 준비</a>')
+    prep = ''   # 2026-10-07 교장님: 맨 위 🔒 준비(잠금 메뉴)는 없앰 — 예배준비는 첫 화면 [예배준비] → prep.html
     lib = (f'<details class="lib"><summary class="tab{" cur" if cur in ("jubo", "song") else ""}">자료실 ▾</summary><div class="menu">'
            f'<a href="{root}jubo.html"{" class=on" if cur == "jubo" else ""}>📰 주보</a>'
            f'<a href="{PUBLIC}/song.html"{" class=on" if cur == "song" else ""}>🎼 악보와 PPT</a></div></details>')

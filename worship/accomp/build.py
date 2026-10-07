@@ -184,7 +184,7 @@ body.prep{overflow:hidden}body.prep #prep{display:block}
 @media print{.shead button.skey{opacity:1}}
 .shead a.stt{text-decoration:underline;text-decoration-color:#93c5fd;text-underline-offset:2px}.shead a.stt .yt{font-size:8pt;color:#dc2626}
 @media print{.shead a.stt{text-decoration:none}.shead a.stt .yt{display:none}}
-@media screen and (max-width:1150px){.page{zoom:calc(100vw / 1150px)}}
+
 """
 
 VIEW = r"""
@@ -244,6 +244,8 @@ VIEW = r"""
     go(cur); setTimeout(fit,60);
   }
   window.wsMode=mode;
+  // 2026-10-07 교장님: 악보집은 처음부터 한 장씩 보기로(「한 장씩」 메뉴는 없앰). 예배용 넘기기에서 나오면 다시 한 장씩
+  addEventListener('load',()=>{ if(!document.body.classList.contains('pr')) mode('sv'); });
   // 공유본은 맨 위에 다운로드 단추 줄(.dlbar)이 따로 붙는다 — 우리 막대는 그 바로 아래에 붙어 함께 고정
   function stick(){const dl=document.querySelector('.dlbar'),bar=document.querySelector('.bar');if(bar)bar.style.top=(dl?dl.offsetHeight:0)+'px'}
   stick(); addEventListener('resize',stick);
@@ -253,13 +255,13 @@ VIEW = r"""
     if(['ArrowRight','ArrowDown','PageDown',' ','Enter'].includes(e.key)){e.preventDefault();go(cur+1)}
     else if(['ArrowLeft','ArrowUp','PageUp','Backspace'].includes(e.key)){e.preventDefault();go(cur-1)}
     else if(e.key==='Home') go(0); else if(e.key==='End') go(pages.length-1);
-    else if(e.key==='Escape') mode('doc');
+    else if(e.key==='Escape') mode('sv');
   });
   stage.addEventListener('click',e=>{ if(!document.body.classList.contains('pr')) return;
     go(cur+(e.clientX>innerWidth/2?1:-1)); });
   let x0=null; stage.addEventListener('touchstart',e=>x0=e.touches[0].clientX,{passive:true});
   stage.addEventListener('touchend',e=>{ if(x0===null) return; const dx=e.changedTouches[0].clientX-x0; if(Math.abs(dx)>40) go(cur+(dx<0?1:-1)); x0=null; });
-  document.addEventListener('fullscreenchange',()=>{ if(!document.fullscreenElement && document.body.classList.contains('pr')) mode('doc'); });
+  document.addEventListener('fullscreenchange',()=>{ if(!document.fullscreenElement && document.body.classList.contains('pr')) mode('sv'); });
   addEventListener('resize',fit);
   const start=()=>{ if(location.hash==='#slides') mode('sv'); else if(location.hash==='#present') mode('pr'); };
   (document.fonts?document.fonts.ready:Promise.resolve()).then(start);
@@ -441,6 +443,10 @@ window.wsKey = function(b){   // 두 코드 악보 — 누른 코드의 악보�
 function wsFit(){document.querySelectorAll('.pages .body').forEach(b=>{let s=parseFloat(b.dataset.max||16);b.style.fontSize=s+'pt';
   while((b.scrollHeight>b.clientHeight+1||b.scrollWidth>b.clientWidth+1)&&s>6){s-=.25;b.style.fontSize=s+'pt'}})}
 wsFit(); if(document.fonts) document.fonts.ready.then(wsFit);
+// 휴대폰·좁은 화면: 쪽을 화면 폭에 맞춰 줄인다. CSS calc(100vw / 1150px) 는 휴대폰 브라우저가 못 읽어 오른쪽이 잘렸다 (2026-10-07)
+function wsZoom(){var z=Math.min(1,(document.documentElement.clientWidth||innerWidth)/1150);
+  document.querySelectorAll('.pages > .page').forEach(function(p){p.style.zoom=z<1?String(z):'';});}
+wsZoom(); addEventListener('resize',wsZoom);
 """
 
 
@@ -751,7 +757,7 @@ def build(date: str) -> Path:
 <title>{html.escape(d["title"])}</title><meta name="description" content="제곡교회 예배팀 · {int(date[5:7])}월 {int(date[8:10])}일 주일예배 예배자 악보 {len(d["pages"])}쪽">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
 <style>{CSS}{wsnav.CSS}{themes.css(d)}</style></head><body>
-{wsnav.nav("score", wsnav.label(date), '<button class="sub on" data-mode="doc" onclick="wsMode(\'doc\')">📖 악보집</button><button class="sub" data-mode="sv" onclick="wsMode(\'sv\')">▣ 한 장씩</button><button class="sub" data-mode="pr" onclick="wsMode(\'pr\')">▶ 예배용 넘기기</button>', [("📄 HWPX 받기", "doc.hwpx"), ("📕 PDF 받기", "js:wsPdf()")], prep_js=True, day=date)}
+{wsnav.nav("score", wsnav.label(date), '<button class="sub on" data-mode="sv" onclick="wsMode(\'sv\')">📖 악보집</button><button class="sub" data-mode="pr" onclick="wsMode(\'pr\')">▶ 예배용 넘기기</button>', [("📄 HWPX 받기", "doc.hwpx"), ("📕 PDF 받기", "js:wsPdf()")], prep_js=True, day=date)}
 <main class="pages">{pages}</main><div id="sv"><aside id="rail"></aside><div id="split" title="끌어서 폭 조절"></div><div id="stage"><span id="hint">← → 방향키로 넘김 · Esc 나가기</span><span id="pn"></span></div></div>{prep_html(d, date)}<script data-share>{wsnav.JS}</script><script data-share>{FIT}</script><script data-share>{VIEW}</script><script data-share>{PREP}</script><script data-share>{BOARD}</script><script data-share>{PDF_JS.replace("@@NAME@@", f"{date} 예배자 악보.pdf")}</script></body></html>"""
     out = HERE / "out" / f"{date}.html"; out.parent.mkdir(exist_ok=True); out.write_text(doc)
     return out

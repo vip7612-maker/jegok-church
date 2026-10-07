@@ -14,7 +14,7 @@ async function call(method, { query = {}, body = null, ip = '10.9.9.' + Math.flo
   const sc = out.headers['set-cookie']; if (sc) cookie = sc.split(';')[0].endsWith('=') ? '' : sc.split(';')[0];
   return out;
 }
-const clean = () => api.batch([['DELETE FROM wor_users WHERE church=?', [C]], ['DELETE FROM wor_settings WHERE church=?', [C]], ['DELETE FROM wor_assign WHERE church=?', [C]]]);
+const clean = () => api.batch([['DELETE FROM wor_order WHERE church=?', [C]], ['DELETE FROM wor_users WHERE church=?', [C]], ['DELETE FROM wor_settings WHERE church=?', [C]], ['DELETE FROM wor_assign WHERE church=?', [C]]]);
 let n = 0; let r0; const ok = (c, m) => { assert.ok(c, m); n++; };
 try {
   await call('GET', { query: { info: 'jegok' } });      // 표 만들기
@@ -61,6 +61,21 @@ try {
   ok(r.code === 200 && r.body.key === '4321', '이름+비밀번호로 맡은 금요일 준비 열림');
   r = await call('POST', { body: { action: 'prep', church: C, date: '2026-10-11' } });
   ok(r.code === 403, '맡지 않은 주일은 여전히 막힘');
+  // 예배순서: 맡은 날은 기본 순서가 오고, 저장·확정이 된다 · 맡지 않은 날은 막힘
+  r = await call('GET', { query: { order: C, date: '2026-10-09' } });
+  ok(r.code === 200 && !r.body.saved && r.body.items.some(x => x.t === '설교'), '금요일 기본 순서(저장 전)');
+  r = await call('POST', { body: { action: 'order', church: C, date: '2026-10-09', items: [{ t: '찬양' }, { t: '기도' }, { t: '' }], confirm: true } });
+  ok(r.code === 200 && r.body.items.length === 2 && r.body.confirmed, '순서 저장·확정(빈 칸은 버림)');
+  r = await call('GET', { query: { order: C, date: '2026-10-09' } });
+  ok(r.body.saved && r.body.items[1].t === '기도' && r.body.by === '김인도', '저장한 순서를 다시 읽음');
+  r = await call('GET', { query: { order: C, date: '2026-10-11' } });
+  ok(r.code === 403, '맡지 않은 주일 순서는 못 봄');
+  r = await call('POST', { body: { action: 'prep', church: C, date: '2026-10-09' } });
+  ok(r.body.conti_key && r.body.conti_key.length === 32, '준비 열쇠와 함께 콘티 열쇠');
+  const saveCookie = cookie; cookie = '';
+  r = await call('GET', { query: { order: C, date: '2026-10-09' } });
+  ok(r.code === 401, '로그인 없으면 순서 못 봄');
+  cookie = saveCookie;
   // 틀린 비밀번호 여러 번 → 막힘
   const ip = '10.8.8.8';
   for (let i = 0; i < 5; i++) await call('POST', { ip, body: { action: 'login', church: C, name: '김인도', pw: 'wrong-' + i } });
