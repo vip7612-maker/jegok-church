@@ -88,6 +88,15 @@ def bg_html(style: str, kind: str, no: str = "") -> str:
             f'<body><div class="s">{body}</div></body></html>')
 
 
+def cover_bg(style: str, out: Path) -> Path:
+    """표지 배경만(영문·러시아어 줄·장식선 없이) — 악보집 표지 바탕으로 쓴다(2026-10-07 교장님: 악보집 표지는 늘 PPT 배경과 같게)."""
+    f = out / "k_cover_bg.jpg"
+    if not f.exists():
+        h = re.sub(r'<div class="(?:sub|line|bar)"[^>]*>[^<]*</div>', "", bg_html(style, "cover"))
+        render({"k_cover_bg": h}, out)
+    return f
+
+
 def render(htmls: dict[str, str], out: Path) -> None:
     """{이름: html} → out/<이름>.jpg (1920×1080)."""
     from PIL import Image

@@ -39,6 +39,22 @@ THEMES = {"keynote": KEYNOTE}
 
 # 예배 PPT 템플릿 → 악보집 테마. 악보집에 테마를 따로 안 정했으면 늘 지금 쓰는 PPT 템플릿을 따른다(2026-10-07 교장님: PPT 를 기준으로)
 TPL_THEME = {3: "keynote"}
+TPL_STYLE = {3: "A", 4: "B", 5: "C"}
+
+
+def cover_bg_css(style: str) -> str:
+    """템플릿 표지 배경 그림(글자 없음, ppt_tpl 이 slides/k_cover_bg.jpg 로 둔다)을 악보집 표지 바탕으로 — 글자 색은 그 템플릿 색.
+    키노트(A)는 손으로 맞춘 KEYNOTE 를 쓰고, 그 밖의 템플릿(B 그랜드 스테이지·C 라이트 에디토리얼)은 이것으로 늘 PPT 와 같은 모습."""
+    import tpl_design as T
+    st = T.STYLE[style]
+    eb, title, small, body = st["eyebrow"][0], st["title"][0], st["small"][0], st["body"][0]
+    return f"""
+/* ── 테마: PPT 템플릿 {style} 표지 배경 그대로 ── */
+.cover{{background:#111 url('slides/k_cover_bg.jpg') center/cover no-repeat}}
+.cover svg.bg{{display:none}}
+.cover .kick{{color:{eb}}}.cover h1{{color:{title}}}.cover .sub{{color:{body}}}.cover .rule{{background:{st["ref"]}}}
+.cover .date{{border-color:{st["ref"]};color:{title}}}.cover .date small{{color:{small}}}.cover .ch{{color:{body}}}.cover .ch b{{color:{title}}}
+""" + (".cover h1{margin-top:20mm}   /* 라이트 에디토리얼: 위 25% 짙은 띠 아래로 제목 */\n" if style == "C" else "")
 
 
 def css(d: dict) -> str:
@@ -46,7 +62,11 @@ def css(d: dict) -> str:
     if not t:
         try:
             import tpl
-            t = TPL_THEME.get(tpl.current(), "")
+            n = tpl.current()
+            t = TPL_THEME.get(n, "") or (f"tpl:{TPL_STYLE[n]}" if n in TPL_STYLE else "")
         except Exception:
             t = ""
+    if t.startswith("tpl:"):
+        try: return cover_bg_css(t[4:])
+        except Exception: return ""
     return THEMES.get(t, "")

@@ -230,6 +230,12 @@ def make(date: str, sid: str) -> Path:
     folder = publish.SITE / "d" / sid; sd = folder / "slides"
     if sd.exists(): shutil.rmtree(sd)
     sd.mkdir(parents=True)
+    try:                                             # 악보집 표지 바탕(글자 없는 템플릿 표지) — 악보집이 늘 PPT 배경과 같게(2026-10-07)
+        import tpl_design
+        st_ = {"template3": "A", "template4": "B", "template5": "C"}.get(TPL.parent.name)
+        if st_: tpl_design.cover_bg(st_, TPL)
+    except Exception as e:
+        print("악보집 표지 바탕 못 그림:", e, file=sys.stderr)
     for f_ in TPL.glob("*.jpg"): shutil.copy(f_, sd / f_.name)
     if svc != "주일예배" and out_slides:               # 표지 그림에 박힌 「Sunday Worship」을 그 예배 이름으로(2026-10-07 교장님)
         try:
