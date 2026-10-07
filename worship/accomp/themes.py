@@ -20,6 +20,7 @@ KEYNOTE = f"""
 .cover .date{{border-color:{BLUE}}}.cover .date small{{color:{SKY}}}
 .cover .ch{{color:rgba(255,255,255,.5)}}
 .page:not(:has(.cover))::before{{content:'';position:absolute;left:0;right:0;top:0;height:1.6mm;z-index:4;background:linear-gradient(90deg,{NAVY} 0,#1d3bd1 70%,{SKY})}}
+#sv .page::before{{display:none!important}}   /* 한 장씩 보기·예배용 넘기기에서는 윗선을 뺀다 — 화면 맞춤 안에서 자리가 틀어져 가운데를 가로지르는 줄로 보였다(2026-10-07) */
 .tag{{background:{NAVY};color:{SKY}}}
 .rs-h{{border-bottom-color:{NAVY}}}.rs-h .kick{{color:{BLUE}}}.rs-h h2{{color:{NAVY};letter-spacing:-.01em}}
 .rs-h .range{{background:{NAVY};color:#fff}}
