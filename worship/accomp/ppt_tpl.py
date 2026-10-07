@@ -243,7 +243,9 @@ def make(date: str, sid: str) -> Path:
     for n, s in enumerate(out_slides, 1): s["n"] = n
     out_slides = slides.add_song_frames(out_slides, date, sd)
     out_slides = slides.add_extra(out_slides, date, sd)
-    if y != "2000": print(order_sync.write_back(date, order_sync.sections(out_slides), row))   # PPT → 예배순서
+    if y != "2000":
+        print(order_sync.write_back(date, order_sync.sections(out_slides), row))   # PPT → 예배순서
+        order_sync.save_smap(date, order_sync.smap_of(out_slides))                 # PPT 장 ↔ 예배순서 칸 짝(이름 고치기 양쪽으로)
     for s_ in out_slides: s_.pop("_sec", None)
     title = f"예배 PPT 템플릿 ({TPL.parent.name})" if y == "2000" else f"{int(m)}월 {int(d)}일 {svc} PPT"
     note = "" if info else '<span style="color:#fbbf24;font-size:12px">주보가 오면 맡은 분·설교·봉독·소식이 채워집니다</span>'

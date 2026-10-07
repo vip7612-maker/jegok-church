@@ -171,5 +171,20 @@ class SameDefaultTests(unittest.TestCase):
         for c in O.FIELDS: self.assertIn(c, h)
 
 
+class SmapTests(unittest.TestCase):
+    """PPT 장 ↔ 예배순서 칸 짝 — PPT 에서 이름을 고치면 예배순서도 (2026-10-07)."""
+    def test_smap(self):
+        items = [dict(x) for x in O.DEFAULT_SUN] + [{"t": "간증", "who": "홍길동"}]
+        out = O.restructure(deck(), items, {})
+        m = O.smap_of(out)
+        by = {(x["key"], x["nth"]): x for x in m}
+        pr = by[("대표기도", 0)]
+        self.assertEqual(out[pr["i"]]["texts"][pr["f"]["who"]]["t"], "정상진 장로")   # 대표기도 가운데 글자 = 맡은 분
+        self.assertEqual(pr["orig"], "\n".join(t["t"] for t in out[pr["i"]]["texts"]))
+        self.assertIn("ref", by[("성경봉독", 0)]["f"])                                 # 봉독 가운데 = 본문
+        self.assertIn(("간증", 0), by)                                                # 새로 넣은 순서도
+        self.assertNotIn(("찬양과경배", 0), by); self.assertNotIn(("사도신경", 0), by)   # 이름 칸이 없는 순서는 빼고
+
+
 if __name__ == "__main__":
     unittest.main()

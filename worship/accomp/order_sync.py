@@ -181,6 +181,40 @@ def restructure(slides: list[dict], items: list[dict] | None, info: dict) -> lis
     return out
 
 
+# PPT 표지에서 어느 글자가 어느 칸인가 — ppt_tpl.set_main/set_small 과 같은 자리
+FIELD_AT = {"성경봉독": {"ref": "main", "who": "small"}, "설교": {"title": "main", "who": "small"},
+            "대표기도": {"who": "main"}, "봉헌": {"who": "main"}, "특송": {"who": "main"}}
+_NO_FIELDS = {"찬양과경배", "찬양과결단", "사도신경", "교회소식", "축도", "성경암송"}
+
+
+def smap_of(slides: list[dict]) -> list[dict]:
+    """PPT 장 ↔ 예배순서 칸 짝(2026-10-07 교장님: PPT 에서 이름을 고치면 예배순서도, 예배순서에서 고치면 PPT 도).
+    [{i: 장 번호(0부터), key: 순서 열쇠(canon), nth: 같은 순서 몇 번째, f: {who|title|ref: 글자 번호}, orig: 만든 글자(줄바꿈으로 이음), texts: 만든 글자들}]"""
+    out, seen = [], {}
+    for i, s in enumerate(slides):
+        sec = s.get("_sec")
+        if not sec: continue
+        c = canon(sec["t"]); n = seen.get(c, 0); seen[c] = n + 1
+        tx = s.get("texts", [])
+        main = next((j for j, t in enumerate(tx) if 40 <= t.get("s", 0) < 100 and t.get("c") != "#efe6dd"), None)
+        small = next((j for j, t in enumerate(tx) if 20 <= t.get("s", 0) < 40 and t.get("y", 0) > 520), None)
+        spec = FIELD_AT.get(c) or ({} if c in _NO_FIELDS else {"who": "main"})   # 새로 넣은 순서(간증 등)는 가운데 글자가 맡은 분
+        f = {k: (main if w == "main" else small) for k, w in spec.items()}
+        f = {k: j for k, j in f.items() if j is not None}
+        if f:
+            texts = [str(t.get("t", "")) for t in tx]
+            out.append({"i": i, "key": c, "nth": n, "f": f, "orig": "\n".join(texts), "texts": texts})
+    return out
+
+
+def save_smap(date: str, smap: list[dict]) -> None:
+    try:
+        ensure()
+        _db([("UPDATE wor_order SET smap=? WHERE church=? AND date=?", [json.dumps(smap, ensure_ascii=False), CHURCH, date])])
+    except Exception as e:
+        print("PPT 짝 못 적음:", e, file=sys.stderr)
+
+
 def sections(slides: list[dict]) -> list[dict]:
     """PPT 에 실제로 들어간 순서(표지에 단 _sec) — 예배순서에 다시 적을 목록."""
     return [dict(s["_sec"]) for s in slides if s.get("_sec")]
@@ -194,7 +228,8 @@ def _db(stmts):
 
 _ALTERS = ["ALTER TABLE wor_order ADD COLUMN rev INTEGER DEFAULT 0", "ALTER TABLE wor_order ADD COLUMN built_rev INTEGER DEFAULT 0",
            "ALTER TABLE wor_order ADD COLUMN src TEXT", "ALTER TABLE wor_order ADD COLUMN jubo_done TEXT",
-           "ALTER TABLE wor_order ADD COLUMN reco_req TEXT"]   # reco_req: [추천곡에 반영]을 누른 때(맥미니가 만들면 비운다)
+           "ALTER TABLE wor_order ADD COLUMN reco_req TEXT",
+           "ALTER TABLE wor_order ADD COLUMN smap TEXT"]   # smap: PPT 장 ↔ 예배순서 칸 짝(PPT 에서 이름을 고치면 예배순서도, 거꾸로도)   # reco_req: [추천곡에 반영]을 누른 때(맥미니가 만들면 비운다)
 
 
 def ensure() -> None:

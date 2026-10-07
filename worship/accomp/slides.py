@@ -385,7 +385,11 @@ function repaint(i){ const sl=all.find(x=>+x.dataset.i===i); if(!sl) return; sl.
   if(document.body.classList.contains('pv')){ thR=null; go(cur,true); } fit(); }
 function applyNews(i,texts){ if(!D[i]) return; texts.forEach((t,j)=>{ if(D[i].texts[j]) D[i].texts[j].t=t; }); repaint(i); }
 if(bc){ const prev=bc.onmessage; bc.onmessage=e=>{ const m=e.data||{}; if(m.news){ applyNews(m.news.i,m.news.texts); return; } if(prev) prev(e); }; }
-fetch('/api/worship?news='+NDATE,{cache:'no-store'}).then(r=>r.json()).then(rows=>{ (rows||[]).forEach(r=>{ if(r.orig===ORIG[r.i]) applyNews(r.i,r.texts); }); }).catch(()=>{});
+// 고친 글자(교회 소식·이름) — 열 때, 그리고 30초마다(예배준비 화면에서 이름을 고치면 띄워 둔 PPT 에도, 2026-10-07)
+let lastNews='';
+function loadNews(){ fetch('/api/worship?news='+NDATE,{cache:'no-store'}).then(r=>r.text()).then(t=>{ if(t===lastNews) return; lastNews=t;
+  (JSON.parse(t)||[]).forEach(r=>{ if(r.orig===ORIG[r.i]) applyNews(r.i,r.texts); }); }).catch(()=>{}); }
+loadNews(); setInterval(loadNews,30000);
 if(!SCREEN&&EDIT.length){
   const st=document.createElement('style'); st.textContent=`#nbtn{position:fixed;right:18px;bottom:18px;z-index:60;display:none;font:800 16px 'Pretendard Variable',sans-serif;border:0;border-radius:999px;padding:12px 20px;background:#f6c76b;color:#3b2a06;box-shadow:0 4px 16px rgba(0,0,0,.4);cursor:pointer}
 #nbox{position:fixed;inset:0;z-index:70;display:none;background:rgba(0,0,0,.6);align-items:center;justify-content:center}
