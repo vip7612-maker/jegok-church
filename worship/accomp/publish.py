@@ -118,6 +118,15 @@ def index_page() -> None:
     (SITE / INDEX / "index.html").write_text(landing_html(items))
     # 「악보와 PPT」 곡 목록의 인도자 배지(2026-10-07 교장님: 한 번이라도 부른 곡엔 그 사람 이름표)
     roles = json.loads((HERE / "services.json").read_text()) if (HERE / "services.json").exists() else {}
+    # 예배준비 화면의 「말씀에 맞는 곡」 추천(conti.py 결과 out/YYYYMMDD-conti.json → reco/YYYYMMDD.json, 2026-10-07)
+    (SITE / INDEX / "reco").mkdir(exist_ok=True)
+    for f in sorted((HERE.parent / "out").glob("*-conti.json")):
+        try:
+            rec = json.loads(f.read_text()).get("rec") or {}
+            pick = lambda L: [{k: x.get(k, "") for k in ("title", "key", "tempo", "why")} for x in (L or [])]
+            (SITE / INDEX / "reco" / f"{f.name[:8]}.json").write_text(json.dumps({"theme": rec.get("theme", ""), "ccm": pick(rec.get("ccm")), "hymns": pick(rec.get("hymns"))}, ensure_ascii=False))
+        except Exception:  # noqa: BLE001
+            pass
     (SITE / INDEX / "song_leaders.json").write_text(json.dumps({"leaders": roles.get("leaders", []), "songs": song_leaders(items)}, ensure_ascii=False))
 
 
@@ -254,7 +263,7 @@ function hero(){const h=document.getElementById('hero');   // 주일예배
     h.innerHTML='<div class="row"><span class="tag live">● 오늘 · '+md(i.date)+'</span><span class="who">'+(i.leader.length?'인도 '+esc(i.leader.join(', ')):'')+'</span></div>'
       +'<a class="shot" href="'+i.ppt+'#pv" style="background-image:url(\''+i.cover+'\')"></a>'
       +'<h2>'+esc(i.title||'주일예배')+'</h2><p class="ref">'+esc(i.ref)+'</p>'
-      +'<div class="btns"><a class="p" href="'+i.book+'#prep">예배준비</a><a href="'+i.book+'">악보</a><a href="'+i.ppt+'#pv">PPT</a></div>';
+      +'<div class="btns"><a class="p" href="prep.html?d='+i.date.replace(/-/g,'')+'">예배준비</a><a href="'+i.book+'">악보</a><a href="'+i.ppt+'#pv">PPT</a></div>';
     return;}
   const up=sundays.filter(i=>i.date>TODAY).sort((a,b)=>a.date<b.date?-1:1)[0];
   const day=up?up.date:nextSunday();
@@ -264,7 +273,7 @@ function hero(){const h=document.getElementById('hero');   // 주일예배
     +'<div class="msg">함께 예배를 준비하는 동역자 여러분, 고맙습니다.<br> 이번 한 주도 말씀과 찬양으로 마음을 준비해 주세요.<br> 주일 아침, 기쁨으로 만나요.</div></div>'
     +(up?'<h2>'+esc(up.title||'주일예배')+'</h2><p class="ref">'+esc(up.ref)+'</p>'
       +(up.songs.length?'<ul class="chips">'+up.songs.map(s=>'<li>'+esc(s)+'</li>').join('')+'</ul>':'')
-      +'<div class="btns"><a class="p" href="'+up.book+'#prep">예배준비</a><a href="'+up.book+'">악보</a><a href="'+up.ppt+'">PPT</a></div>':'');}
+      +'<div class="btns"><a class="p" href="prep.html?d='+up.date.replace(/-/g,'')+'">예배준비</a><a href="'+up.book+'">악보</a><a href="'+up.ppt+'">PPT</a></div>':'');}
 const PAST0=ALL.filter(i=>i!==today&&i.date<=TODAY), PER=10;
 const KINDS=['주일','수요','금요'], NOREC='기록 없음';
 const kOf=i=>KINDS.includes(i.kind)?i.kind:'기타', lOf=i=>(i.leader&&i.leader.length)?i.leader:[NOREC];
@@ -306,10 +315,8 @@ function heroSvc(r){const v=r.v,h=document.getElementById('hero'),w=dayWord(r.da
 // 새벽·수요·금요도 [예배준비][악보][PPT] (2026-10-07 교장님). 그 예배 자료가 올라와 있으면 열리고, 아직이면 흐리게 막아 둔다.
 function svcBtns(k,d){const kind={dawn:'새벽',wed:'수요',fri:'금요'}[k], it=ALL.find(i=>i.date===d&&i.kind===kind&&(i.book||i.ppt));
   const b=(cls,href,t)=>href?'<a class="'+cls+'" href="'+href+'">'+t+'</a>':'<a class="'+cls+' off" aria-disabled="true" title="아직 올라오지 않았습니다">'+t+'</a>';
-  // 예배준비는 늘 열린다 (2026-10-07 국장님) — 그 예배 악보집이 없으면 가장 가까운 주일 악보집의 준비 탭으로
-  const pb=(it&&it.book)||(function(){const bs=ALL.filter(i=>i.book&&i.kind==='주일').sort((a,b)=>a.date<b.date?-1:1);
-    return ((bs.find(i=>i.date>=TODAY))||bs[bs.length-1]||{}).book||'';})();
-  return '<div class="btns">'+b('p',pb?pb+'#prep':'','예배준비')+b('',it&&it.book,'악보')+b('',it&&it.ppt,'PPT')+'</div>'
+  // 예배준비는 늘 열린다 (2026-10-07) — 그날의 예배준비 화면(prep.html: 예배순서·콘티준비·콘티확정)
+  return '<div class="btns">'+b('p','prep.html?d='+d.replace(/-/g,''),'예배준비')+b('',it&&it.book,'악보')+b('',it&&it.ppt,'PPT')+'</div>'
     +(it?'':'<p class="svmsg" style="margin-top:8px"><small>악보와 PPT는 준비되는 대로 열립니다.</small></p>');}
 const ROLES=JSON.parse(document.getElementById('roles').textContent||'{}');
 function roleOf(k,d){const r=Object.assign({},ROLES[k]||{},(ROLES.dates||{})[d]||{});return [r['인도']?'인도 '+r['인도']:'',r['설교']?'설교 '+r['설교']:''].filter(Boolean).join(' · ');}
