@@ -110,9 +110,19 @@ try {
   r = await call('POST', { body: { action: 'order', church: C, date: '2026-10-09', items: [{ t: '찬양' }], confirm: true } });
   ok(r.body.rev === rev0 + 1 && r.body.built_rev < r.body.rev, '확정하면 rev 하나 올림 → 맥미니가 PPT 를 다시 만들 차례');
   await api.batch([['UPDATE wor_order SET jubo_done=? WHERE church=? AND date=?', ['2026-10-07T00:00:00Z', C, '2026-10-09']]]);
-  await call('POST', { body: { action: 'jubo', church: C, date: '2026-10-09', name: '새 주보.pdf', url: `https://abc.public.blob.vercel-storage.com/jubo/${C}/2026-10-09/2.pdf` } });
+  // 첨부가 있으면 새로 올리지 못한다 — 지운 뒤에만(2026-10-07 교장님)
+  r = await call('POST', { body: { action: 'jubo', church: C, date: '2026-10-09', name: '새 주보.pdf', url: `https://abc.public.blob.vercel-storage.com/jubo/${C}/2026-10-09/2.pdf` } });
+  ok(r.code === 409 && r.body.error.includes('삭제하고 다시 첨부'), '첨부가 있으면 다시 올리기 막힘');
+  r = await tok('2026-10-09', `jubo/${C}/2026-10-09/3.pdf`);
+  ok(r.code === 403 && r.body.error.includes('삭제하고 다시 첨부'), '첨부가 있으면 올릴 열쇠도 없음');
+  r = await call('POST', { body: { action: 'jubo', church: C, date: '2026-10-09', del: true } });
+  ok(r.code === 200 && r.body.jubo === null, '첨부 지우기');
   r = await call('GET', { query: { order: C, date: '2026-10-09' } });
-  ok(r.body.jubo_done === '', '주보를 다시 올리면 맥미니가 읽을 차례');
+  ok(r.body.jubo === null && r.body.items.length > 0, '지워도 순서는 그대로');
+  r = await call('POST', { body: { action: 'jubo', church: C, date: '2026-10-09', name: '새 주보.pdf', url: `https://abc.public.blob.vercel-storage.com/jubo/${C}/2026-10-09/2.pdf` } });
+  ok(r.code === 200, '지운 뒤에는 새로 올림');
+  r = await call('GET', { query: { order: C, date: '2026-10-09' } });
+  ok(r.body.jubo_done === '', '새로 올리면 맥미니가 읽을 차례');
   ok(JSON.stringify(api.defaultOrder('2026-10-11').map(x => x.t)) === JSON.stringify(['성경암송', '찬양과 경배', '사도신경', '찬양과 경배', '대표기도', '교회소식', '봉헌', '성경봉독', '특송', '설교', '찬양과 결단', '축도']), '주일 기본 순서 = 템플릿 PPT 순서');
   // 교회 템플릿: 저장·목록·불러오기·지우기 — 날짜마다 바뀌는 제목·본문은 저장하지 않는다
   r = await call('POST', { body: { action: 'tpl_save', church: C, name: '금요예배', items: [{ t: '찬양' }, { t: '설교', who: '정영선 목사', title: '이번 주 제목', ref: '요 3:16' }] } });
