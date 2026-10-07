@@ -754,7 +754,7 @@ def build(date: str) -> Path:
             p.setdefault("title", st.get("title", "")); p.setdefault("ref", st.get("ref", ""))
     pages = "".join(page_html(i, p, date) for i, p in enumerate(d["pages"], 1))
     doc = f"""<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{html.escape(d["title"])}</title><meta name="description" content="제곡교회 예배팀 · {int(date[5:7])}월 {int(date[8:10])}일 주일예배 예배자 악보 {len(d["pages"])}쪽">
+<title>{html.escape(d["title"])}</title><meta name="description" content="제곡교회 예배팀 · {int(date[5:7])}월 {int(date[8:10])}일 {wsnav.svc_name(date)} 예배자 악보 {len(d["pages"])}쪽">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
 <style>{CSS}{wsnav.CSS}{themes.css(d)}</style></head><body>
 {wsnav.nav("score", wsnav.label(date), '<button class="sub on" data-mode="sv" onclick="wsMode(\'sv\')">📖 악보집</button><button class="sub" data-mode="pr" onclick="wsMode(\'pr\')">▶ 예배용 넘기기</button>', [("📄 HWPX 받기", "doc.hwpx"), ("📕 PDF 받기", "js:wsPdf()")], prep_js=True, day=date)}

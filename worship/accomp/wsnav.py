@@ -100,8 +100,18 @@ def r1(cur: str, when: str, date: str | None = None, prep_js: bool = False, day:
     day = day or date
     return (f'<div class="r1"{f" data-date={chr(34)}{day}{chr(34)}" if day else ""}><a class="ttl" href="{PUBLIC}/">🏠 제곡교회 예배 플랫폼</a>'
             f'<div class="tick" aria-live="polite" title="예배팀 소통 메시지 — PPT 왼쪽 채팅에서 체크하면 사라집니다"></div>'
-            f'<nav class="tabs"><a class="wk" href="{root}">{H.escape(when)} 주일예배</a>'
+            f'<nav class="tabs"><a class="wk" href="{root}">{H.escape(when)} {svc_name(day)}</a>'
             f'{tab("score", "악보", root)}{tab("ppt", "PPT", root + "ppt.html")}{lib}{prep}</nav></div>')
+
+
+def svc_name(day: str | None) -> str:
+    """날짜 → 예배 이름(새벽·수요·금요·주일). 날짜를 못 읽으면 주일예배 (2026-10-07 교장님)."""
+    try:
+        import re as _re, weekday
+        m = _re.search(r"(\d{4})-?(\d{2})-?(\d{2})", str(day or ""))
+        return weekday.service(f"{m.group(1)}-{m.group(2)}-{m.group(3)}") if m else "주일예배"
+    except Exception:
+        return "주일예배"
 
 
 def nav(cur: str, when: str, sub: str = "", dl: list[tuple[str, str]] | None = None,
