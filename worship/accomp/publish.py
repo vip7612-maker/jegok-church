@@ -183,6 +183,9 @@ def index_page() -> None:
             (SITE / INDEX / "reco" / f"{f.name[:8]}.json").write_text(json.dumps({"theme": rec.get("theme", ""), "ccm": pick(rec.get("ccm")), "hymns": pick(rec.get("hymns"))}, ensure_ascii=False))
         except Exception:  # noqa: BLE001
             pass
+    (SITE / "wd").mkdir(exist_ok=True)              # 다른 교회 첫 화면(예배 자료 없이 시작, 교회는 주소에서) — worship-desk /<교회>/ (2026-10-07)
+    (SITE / "wd" / "index.html").write_text(landing_html([]).replace("<title>제곡교회 예배 플랫폼</title>", "<title>예배 플랫폼</title>")
+                                             .replace('<h1 id="cname">제곡교회 예배 플랫폼</h1>', '<h1 id="cname">예배 플랫폼</h1>'))
     (SITE / INDEX / "song_leaders.json").write_text(json.dumps({"leaders": roles.get("leaders", []), "songs": song_leaders(items)}, ensure_ascii=False))
     try:                                   # 곡 빠르기 표 — 새 곡만 Claude 가 매긴다(추천 [빠른곡·중간곡·느린곡·주제곡] 나누기, 2026-10-07)
         import song_tempo
@@ -314,13 +317,17 @@ h3.sec{margin:28px 4px 10px;font-size:15px;color:#334155;display:flex;justify-co
 .roles{display:block;color:#475569;font-size:13px;margin-top:4px}
 @media(max-width:560px){.svc button{font-size:13.5px;padding:10px 2px 9px}.svc button small{font-size:10.5px}.ready{aspect-ratio:auto;min-height:220px}.ready .msg br{display:none}header{padding:24px 16px 80px}.go{display:none}.hero{padding:12px}.d{flex-basis:48px}}
 </style></head><body>
-<header><span class="k">JEGOK CHURCH · WORSHIP TEAM</span><h1>제곡교회 예배 플랫폼</h1></header>
+<header><span class="k" id="ck">JEGOK CHURCH · WORSHIP TEAM</span><h1 id="cname">제곡교회 예배 플랫폼</h1></header>
 <main><nav class="svc" id="svc" aria-label="예배 고르기"></nav><section class="hero" id="hero"></section>
 <h3 class="sec">지난 예배 <span id="cnt"></span></h3><div class="flt" id="flt"></div><div class="list" id="list"></div><div class="pg" id="pg"></div></main>
 <footer class="foot" id="foot"><b>제곡교회</b></footer>
 <script id="data" type="application/json">@@DATA@@</script><script id="roles" type="application/json">@@ROLES@@</script>
 <script>
 const ALL=JSON.parse(document.getElementById('data').textContent);
+// 교회 = 주소에서(worship-desk.vercel.app/<교회>/, 2026-10-07). report-site 의 /jegok_worship/ 는 제곡교회
+const CH=new URLSearchParams(location.search).get('c')||(s=>/^[a-z0-9-]{2,30}$/.test(s)?s:'jegok')(location.pathname.split('/')[1]);
+let CNAME=CH==='jegok'?'제곡교회':'';
+const INFO=fetch('/api/wadmin?info='+CH).then(r=>r.json()).catch(()=>({}));
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const Q=new URLSearchParams(location.search), NOW=Q.get('now')?new Date(Q.get('now')+':00Z'):new Date(Date.now()+9*3600e3);   // ?now=2026-10-07T19:45 미리 보기용(한국 시간)
 const TODAY=Q.get('today')||NOW.toISOString().slice(0,10);   // ?today= 은 옛 미리 보기용
@@ -383,7 +390,7 @@ function heroSvc(r){const v=r.v,h=document.getElementById('hero'),w=dayWord(r.da
   const tag=r.state==='live'?'<span class="tag live">● 지금 예배 중</span>':r.state==='done'?'<span class="tag done">마쳤습니다 · '+md(r.date)+'</span>':'<span class="tag">준비 중 · '+md(r.date)+'</span>';
   const msg=r.state==='live'?'지금 '+v.name+'를 드리고 있습니다.':r.state==='done'?w+' '+v.name+'를 마쳤습니다. 함께해 주셔서 고맙습니다.':w+' '+hm(v.s)+', '+v.name+'를 준비하고 있습니다.';
   h.innerHTML='<div class="row">'+tag+'<span class="who">'+v.s+' ~ '+v.e+'</span></div>'
-    +'<div class="slide"><div class="ch">제 곡 교 회</div><div class="nm">'+v.name+'</div>'
+    +'<div class="slide"><div class="ch">'+esc(CNAME.split('').join(' '))+'</div><div class="nm">'+v.name+'</div>'
     +(v.en?'<div class="en">'+v.en+'</div><div class="ru">'+v.ru+'</div>':'')+'<div class="ln"></div><div class="tm">'+md(r.date)+' · '+hm(v.s)+(v.place?' · '+esc(v.place):'')+'</div></div>'
     +'<p class="svmsg">'+msg+(roleOf(v.k,r.date)?'<span class="roles">'+esc(roleOf(v.k,r.date))+'</span>':'')+'</p>'+svcBtns(v.k,r.date);}
 // 새벽·수요·금요도 [예배준비][악보][PPT] (2026-10-07 교장님). 그 예배 자료가 올라와 있으면 열리고, 아직이면 흐리게 막아 둔다.
@@ -402,17 +409,19 @@ function svcTabs(){const n=document.getElementById('svc');
 function show(){if(SEL==='sun'){hero();return;} const r=SEL===CUR.k?CUR:nextOf(SEL,NOW); if(r) heroSvc(r);}
 svcTabs(); show(); route();
 // 관리자 화면에서 예배를 만들거나 고치면 다시 올리지 않아도 바로 — 열 때 예배 구분을 다시 받는다
-fetch('/api/wadmin?info=jegok').then(r=>r.json()).then(j=>{if(!j.services||!j.services.length)return;const nw=svcList(j.services);
-  if(JSON.stringify(nw)===JSON.stringify(SVC))return;SVC=nw;const c=svcAt(NOW);if(c){Object.assign(CUR,c);}if(!SVC.some(v=>v.k===SEL))SEL=CUR.k;svcTabs();show();}).catch(()=>{});
+INFO.then(j=>{const nm=(j.settings||{}).name;if(nm&&nm!==CNAME){CNAME=nm;document.title=nm+' 예배 플랫폼';document.getElementById('cname').textContent=nm+' 예배 플랫폼';
+    document.getElementById('ck').textContent='WORSHIP DESK · '+nm;}
+  if(!j.services||!j.services.length){if(nm)show();return;}const nw=svcList(j.services);
+  if(JSON.stringify(nw)===JSON.stringify(SVC)){show();return;}SVC=nw;const c=svcAt(NOW);if(c){Object.assign(CUR,c);}if(!SVC.some(v=>v.k===SEL))SEL=CUR.k;svcTabs();show();}).catch(()=>{});
 // 하단 교회 정보 (2026-10-07 교장님) — 관리자 화면에서 고친 값(api/wadmin ?info=). 비운 칸은 안 보인다. 맨 끝 작은 「관리자」
 (async function(){const f=document.getElementById('foot');let s={};
-  try{s=(await (await fetch('/api/wadmin?info=jegok')).json()).settings||{};}catch(e){}
+  try{s=(await INFO).settings||{};}catch(e){}
   const tel=t=>t?'<a href="tel:'+esc(t.replace(/[^0-9+]/g,''))+'">'+esc(t)+'</a>':'';
-  const L=[[s.denom,s.name].filter(Boolean).join(' ')||'제곡교회'];
+  const L=[[s.denom,s.name].filter(Boolean).join(' ')||CNAME||'우리 교회'];
   const l2=[s.pastor?'담임목사 '+esc(s.pastor):'', s.address?esc((s.zip?s.zip+' ':'')+s.address):''].filter(Boolean);
   const l3=[s.phone?'전화 '+tel(s.phone):'', s.phone2?'상담 '+tel(s.phone2):'', s.email?esc(s.email):''].filter(Boolean);
   f.innerHTML='<b>'+esc(L[0])+'</b>'+(l2.length?'<div>'+l2.join('<span class="sep">·</span>')+'</div>':'')+(l3.length?'<div>'+l3.join('<span class="sep">·</span>')+'</div>':'')
-    +(s.times?'<div>'+esc(s.times)+'</div>':'')+'<div>© '+esc(s.name||'제곡교회')+' 예배팀 <span class="sep">·</span><a class="adm" href="admin.html">관리자</a></div>';})();
+    +(s.times?'<div>'+esc(s.times)+'</div>':'')+'<div>© '+esc(s.name||CNAME||'우리 교회')+' 예배팀 <span class="sep">·</span><a class="adm" href="admin.html">관리자</a></div>';})();
 </script></body></html>"""
 
 
