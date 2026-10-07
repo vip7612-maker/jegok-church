@@ -128,6 +128,11 @@ def index_page() -> None:
         except Exception:  # noqa: BLE001
             pass
     (SITE / INDEX / "song_leaders.json").write_text(json.dumps({"leaders": roles.get("leaders", []), "songs": song_leaders(items)}, ensure_ascii=False))
+    try:                                   # 곡 빠르기 표 — 새 곡만 Claude 가 매긴다(추천 [빠른곡·중간곡·느린곡·주제곡] 나누기, 2026-10-07)
+        import song_tempo
+        print(song_tempo.update())
+    except Exception as e:  # noqa: BLE001
+        print("곡 빠르기 표:", e)
 
 
 def song_key(title: str) -> str:

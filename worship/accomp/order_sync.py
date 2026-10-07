@@ -23,7 +23,7 @@ CHURCH = "jegok"
 # ── 순서 이름 ─────────────────────────────────────────────────────────────
 _ALIAS = {"성경암송": "성경암송", "암송": "성경암송", "찬양과경배": "찬양과경배", "경배와찬양": "찬양과경배", "사도신경": "사도신경",
           "대표기도": "대표기도", "기도": "대표기도", "교회소식": "교회소식", "광고": "교회소식", "봉헌": "봉헌",
-          "성경봉독": "성경봉독", "봉독": "성경봉독", "특송": "특송", "특별찬양": "특송", "설교": "설교",
+          "성경봉독": "성경봉독", "봉독": "성경봉독", "특송": "특송", "특별찬양": "특송", "설교": "설교", "말씀": "설교",
           "찬양과결단": "찬양과결단", "결단찬양": "찬양과결단", "축도": "축도"}
 _SHOW = {"찬양과경배": "찬양과 경배", "찬양과결단": "찬양과 결단"}
 # 맡은 분 칸 — 예배준비 화면(prep.html ROLE)과 같아야 한다
@@ -270,6 +270,12 @@ def build(row: dict, dry: bool = False) -> list[str]:
     date, rev = row["date"], int(row["rev"] or 0)
     if dry: return [f"{date} 순서 rev {rev} > {row['built_rev']} — PPT 다시 만들 차례"]
     out = []
+    try:                                              # 순서를 확정하면 본문·제목으로 말씀에 맞는 곡과 예배 방향 글(새벽·수요·금요·주일 모두)
+        import reco_gen
+        cur = load(date)
+        out.append(reco_gen.ensure_for(date, json.loads(cur["items"]) if cur and cur.get("items") else []))
+    except Exception as e:
+        out.append(f"{date} 추천 실패: {e}")
     if dt.date.fromisoformat(date).weekday() == 6:     # PPT 는 주일만
         r = subprocess.run([PY, str(HERE / "build.py"), date, "--share"], capture_output=True, text=True, timeout=1800)
         out.append(f"{date} build {'ok' if r.returncode == 0 else '실패: ' + (r.stderr or r.stdout)[-300:]}")

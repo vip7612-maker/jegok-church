@@ -14,7 +14,7 @@ async function call(method, { query = {}, body = null, ip = '10.9.9.' + Math.flo
   const sc = out.headers['set-cookie']; if (sc) cookie = sc.split(';')[0].endsWith('=') ? '' : sc.split(';')[0];
   return out;
 }
-const clean = () => api.batch([['DELETE FROM wor_order WHERE church=?', [C]], ['DELETE FROM wor_tpl WHERE church=?', [C]], ['DELETE FROM wor_users WHERE church=?', [C]], ['DELETE FROM wor_settings WHERE church=?', [C]], ['DELETE FROM wor_assign WHERE church=?', [C]]]);
+const clean = () => api.batch([['DELETE FROM wor_order WHERE church=?', [C]], ['DELETE FROM wor_tpl WHERE church=?', [C]], ['DELETE FROM wor_reco WHERE church=?', [C]], ['DELETE FROM wor_users WHERE church=?', [C]], ['DELETE FROM wor_settings WHERE church=?', [C]], ['DELETE FROM wor_assign WHERE church=?', [C]]]);
 let n = 0; let r0; const ok = (c, m) => { assert.ok(c, m); n++; };
 try {
   await call('GET', { query: { info: 'jegok' } });      // 표 만들기
@@ -129,6 +129,17 @@ try {
   ok(r.code === 200, '템플릿 저장');
   r = await call('GET', { query: { tpl: C } });
   ok(r.code === 200 && r.body.list.length === 1 && r.body.list[0].name === '금요예배' && r.body.list[0].items[1].who === '정영선 목사' && !r.body.list[0].items[1].title && !r.body.list[0].items[1].ref, '템플릿 목록(제목·본문은 빼고)');
+  // 칸 기록(최근 순서)·말씀에 맞는 곡
+  await call('POST', { body: { action: 'order', church: C, date: '2026-10-09', items: [{ t: '설교', who: '정영선 목사', title: '제목' }] } });
+  r = await call('GET', { query: { recent: C } });
+  ok(r.code === 200 && r.body.rows.some(x => x.items.some(i => i.who === '정영선 목사')), '최근 순서에서 맡은 분 기록');
+  r = await call('GET', { query: { reco: C, date: '2026-10-09' } });
+  ok(r.code === 200 && r.body.reco === null, '추천 없으면 null');
+  await api.batch([['INSERT INTO wor_reco(church,date,src,data,updated) VALUES(?,?,?,?,?)', [C, '2026-10-09', '요3:16|', JSON.stringify({ guide: '한 줄', ccm: [{ title: '곡', tempo: '느린곡' }] }), 'now']]]);
+  r = await call('GET', { query: { reco: C, date: '2026-10-09' } });
+  ok(r.body.reco.guide === '한 줄' && r.body.reco.ccm[0].tempo === '느린곡', '추천·예배 방향 읽기');
+  const sc2 = cookie; cookie = '';
+  r = await call('GET', { query: { reco: C, date: '2026-10-09' } }); ok(r.code === 401, '로그인 없으면 추천 못 봄'); cookie = sc2;
   r = await call('POST', { body: { action: 'tpl_save', church: 'jegok', name: '남의교회', items: [{ t: '찬양' }] } });
   ok(r.code === 400, '다른 교회 템플릿은 저장 못 함');
   r = await call('POST', { body: { action: 'tpl_save', church: C, name: '', items: [{ t: '찬양' }] } });
