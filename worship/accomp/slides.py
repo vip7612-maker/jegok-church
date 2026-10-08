@@ -435,12 +435,15 @@ BGM_CATS = {
                        "묵상 CCM 찬양 연속듣기", "경건한 찬송가 피아노 연주"],
     "기도용 CCM(열정)": ["기도할 때 듣는 CCM 찬양 연속듣기", "뜨거운 기도 찬양 연속듣기", "기도회 CCM 찬양 플레이리스트", "부흥 찬양 기도 모음",
                        "성령 CCM 찬양 기도회", "성령 찬양 기도회 연속듣기"],
+    # 기도회 때 깔아 두는 반주(노래 없는 연주·패드) — 이 칸만 「반주·MR」 제목도 받는다 (2026-10-08 국장님)
+    "기도회 반주": ["기도회 반주 음악", "통성기도 반주 음악", "기도회 배경음악 피아노 패드", "중보기도 반주 연속",
+                 "기도 반주 키보드 패드", "기도회 BGM 반주"],
     "경쾌한 CCM": BGM_Q,
     "JAZZ CCM": ["재즈 찬양 피아노", "CCM 재즈 플레이리스트", "재즈 찬송가 연주", "jazz worship piano playlist"],
 }
 
 
-def _yt(q: str) -> list[dict]:
+def _yt(q: str, accomp: bool = False) -> list[dict]:
     import subprocess
     try:
         r = subprocess.run(["yt-dlp", "--no-warnings", "--skip-download", "--print",
@@ -452,7 +455,7 @@ def _yt(q: str) -> list[dict]:
     for ln in r.stdout.splitlines():
         p = ln.split("\t")
         if len(p) < 5 or p[3] != "True" or not p[2].isdigit() or int(p[2]) < 180: continue
-        if re.search(r"(?i)shorts|MR|반주|inst", p[1]): continue
+        if re.search(r"(?i)shorts", p[1]) or (not accomp and re.search(r"(?i)MR|반주|inst", p[1])): continue
         out.append({"id": p[0], "title": p[1], "sec": int(p[2]), "ch": p[4]})
     return out
 
@@ -479,7 +482,7 @@ def bgm(date: str, n: int = 5) -> dict[str, list[dict]]:
         two = (qs[wk % len(qs)], qs[(wk + 3) % len(qs)])
         if name.startswith("기도용"):                       # 짝수 칸 = CCM, 홀수 칸 = 피아노·기도회 → 한 주에 둘 다
             k = (wk % (len(qs) // 2)) * 2; two = (qs[k], qs[k + 1])
-        for q in two: got += _yt(q)
+        for q in two: got += _yt(q, accomp=name == "기도회 반주")
         cats[name] = _pick(got, n)
     if any(cats.values()):
         f.parent.mkdir(parents=True, exist_ok=True); f.write_text(json.dumps(cats, ensure_ascii=False, indent=1))
