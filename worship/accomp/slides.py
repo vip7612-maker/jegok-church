@@ -350,10 +350,12 @@ addEventListener('keydown',e=>{ if(!document.body.classList.contains('pv')) retu
   else if(e.key==='Home')go(0); else if(e.key==='End')go(all.length-1); else if(e.key==='Escape')endPV(); });
 
 // ── BGM·유튜브는 늘 따로 새 창(jegok_worship/bgm.html) — 슬라이드를 넘겨도 끊기지 않는다 (2026-10-04 교장님) ──
+// BGM 창 주소: report-site 에서는 /jegok_worship/bgm.html, worship-desk 에서는 /<교회>/bgm.html — 예전 주소만 써서 worship-desk 에서 404 (2026-10-08)
+window.wsBgmUrl=()=>/(^|\.)report-site|^localhost|^127\./.test(location.hostname)?'/jegok_worship/bgm.html':'/'+(location.pathname.split('/')[1]||'jegok')+'/bgm.html';
 window.wsBgm={ w:null, id:null,
   open(id){ if(!id) return null; if(this.w&&!this.w.closed&&this.id===id){ try{this.w.focus();}catch(e){} return this.w; }
     const o=window.WS_OTHER, f=o?('popup,left='+o.availLeft+',top='+o.availTop+',width='+o.availWidth+',height='+o.availHeight):'popup,width=1280,height=720';
-    const u='/jegok_worship/bgm.html?v='+encodeURIComponent(id);
+    const u=wsBgmUrl()+'?v='+encodeURIComponent(id);
     if(this.w&&!this.w.closed){ try{ this.w.location.href=u; this.id=id; this.w.focus(); wsBgmBtn(); return this.w; }catch(e){} }
     this.w=window.open(u,'wsbgm',f); this.id=this.w?id:null;
     if(!this.w) alert('BGM 창이 막혔습니다. 주소창 오른쪽에서 팝업을 「허용」한 뒤 다시 눌러 주세요.');
@@ -494,7 +496,7 @@ def bgm_html(cats, first: str = "") -> str:
 // 🎵 BGM 단추·목차 → 슬라이드 화면과 따로, 두 번째 모니터에 BGM 전용 창(목록 + 재생)을 연다 (2026-10-04 교장님)
 function bgmOpen(){ const items=[...document.querySelectorAll('#bgmbox .bgml.on .bgmc')].map(c=>({id:c.dataset.id,title:c.querySelector('span').textContent,ch:(c.querySelector('small').textContent.split(' · ')[0]||'')}));
   const o=window.WS_OTHER, f=o?('popup,left='+o.availLeft+',top='+o.availTop+',width='+o.availWidth+',height='+o.availHeight):'popup,width=1280,height=720';
-  const w=window.open('/jegok_worship/bgm.html#'+encodeURIComponent(JSON.stringify(items)),'wsbgm',f);
+  const w=window.open(wsBgmUrl()+'#'+encodeURIComponent(JSON.stringify(items)),'wsbgm',f);
   if(w){ wsBgm.w=w; wsBgm.id='list'; try{w.focus();}catch(e){} wsBgmBtn(); return; }
   bgmMode(); document.body.classList.add('bgm'); document.querySelectorAll('#toc a').forEach(a=>a.classList.toggle('on',a.classList.contains('bgm'))); }   // 팝업이 막혔을 때만 예전처럼 화면 안에
 function bgmScreen(){ return typeof scr!=='undefined' && scr && !scr.closed && typeof bc!=='undefined' && bc; }
