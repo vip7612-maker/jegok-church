@@ -541,7 +541,7 @@ body.bgm #bgmbox{display:block}body.pv #bgmbox{z-index:60;left:0}body.pr #bgmbox
 .bgmc{display:flex;flex-direction:column;gap:6px;text-align:left;border:2px solid transparent;border-radius:10px;background:#1e293b;color:#e2e8f0;padding:6px;cursor:pointer;font:600 13.5px inherit}
 .bgmc:hover{border-color:#475569}.bgmc.on{border-color:#f6c76b}.bgmc img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px}
 .bgmc span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.bgmc small{color:#94a3b8;font-weight:400}
-.bgmnote{color:#94a3b8;font-size:12.5px}#toc a.bgm{margin-top:8px;border-top:1px solid #1e293b;color:#f6c76b}
+.bgmnote{color:#94a3b8;font-size:12.5px}#toc a.bgm{margin-top:8px;border-top:1px solid #1e293b;color:#f6c76b}#toc a.xmadd{margin-top:8px;border-top:1px solid #1e293b;color:#93c5fd}#toc a.xmenu{color:#e2e8f0}
 @media (max-width:760px){#bgmbox{left:0}}
 """
 
@@ -664,8 +664,52 @@ window.xpPaint=(s,inn)=>{
   if(s.html){ const f=document.createElement('iframe'); f.srcdoc=s.html;   // 스크립트는 맥미니가 빼고 저장(sandbox 를 걸면 글자가 안 그려졌다)
     f.style.cssText='position:absolute;left:0;top:0;width:1920px;height:1080px;border:0;transform:scale(.75);transform-origin:0 0;pointer-events:none;background:transparent'; inn.appendChild(f); }
 };
+// ── ＋ 메뉴 추가 (2026-10-08 교장님): 왼쪽 목차 BGM 위 ＋ → 제목을 넣으면 그 제목의 표지 한 장과 목차 줄이 생기고, 그 안에 ＋ 장 넣기
+//   ppt_pages 에 type 'menu'(sect 'menu', data {title, after}) 로 저장, 그 안의 장은 sect 'm:<메뉴 id>'. 프레젠테이션 창도 같이 바뀐다.
+const mainA=()=>TOC().filter(a=>!a.classList.contains('song')&&!a.classList.contains('xmenu'));
+function coverD(title){ const L=mainA(), base=L.slice(1).concat(L.slice(0,1)).map(a=>D[+document.getElementById(a.getAttribute('href').slice(1)).dataset.i]).find(d=>d&&d.img&&!d.html&&(d.texts||[]).some(t=>t.s>=100));
+  if(!base) return {img:bg(), texts:[{x:120,y:330,w:1200,h:0,s:110,c:'#ffffff',b:true,t:title,a:'c',wrap:true,lh:1.2}]};
+  const big=base.texts.filter(t=>t.s>=100).sort((p,q)=>q.s-p.s)[0], cx=big.x+big.w/2, w=Math.min(1400,big.w*Math.max(1,title.length/Math.max(1,big.t.length)));
+  return {img:base.img, cover:true, texts:[Object.assign({},big,{t:title,w:Math.round(w),x:Math.round(cx-w/2)})]}; }
+function applyMenus(menus){
+  document.querySelectorAll('#toc a.xmenu').forEach(a=>a.remove());
+  sects(); if(!_S) _S=Object.keys(SECT); _S=_S.filter(k=>!/^m:/.test(k));
+  for(const m of menus.slice().sort((p,q)=>p.id-q.id)){ const t=(m.data&&m.data.title||'').trim(); if(!t) continue;
+    const k='m:'+m.id; SECT[k]=new RegExp('^'+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$'); NAME[k]=t; _S.push(k);
+    const L=mainA(), af=m.data.after?L.findIndex(a=>a.textContent.trim()===m.data.after):-1;
+    let nextA=af>=0?L[af+1]:L.find(a=>/^마침$/.test(a.textContent.trim().replace(/\s/g,'')));   // 기본: 마침 앞
+    let at=nextA?all.indexOf(document.getElementById(nextA.getAttribute('href').slice(1))):-1; if(at<0) at=all.length;
+    const di=D.length; D.push(coverD(t));
+    const sec=document.createElement('section'); sec.className='sl xp'; sec.id='sxm'+m.id; sec.dataset.i=di; sec.dataset.xp=m.id; sec.dataset.sect=k;
+    sec.innerHTML='<div class="in"></div><span class="no">+</span>';
+    deck.insertBefore(sec, all[at]||document.getElementById('vbar')); all.splice(at,0,sec); io.observe(sec);
+    const a=document.createElement('a'); a.href='#sxm'+m.id; a.className='xmenu'; a.textContent=t;
+    a.onclick=ev=>{ ev.preventDefault(); a.blur(); if(window.bgmClose) bgmClose(); const el=document.getElementById('sxm'+m.id);
+      if(document.body.classList.contains('pv')){ peek(all.indexOf(el),a); return; } if(document.body.classList.contains('grid')){ gridSec(a); return; }
+      if(ONE()){ view(all.indexOf(el)); return; } el.scrollIntoView({behavior:'instant',block:'start'}); };
+    const toc=document.getElementById('toc'); if(!toc) continue; const ref=nextA||toc.querySelector('a.xmadd')||toc.querySelector('a.bgm');
+    if(ref&&ref.parentNode) ref.parentNode.insertBefore(a,ref); else toc.appendChild(a); }
+}
+function menuForm(pg){ const d=(pg&&pg.data)||{}, L=mainA();
+  if(!box.isConnected) document.body.appendChild(box); box.classList.add('on');
+  P().innerHTML='<h3>'+(pg?'✏️ 메뉴 고치기':'＋ 메뉴 추가')+'</h3><label>메뉴 제목</label><input class="t" maxlength="30" placeholder="예) 선교 보고 · 간증 · 광고" value="'+esc(d.title)+'">'
+    +'<label>어디에 넣을까요</label><select class="w" style="width:100%;font:16px inherit;padding:8px;border:1px solid #cbd5e1;border-radius:8px"><option value="">맨 끝 (마침 앞)</option>'
+    +L.filter(a=>!/^마침$/.test(a.textContent.trim().replace(/\s/g,''))).map(a=>{ const v=a.textContent.trim(); return '<option value="'+esc(v)+'"'+(v===d.after?' selected':'')+'>「'+esc(v)+'」 뒤</option>'; }).join('')+'</select>'
+    +'<div class="hint">넣으면 이 제목의 표지 한 장이 생기고 왼쪽 목차에 메뉴가 붙습니다. 메뉴를 누른 뒤 모아 보기의 「＋ 장 넣기」로 글·AI 디자인·유튜브 장을 더할 수 있습니다.</div>'+foot(pg?'고치기':'넣기');
+  const T=P().querySelector('.t'); setTimeout(()=>T.focus(),50); T.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); P().querySelector('.ok').click(); } });
+  wire(async()=>{ const t=T.value.trim(); if(!t) throw new Error('메뉴 제목을 넣어 주세요');
+    if(mainA().some(a=>a.textContent.trim()===t&&!(pg&&a.getAttribute('href')==='#sxm'+pg.id))) throw new Error('같은 이름의 메뉴가 이미 있습니다');
+    const j=await save({action:'page',id:pg&&pg.id,sect:'menu',type:'menu',data:{title:t,after:P().querySelector('.w').value}});
+    if(!pg){ const a=[...document.querySelectorAll('#toc a.xmenu')].find(x=>x.textContent.trim()===t); if(a) setTimeout(()=>a.click(),50); } return j; }); }
+window.xpMenuAdd=()=>menuForm(null);
+// 목차에 「＋ 메뉴 추가」 — BGM 바로 위(발표자·편집 화면에서만, 프레젠테이션 창 X)
+setTimeout(()=>{ const toc=document.getElementById('toc'); if(!toc||SCREEN||!NDATE||toc.querySelector('a.xmadd')) return;
+  const a=document.createElement('a'); a.href='#'; a.className='xmadd'; a.textContent='＋ 메뉴 추가'; a.title='이 예배 PPT 에 순서(메뉴)를 더합니다';
+  a.onclick=ev=>{ ev.preventDefault(); a.blur(); menuForm(null); };
+  const b=toc.querySelector('a.bgm'); if(b) toc.insertBefore(a,b); else toc.appendChild(a); },0);
 function applyPages(list){ const curEl=all[cur];
   all.filter(x=>x.classList.contains('xp')).forEach(x=>{ io.unobserve(x); x.remove(); all.splice(all.indexOf(x),1); });
+  applyMenus(list.filter(p=>p.type==='menu'));
   for(const sect of sects()){ const s0=startOf(sect); if(s0<0) continue; let at=songRange(s0)[1];
     list.filter(p=>p.sect===sect).forEach(p=>[].concat(pageD(p)).forEach(dd=>{ const di=D.length; D.push(dd);   // 성경 봉독 한 건 = 여러 장
       const sec=document.createElement('section'); sec.className='sl xp'; sec.dataset.i=di; sec.dataset.xp=p.id; sec.dataset.sect=sect;
@@ -687,8 +731,9 @@ async function save(body){ const r=await fetch('/api/worship',{method:'POST',hea
   const j=await r.json().catch(()=>({})); if(!j.ok) throw new Error(j.error||'저장 실패'); await loadPages(); if(bc) bc.postMessage({pages:1}); return j; }
 // ── 미리 보기 칸: 교회 소식·설교 구간이면 ＋, 끼운 장에는 ✏️ 🗑
 function xpBar(sect,sl){ const id=+sl.dataset.xp, pg=(window.XP||[]).find(p=>p.id===id); const bar=document.createElement('div'); bar.className='xpb';
-  const ed=document.createElement('button'); ed.textContent='✏️'; ed.title='고치기'; ed.onclick=ev=>{ ev.stopPropagation(); open(sect,pg); };
-  const del=document.createElement('button'); del.textContent='🗑'; del.title='빼기'; del.onclick=async ev=>{ ev.stopPropagation(); if(confirm('이 장을 뺄까요?')){ try{ await save({action:'pagedel',id}); }catch(err){ alert(err.message); } } };
+  const isMenu=pg&&pg.type==='menu';
+  const ed=document.createElement('button'); ed.textContent='✏️'; ed.title=isMenu?'메뉴 이름·자리 고치기':'고치기'; ed.onclick=ev=>{ ev.stopPropagation(); isMenu?menuForm(pg):open(sect,pg); };
+  const del=document.createElement('button'); del.textContent='🗑'; del.title='빼기'; del.onclick=async ev=>{ ev.stopPropagation(); if(confirm(isMenu?'「'+pg.data.title+'」 메뉴와 그 안의 장을 모두 뺄까요?':'이 장을 뺄까요?')){ try{ await save({action:'pagedel',id}); if(isMenu&&document.body.classList.contains('grid')){ const f=TOC()[0]; if(f) gridSec(f); } }catch(err){ alert(err.message); } } };
   bar.append(ed,del); return bar; }
 window.xpThumbs=(box,s,e)=>{
   const sect=sects().find(x=>startOf(x)===s); if(!sect||SCREEN) return;
