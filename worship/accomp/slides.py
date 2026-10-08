@@ -503,7 +503,9 @@ def bgm_html(cats, first: str = "") -> str:
             '<div class="bgmtabs">' + tabs + '</div><div id="bgmmode"></div><div id="bgmplay"></div>' + lists + '<p class="bgmnote">누르면 BGM 전용 새 창(두 번째 모니터)에서 나옵니다 · 슬라이드를 넘기거나 다른 순서로 가도 음악은 계속 · 끝낼 때 ■ BGM 멈춤</p></div>'
             """<script>
 // 🎵 BGM 단추·목차 → 슬라이드 화면과 따로, 두 번째 모니터에 BGM 전용 창(목록 + 재생)을 연다 (2026-10-04 교장님)
-function bgmOpen(){ const items=[...document.querySelectorAll('#bgmbox .bgml.on .bgmc')].map(c=>({id:c.dataset.id,title:c.querySelector('span').textContent,ch:(c.querySelector('small').textContent.split(' · ')[0]||'')}));
+function bgmOpen(){ const pick=l=>[...l.querySelectorAll('.bgmc')].map(c=>({id:c.dataset.id,title:c.querySelector('span').textContent,ch:(c.querySelector('small').textContent.split(' · ')[0]||'')}));
+  const cats={}; document.querySelectorAll('#bgmbox .bgml').forEach(l=>cats[l.dataset.cat]=pick(l));   // 탭(기도용·기도회 반주·경쾌한…) 전부 BGM 창으로 (2026-10-08 국장님: 탭을 찾을 수 없어)
+  const on=document.querySelector('#bgmbox .bgml.on'); const items={cats, first:on?on.dataset.cat:Object.keys(cats)[0]};
   const o=window.WS_OTHER, f=o?('popup,left='+o.availLeft+',top='+o.availTop+',width='+o.availWidth+',height='+o.availHeight):'popup,width=1280,height=720';
   const w=window.open(wsBgmUrl()+'#'+encodeURIComponent(JSON.stringify(items)),'wsbgm',f);
   if(w){ wsBgm.w=w; wsBgm.id='list'; try{w.focus();}catch(e){} wsBgmBtn(); return; }
