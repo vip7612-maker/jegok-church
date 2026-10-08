@@ -944,7 +944,8 @@ def add_song_frames(slides: list[dict], date: str, out: Path | None) -> list[dic
         return slides
     lab = lambda g, i: {"intro": "도입곡", "apply": "적용송"}.get(g) or str(i + 1)
     groups = {g: [(lab(g, i), x) for i, x in enumerate(d.get(g, []))] for g in ("intro", "main", "apply")}
-    is_sec = lambda s: any(x in _flat40(s) for x in SECTIONS)   # 다음 장이 곧바로 다른 순서 표지 = 가사 장 없음
+    # 다음 장이 곧바로 다른 순서 표지 = 가사 장 없음. 예배순서에서 온 표지(합심기도·간증 등 _sec·cover)도 순서 표지(2026-10-08)
+    is_sec = lambda s: any(x in _flat40(s) for x in SECTIONS) or bool(s.get("_sec")) or bool(s.get("cover"))
     divs = [k for k, s in enumerate(slides) if cover_kind(s)]
     empty = [k for k in divs if k + 1 >= len(slides) or is_sec(slides[k + 1])]
     if not any(groups.values()) or not divs or len(empty) < len(divs) or out is None:   # 가사 장이 이미 들어 있는 PPT

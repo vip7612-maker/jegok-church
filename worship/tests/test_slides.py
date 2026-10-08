@@ -105,5 +105,25 @@ class WeekdayTocTests(unittest.TestCase):
         self.assertEqual(names, ["새벽예배", "설교", "통성기도", "마침"])
 
 
+class FridaySongsTests(unittest.TestCase):
+    """금요예배: 찬양과 결단 바로 뒤가 합심기도(예배순서에서 온 표지)여도 곡 장을 넣는다 (2026-10-08)."""
+    def test_frames_before_generic_cover(self):
+        import json, tempfile
+        from pathlib import Path
+        t = Path(tempfile.mkdtemp()); (t / "data").mkdir(); out = t / "out"; out.mkdir()
+        (t / "data" / "2026-10-09.json").write_text(json.dumps({"songs": {"intro": [], "main": [{"title": "가"}, {"title": "나"}], "apply": [{"title": "다"}]}}, ensure_ascii=False))
+        old_here, old_ss = S.HERE, S.song_slides
+        try:
+            S.HERE = t; S.song_slides = lambda *a, **k: []
+            pr = dict(sl(4, "합심기도"), _sec={"t": "합심기도"})
+            deck = [sl(1, "금요예배"), sl(2, "찬양과경배 Praise & Worship"), sl(3, "Sermon 설교"), sl(4, "찬양과 결단 Praise & Worship"), pr, sl(6, "주기도문")]
+            for x in deck: x.update(w=1440, h=810)
+            got = S.add_song_frames(deck, "2026-10-09", out)
+        finally:
+            S.HERE, S.song_slides = old_here, old_ss
+        self.assertEqual([x.get("start") for x in got if x.get("start")], ["가", "나", "다"])
+        self.assertEqual(got[got.index(next(x for x in got if x.get("start") == "다")) - 1]["plain"], "찬양과 결단 Praise & Worship")   # 결단 표지 바로 뒤
+
+
 if __name__ == "__main__":
     unittest.main()

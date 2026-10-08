@@ -175,6 +175,40 @@ def svc_cover(svc: str, sd: Path) -> str:
     return f"{name}.jpg"
 
 
+def prayer_pages(lines: list[str], top: int = 60, bottom: int = 760) -> list[list[dict]]:
+    """합심기도 장 — 기도제목 하나에 한 장(따라 기도하기 쉽게, 2026-10-08 교장님: 가독성 있게 여러 장).
+    머리(「1. …」)는 크게 금빛, 그 아래 목록은 크게 흰색. 한 장을 넘으면 「(이어서)」로 다음 장."""
+    groups, cur = [], None
+    for ln in lines:
+        ln = re.sub(r"<[^>]+>", "", ln).strip()
+        if not ln: continue
+        if re.match(r"\d+\.", ln) or cur is None:
+            cur = {"head": ln if re.match(r"\d+\.", ln) else "", "items": []}; groups.append(cur)
+            if not re.match(r"\d+\.", ln): cur["items"].append(ln)
+        else:
+            cur["items"].append(ln)
+    HS, HSTEP, BS, BSTEP, GAP = 68, 90, 58, 82, 18   # 예배 화면에서 멀리서도 읽히게(2026-10-08)
+    out = []
+    for g in groups:
+        def start(cont: bool):
+            page, y = [], top
+            if g["head"]:
+                for k, h in enumerate(wrap(g["head"] + (" (이어서)" if cont else ""), HS)):
+                    page.append({"x": 45, "y": y, "w": 1350, "h": HS, "s": HS, "c": "#f6c76b", "b": True, "t": h, "a": "l"}); y += HSTEP
+                y += 20
+            return page, y
+        page, y = start(False)
+        for it in g["items"]:
+            ls = wrap(it, BS)
+            if y + len(ls) * BSTEP > bottom and len(page) > (1 if g["head"] else 0):
+                out.append(page); page, y = start(True)
+            for t in ls:
+                page.append({"x": 45, "y": y, "w": 1350, "h": BS, "s": BS, "c": "#ffffff", "b": False, "t": t, "a": "l"}); y += BSTEP
+            y += GAP
+        out.append(page)
+    return out
+
+
 def add_prayer(slides: list, date: str) -> list:
     """합심기도 표지 뒤에 노션 「공동기도제목」의 가장 최근 금요기도회 기도제목 — 교회 소식 장과 같은 꼴(news_bg)."""
     import order_sync, svc as _svc
@@ -188,7 +222,7 @@ def add_prayer(slides: list, date: str) -> list:
     if not lines: return slides
     s0 = slides[k]
     add = [{"n": 0, "w": s0["w"], "h": s0["h"], "img": "news_bg", "texts": txt, "plain": "", "hidden": ""}
-           for txt in pages(news_blocks(lines), 53, 63, 64, top=54)]
+           for txt in prayer_pages(lines)]
     print(f"합심기도 기도제목 {when} · {len(add)}장")
     return slides[:k + 1] + add + slides[k + 1:]
 

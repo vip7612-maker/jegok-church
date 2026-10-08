@@ -89,7 +89,7 @@ console.log(JSON.stringify(['dawn','wed','fri','sun'].map(k=>{const r=nextOf(k,n
 
     def test_page_has_tabs(self):
         doc = publish.landing_html([])
-        for w in ("새벽예배", "수요예배", "금요예배", "주일예배", 'id="svc"', "svcAt(", "prep.html?d='+up.date", "function svcBtns(", 'id="foot"', "admin.html\">관리자</a>", "/api/wadmin?info=jegok"):
+        for w in ("새벽예배", "수요예배", "금요예배", "주일예배", 'id="svc"', "svcAt(", "prep.html?d='+up.date", "function svcBtns(", 'id="foot"', "admin.html\">관리자</a>", "/api/wadmin?info='+CH"):
             self.assertIn(w, doc)
         self.assertNotIn("@@", doc)
 
