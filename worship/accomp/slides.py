@@ -430,8 +430,11 @@ BGM_Q = ["신나는 CCM 찬양 모음", "기쁨의 찬양 CCM 플레이리스트
          "신나는 찬양 메들리", "드라이브 CCM 찬양 플레이리스트", "업비트 CCM 찬양 모음"]
 # BGM 고르기 단추 — 단추마다 유튜브 5개 (2026-10-07 교장님: 새벽예배든 다른 예배든)
 BGM_CATS = {
-    "기도용 CCM(경건)": ["기도할 때 듣는 찬양 피아노", "잔잔한 묵상 찬양 피아노 연주", "기도 찬양 피아노 플레이리스트", "경건한 찬송가 피아노 연주"],
-    "기도용 CCM(열정)": ["뜨거운 기도 찬양 연속듣기", "기도회 찬양 플레이리스트", "부흥 찬양 기도 모음", "성령 찬양 기도회 연속듣기"],
+    # 기도용은 노래가 있는 CCM 이 늘 섞이게 — 찾는 말 두 개 중 하나는 꼭 「CCM」 (2026-10-08 국장님: 기도할 때 트는 CCM 도 목록에)
+    "기도용 CCM(경건)": ["기도할 때 듣는 CCM 찬양 플레이리스트", "기도할 때 듣는 찬양 피아노", "잔잔한 기도 CCM 찬양 모음", "잔잔한 묵상 찬양 피아노 연주",
+                       "묵상 CCM 찬양 연속듣기", "경건한 찬송가 피아노 연주"],
+    "기도용 CCM(열정)": ["기도할 때 듣는 CCM 찬양 연속듣기", "뜨거운 기도 찬양 연속듣기", "기도회 CCM 찬양 플레이리스트", "부흥 찬양 기도 모음",
+                       "성령 CCM 찬양 기도회", "성령 찬양 기도회 연속듣기"],
     "경쾌한 CCM": BGM_Q,
     "JAZZ CCM": ["재즈 찬양 피아노", "CCM 재즈 플레이리스트", "재즈 찬송가 연주", "jazz worship piano playlist"],
 }
@@ -473,7 +476,10 @@ def bgm(date: str, n: int = 5) -> dict[str, list[dict]]:
     for name, qs in BGM_CATS.items():
         if old.get(name): cats[name] = old[name]; continue
         got = []
-        for q in (qs[wk % len(qs)], qs[(wk + 3) % len(qs)]): got += _yt(q)
+        two = (qs[wk % len(qs)], qs[(wk + 3) % len(qs)])
+        if name.startswith("기도용"):                       # 짝수 칸 = CCM, 홀수 칸 = 피아노·기도회 → 한 주에 둘 다
+            k = (wk % (len(qs) // 2)) * 2; two = (qs[k], qs[k + 1])
+        for q in two: got += _yt(q)
         cats[name] = _pick(got, n)
     if any(cats.values()):
         f.parent.mkdir(parents=True, exist_ok=True); f.write_text(json.dumps(cats, ensure_ascii=False, indent=1))
