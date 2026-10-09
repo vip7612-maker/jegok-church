@@ -119,14 +119,26 @@ def news_blocks(lines: list[str]) -> list[list[tuple[str, bool]]]:
 
 
 # ── 주보에서 읽기 ─────────────────────────────────────────────────────────
+def _prev_hwp(J, date: str):
+    """같은 날 한글 주보 — 지금 자리에 없으면 prev/ 에 밀려난 것 중 가장 새 것 (2026-10-09: PDF 주보로 바꿔 올리면
+    한글 파일이 prev/ 로 밀려나 PPT 교회 소식이 비던 것. PDF 에서는 소식 칸이 읽히지 않는다)."""
+    for x in (".hwp", ".hwpx"):
+        if (J / f"{date}{x}").exists(): return J / f"{date}{x}"
+    old = sorted((J / "prev").glob(f"{date}.hwp*"), key=lambda p: p.stat().st_mtime, reverse=True) if (J / "prev").exists() else []
+    return old[0] if old else None
+
+
 def jubo_info(date: str) -> dict:
     J = HERE / "jubo"
-    h = next((J / f"{date}{x}" for x in (".hwp", ".hwpx") if (J / f"{date}{x}").exists()), None)
+    h = next((J / f"{date}{x}" for x in (".hwp", ".hwpx") if (J / f"{date}{x}").exists()), None) or _prev_hwp(J, date)
     if not h:
         return {}
     import jubo_form
     md, _ = jubo_form.kordoc(h.read_bytes()); d = jubo_form.parse(md)
     info = {"news": d.get("news", [])}
+    if not info["news"] and h.suffix not in (".hwp", ".hwpx"):   # PDF 는 소식 칸을 못 읽는다 — 같은 날 한글 주보에서 소식만
+        hw = _prev_hwp(J, date)
+        if hw: info["news"] = jubo_form.parse(jubo_form.kordoc(hw.read_bytes())[0]).get("news", [])
     for r in d.get("order", []):
         k = re.sub(r"\s", "", r[0]) if r else ""
         who = r[1].strip() if len(r) > 1 else ""; extra = r[3].strip() if len(r) > 3 else ""
